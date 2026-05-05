@@ -1,0 +1,15 @@
+docs/
+target/
+temp.txt
+Thumbs.db
+src-tauri/target/
+target/
+**/target/
+
+# 🖥️ IDE stuff
+.vscode/
+.idea/
+
+# ⚡ Tauri build outputs
+dist/
+build/

@@ -1,0 +1,62 @@
+[package]
+name    = "cypheria"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name         = "cypheria_lib"
+crate-type   = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-dialog = "2"
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+
+# Cryptography — classical
+aes-gcm     = { version = "0.10", features = ["aes"] }
+argon2      = { version = "0.5", features = ["std"] }
+rand        = { version = "0.8", features = ["getrandom"] }
+rand_core   = "0.6"
+getrandom   = { version = "0.2", features = ["js"] }
+
+# Cryptography — post-quantum
+pqcrypto-kyber    = "0.8"
+pqcrypto-traits   = "0.3"
+
+# Memory security
+zeroize     = { version = "1.7", features = ["derive", "alloc"] }
+secrecy     = "0.8"
+subtle      = "2.5"
+
+# Vault storage
+uuid        = { version = "1", features = ["v4"] }
+chrono      = { version = "0.4", features = ["serde"] }
+bincode     = "1"
+sha2        = "0.10"
+hmac        = "0.12"
+
+# Async runtime
+tokio       = { version = "1", features = ["rt", "sync", "time"] }
+
+# Clipboard
+arboard     = "3"
+
+# Error handling
+thiserror   = "1"
+anyhow      = "1"
+
+[profile.release]
+opt-level       = 3
+lto             = true
+codegen-units   = 1
+strip           = true
+panic           = "abort"
+overflow-checks = true
+
+[profile.dev]
+overflow-checks = true

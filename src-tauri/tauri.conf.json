@@ -1,0 +1,31 @@
+{
+  "productName": "Cypheria",
+  "version": "0.1.0",
+  "identifier": "com.cypheria.app",
+  "build": {
+    "beforeDevCommand": "",
+    "devUrl": "../index.html",
+    "beforeBuildCommand": "",
+    "frontendDist": "../"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Cypheria",
+        "width": 1100,
+        "height": 720,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    },
+    "macOSPrivateApi": true
+  },
+  "plugins": {}
+}

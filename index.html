@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cypheria — Quantum-Resistant Offline Password Manager</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg-base:        #09090f;
+  --bg-surface:     #0e0f1e;
+  --bg-panel:       #12132a;
+  --bg-card:        #161829;
+  --bg-card-hover:  #1c1e35;
+  --bg-modal:       #13142b;
+  --accent:         #8b5cf6;
+  --accent-light:   #a78bfa;
+  --accent-dim:     rgba(139,92,246,0.12);
+  --accent-glow:    rgba(139,92,246,0.30);
+  --color-green:    #22c55e;
+  --color-green-dim:rgba(34,197,94,0.15);
+  --color-amber:    #f59e0b;
+  --color-amber-dim:rgba(245,158,11,0.15);
+  --color-red:      #ef4444;
+  --color-red-dim:  rgba(239,68,68,0.15);
+  --color-blue:     #3b82f6;
+  --color-blue-dim: rgba(59,130,246,0.15);
+  --border-subtle:  rgba(255,255,255,0.05);
+  --border-mid:     rgba(255,255,255,0.09);
+  --border-strong:  rgba(255,255,255,0.14);
+  --border-accent:  rgba(139,92,246,0.40);
+  --text-primary:   #e8eaf6;
+  --text-secondary: #8b93c4;
+  --text-muted:     #4a5280;
+  --text-accent:    #a78bfa;
+  --glow-purple-sm: 0 0 12px rgba(139,92,246,0.20);
+  --glow-purple-md: 0 0 20px rgba(139,92,246,0.25), 0 0 40px rgba(139,92,246,0.10);
+  --glow-card:      0 4px 24px rgba(0,0,0,0.45);
+  --radius-xs:6px; --radius-sm:8px; --radius-md:12px; --radius-lg:16px;
+  --sidebar-width:176px; --titlebar-height:48px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;background:var(--bg-base);}
+body{font-family:'DM Sans',sans-serif;color:var(--text-primary);font-size:13px;line-height:1.5;}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-mid);border-radius:2px;}
+
+/* App Shell */
+#app{display:flex;flex-direction:column;height:100vh;min-width:1000px;}
+
+/* Titlebar */
+#titlebar{
+  height:var(--titlebar-height);
+  background:var(--bg-surface);
+  border-bottom:1px solid var(--border-subtle);
+  display:flex;align-items:center;padding:0 16px;gap:12px;
+  flex-shrink:0;-webkit-app-region:drag;
+}
+.title-logo{
+  display:flex;align-items:center;gap:8px;-webkit-app-region:no-drag;
+  text-decoration:none;
+}
+.logo-icon{
+  width:28px;height:28px;border-radius:8px;
+  background:var(--accent-dim);border:1.5px solid var(--accent);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.logo-icon svg{width:14px;height:14px;stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.logo-text{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:var(--text-primary);letter-spacing:0.02em;}
+.title-search{
+  flex:1;max-width:320px;height:32px;
+  background:var(--bg-card);border:1px solid var(--border-mid);
+  border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 10px;
+  -webkit-app-region:no-drag;transition:border-color 0.15s;
+}
+.title-search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,92,246,0.15);}
+.title-search svg{width:14px;height:14px;stroke:var(--text-muted);fill:none;stroke-width:2;flex-shrink:0;stroke-linecap:round;stroke-linejoin:round;}
+.title-search input{
+  background:none;border:none;outline:none;color:var(--text-primary);
+  font-size:13px;font-family:'DM Sans',sans-serif;flex:1;width:100%;
+}
+.title-search input::placeholder{color:var(--text-muted);}
+.kbd-badge{
+  background:var(--bg-panel);border:1px solid var(--border-subtle);
+  border-radius:4px;padding:2px 6px;font-size:11px;color:var(--text-muted);
+  white-space:nowrap;flex-shrink:0;
+}
+.title-spacer{flex:1;}
+.title-actions{display:flex;align-items:center;gap:8px;-webkit-app-region:no-drag;}
+.title-btn{
+  width:28px;height:28px;border-radius:6px;border:none;cursor:pointer;
+  background:none;display:flex;align-items:center;justify-content:center;
+  color:var(--text-muted);transition:all 0.15s;
+}
+.title-btn:hover{background:var(--bg-card);color:var(--text-secondary);}
+.title-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.title-divider{width:1px;height:18px;background:var(--border-subtle);}
+.win-controls{display:flex;align-items:center;gap:6px;margin-left:4px;}
+.win-btn{width:12px;height:12px;border-radius:50%;border:none;cursor:pointer;transition:opacity 0.15s;}
+.win-btn:hover{opacity:0.8;}
+.win-close{background:#ff5f57;}
+.win-min{background:#febc2e;}
+.win-max{background:#28c840;}
+
+/* Main */
+#main{display:flex;flex:1;overflow:hidden;}
+
+/* Sidebar */
+#sidebar{
+  width:var(--sidebar-width);background:var(--bg-surface);
+  border-right:1px solid var(--border-subtle);
+  display:flex;flex-direction:column;padding:12px 8px;flex-shrink:0;
+}
+.nav-item{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 12px;border-radius:var(--radius-sm);
+  margin-bottom:2px;border:1px solid transparent;
+  cursor:pointer;transition:all 0.15s ease;
+  color:var(--text-secondary);font-size:13px;font-weight:500;
+  text-decoration:none;user-select:none;
+}
+.nav-item svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;}
+.nav-item:hover{background:var(--bg-card);color:var(--text-primary);}
+.nav-item.active{
+  background:var(--accent-dim);color:var(--accent-light);
+  border-color:var(--border-accent);box-shadow:var(--glow-purple-sm);
+}
+.nav-spacer{flex:1;}
+.nav-lock{margin-top:auto;}
+
+/* Content */
+#content{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+
+/* Pages */
+.page{display:none;flex:1;overflow:hidden;flex-direction:column;}
+.page.active{display:flex;}
+.page-header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  padding:20px 24px 16px;border-bottom:1px solid var(--border-subtle);flex-shrink:0;
+}
+.page-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--text-primary);}
+.page-subtitle{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.page-body{flex:1;overflow-y:auto;padding:20px 24px;}
+
+/* Btn styles */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 16px;border-radius:var(--radius-sm);
+  font-size:13px;font-weight:600;cursor:pointer;
+  border:none;transition:all 0.15s;font-family:'DM Sans',sans-serif;
+}
+.btn-primary{
+  background:var(--accent);color:#fff;
+  box-shadow:0 4px 16px rgba(139,92,246,0.35);
+}
+.btn-primary:hover{background:var(--accent-light);transform:translateY(-1px);}
+.btn-secondary{
+  background:var(--bg-card);color:var(--text-secondary);
+  border:1px solid var(--border-mid);
+}
+.btn-secondary:hover{border-color:var(--border-accent);color:var(--accent-light);}
+.btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;}
+
+/* Icon btn */
+.icon-btn{
+  width:28px;height:28px;border-radius:6px;
+  background:var(--bg-card);border:1px solid var(--border-subtle);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--text-muted);transition:all 0.15s;
+}
+.icon-btn:hover{border-color:var(--border-accent);color:var(--accent-light);}
+.icon-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+
+/* ─── DASHBOARD ─── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.stat-card{
+  background:var(--bg-card);border:1px solid var(--border-mid);
+  border-radius:var(--radius-md);padding:16px;
+  transition:border-color 0.15s,box-shadow 0.15s;
+}
+.stat-card:hover{border-color:var(--border-accent);box-shadow:var(--glow-purple-md);}
+.stat-icon{
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;margin-bottom:12px;
+}
+.stat-icon svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.stat-value{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;color:var(--text-primary);line-height:1;}
+.stat-label{font-size:11px;color:var(--text-muted);margin-top:4px;}
+.stat-sub{font-size:11px;font-weight:500;margin-top:2px;}
+
+.dash-bottom{display:grid;grid-template-columns:1fr 280px;gap:16px;}
+.panel{background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;}
+.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.panel-title{font-size:14px;font-weight:600;color:var(--text-primary);}
+.panel-link{font-size:12px;color:var(--accent-light);cursor:pointer;text-decoration:none;}
+.panel-link:hover{text-decoration:underline;}
+
+.recent-row{
+  display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid var(--border-subtle);cursor:pointer;
+  transition:background 0.15s;border-radius:6px;margin:0 -8px;padding:8px 8px;
+}
+.recent-row:hover{background:var(--bg-card-hover);}
+.site-avatar{
+  width:28px;height:28px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;flex-shrink:0;
+  background:var(--bg-panel);border:1px solid var(--border-mid);
+}
+.recent-info{flex:1;min-width:0;}
+.recent-name{font-size:13px;font-weight:500;color:var(--text-primary);}
+.recent-user{font-size:11px;color:var(--text-muted);}
+.recent-date{font-size:11px;color:var(--text-muted);}
+
+/* Security ring */
+.security-panel{text-align:center;}
+.ring-wrap{display:flex;justify-content:center;margin:12px 0;}
+.ring-svg{transform:rotate(-90deg);}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.ring-container{position:relative;width:120px;height:120px;}
+.ring-pct{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;}
+.ring-label{font-size:10px;font-weight:600;color:var(--color-green);}
+.sec-msg{font-size:12px;color:var(--text-secondary);margin-bottom:12px;}
+
+/* ─── VAULT ─── */
+.vault-layout{display:flex;flex:1;overflow:hidden;}
+.vault-table-wrap{flex:1;overflow-y:auto;}
+.vault-detail{
+  width:300px;border-left:1px solid var(--border-subtle);
+  background:var(--bg-panel);overflow-y:auto;padding:20px;flex-shrink:0;
+}
+.table-toolbar{
+  display:flex;align-items:center;gap:8px;padding:12px 20px;
+  border-bottom:1px solid var(--border-subtle);flex-shrink:0;
+}
+.sort-select{
+  background:var(--bg-card);border:1px solid var(--border-mid);
+  border-radius:6px;color:var(--text-primary);padding:5px 10px;
+  font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;
+}
+.sort-select:focus{outline:none;border-color:var(--accent);}
+.tb-spacer{flex:1;}
+
+table{width:100%;border-collapse:collapse;}
+thead th{
+  font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;
+  color:var(--text-muted);padding:10px 20px;border-bottom:1px solid var(--border-subtle);
+  text-align:left;
+}
+thead th:last-child{width:40px;text-align:center;}
+tbody tr{
+  cursor:pointer;border-bottom:1px solid var(--border-subtle);
+  transition:background 0.1s;
+}
+tbody tr:hover{background:var(--bg-card-hover);}
+tbody tr.selected{background:var(--accent-dim);}
+tbody td{padding:12px 20px;}
+.td-title{display:flex;align-items:center;gap:10px;}
+.site-icon{
+  width:24px;height:24px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;flex-shrink:0;
+  background:var(--bg-card);border:1px solid var(--border-mid);
+}
+.td-name{font-size:13px;font-weight:500;color:var(--text-primary);}
+.td-username,.td-date{font-size:12px;color:var(--text-muted);}
+.td-star{text-align:center;}
+.star-btn{
+  background:none;border:none;cursor:pointer;padding:4px;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.star-btn svg{width:14px;height:14px;fill:none;stroke:var(--text-muted);stroke-width:2;transition:all 0.15s;stroke-linecap:round;stroke-linejoin:round;}
+.star-btn.starred svg{stroke:var(--color-amber);fill:var(--color-amber);}
+
+/* Detail panel */
+.detail-head{display:flex;align-items:center;gap:10px;padding-bottom:16px;border-bottom:1px solid var(--border-subtle);margin-bottom:20px;}
+.detail-icon{
+  width:40px;height:40px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;flex-shrink:0;
+  background:var(--bg-card);border:1px solid var(--border-mid);
+}
+.detail-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;flex:1;}
+.detail-actions{display:flex;gap:6px;}
+
+.field-block{margin-bottom:12px;}
+.field-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;}
+.field-value-row{
+  background:var(--bg-card);border:1px solid var(--border-subtle);
+  border-radius:var(--radius-sm);padding:9px 12px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+.field-val{font-size:13px;color:var(--text-primary);flex:1;word-break:break-all;}
+.field-val.link{color:var(--accent-light);}
+.field-actions{display:flex;gap:4px;}
+.detail-footer{
+  border-top:1px solid var(--border-subtle);padding-top:16px;
+  display:flex;justify-content:space-between;
+}
+.detail-meta{font-size:11px;color:var(--text-muted);}
+
+/* ─── FAVORITES ─── */
+/* same table, full width */
+
+/* ─── NOTES ─── */
+.notes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.note-card{
+  background:var(--bg-card);border:1px solid var(--border-mid);
+  border-radius:var(--radius-md);padding:16px;cursor:pointer;
+  transition:border-color 0.2s,box-shadow 0.2s;
+  display:flex;flex-direction:column;gap:6px;
+}
+.note-card:hover{border-color:var(--border-accent);box-shadow:var(--glow-purple-md);}
+.note-title{font-size:14px;font-weight:600;color:var(--text-primary);}
+.note-preview{font-size:12px;color:var(--text-secondary);line-height:1.5;flex:1;}
+.note-date{font-size:11px;color:var(--text-muted);}
+
+/* ─── GENERATOR ─── */
+.gen-wrap{max-width:560px;padding:24px;}
+.gen-display{
+  background:var(--bg-card);border:1.5px solid var(--border-accent);
+  border-radius:var(--radius-md);padding:16px 20px;
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow:var(--glow-purple-md);margin-bottom:16px;gap:12px;
+}
+.gen-password{
+  font-family:'Courier New',monospace;font-size:18px;font-weight:600;
+  color:var(--accent-light);letter-spacing:0.05em;word-break:break-all;flex:1;
+}
+.strength-bar{height:4px;border-radius:2px;background:var(--border-subtle);margin-bottom:6px;overflow:hidden;}
+.strength-fill{height:100%;border-radius:2px;transition:width 0.3s,background 0.3s;}
+.strength-label{font-size:12px;font-weight:600;margin-bottom:20px;}
+.gen-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border-subtle);}
+.gen-row-label{font-size:13px;color:var(--text-secondary);}
+.gen-select{
+  background:var(--bg-card);border:1px solid var(--border-mid);
+  border-radius:6px;color:var(--text-primary);padding:5px 10px;
+  font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;
+}
+.gen-select:focus{outline:none;border-color:var(--accent);}
+.checkbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0;}
+.check-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer;}
+.check-item input{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;}
+.gen-btns{display:flex;gap:8px;margin-top:20px;}
+.gen-btns .btn:first-child{flex:2;}
+.gen-btns .btn:last-child{flex:1;}
+
+/* ─── SETTINGS ─── */
+.settings-layout{display:flex;flex:1;overflow:hidden;}
+.settings-nav{
+  width:180px;border-right:1px solid var(--border-subtle);
+  padding:16px 8px;flex-shrink:0;
+}
+.settings-content{flex:1;overflow-y:auto;padding:24px;}
+.settings-section-title{font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:16px;}
+.settings-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 0;border-bottom:1px solid var(--border-subtle);
+}
+.settings-row-label{font-size:13px;color:var(--text-primary);}
+.settings-select{
+  background:var(--bg-card);border:1px solid var(--border-mid);
+  border-radius:6px;color:var(--text-primary);padding:6px 10px;
+  font-size:13px;font-family:'DM Sans',sans-serif;cursor:pointer;
+}
+.settings-select:focus{outline:none;border-color:var(--accent);}
+
+/* Toggle */
+.toggle{position:relative;display:inline-block;width:38px;height:22px;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{
+  position:absolute;inset:0;border-radius:11px;
+  background:var(--border-mid);cursor:pointer;transition:0.2s;
+}
+.toggle-slider::before{
+  content:'';position:absolute;width:16px;height:16px;
+  border-radius:50%;background:#fff;left:3px;top:3px;transition:0.2s;
+}
+.toggle input:checked + .toggle-slider{background:var(--accent);}
+.toggle input:checked + .toggle-slider::before{transform:translateX(16px);}
+
+/* ─── LOCK SCREEN ─── */
+#lock-screen{
+  position:fixed;inset:0;background:var(--bg-base);
+  display:flex;align-items:center;justify-content:center;
+  z-index:500;
+}
+#lock-screen.hidden{display:none;}
+.lock-card{
+  background:var(--bg-card);border:1px solid var(--border-accent);
+  border-radius:var(--radius-lg);padding:32px;width:320px;
+  text-align:center;box-shadow:var(--glow-purple-md);
+}
+.lock-icon-wrap{
+  width:56px;height:56px;border-radius:16px;
+  background:var(--accent-dim);border:1.5px solid var(--border-accent);
+  display:flex;align-items:center;justify-content:center;
+  margin:0 auto 16px;
+}
+.lock-icon-wrap svg{width:26px;height:26px;stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.lock-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;}
+.lock-sub{font-size:13px;color:var(--text-muted);margin-bottom:24px;}
+.lock-label{font-size:12px;font-weight:500;color:var(--text-secondary);text-align:left;margin-bottom:6px;}
+.lock-input-wrap{position:relative;margin-bottom:16px;}
+.lock-input{
+  width:100%;padding:10px 40px 10px 14px;background:var(--bg-card);
+  border:1px solid var(--border-mid);border-radius:var(--radius-sm);
+  color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;
+  outline:none;transition:border-color 0.15s,box-shadow 0.15s;
+}
+.lock-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,92,246,0.15);}
+.lock-eye{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;color:var(--text-muted);
+  display:flex;padding:2px;
+}
+.lock-eye svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.lock-error{font-size:12px;color:var(--color-red);margin-bottom:12px;display:none;}
+.btn-unlock{
+  width:100%;padding:12px;background:var(--accent);color:#fff;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:0.02em;
+  border:none;border-radius:var(--radius-sm);cursor:pointer;
+  box-shadow:0 4px 20px rgba(139,92,246,0.40);transition:all 0.15s;
+}
+.btn-unlock:hover{background:var(--accent-light);transform:translateY(-1px);}
+.btn-unlock:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+.lock-alt{font-size:12px;color:var(--text-muted);margin-top:12px;cursor:pointer;}
+.lock-alt:hover{color:var(--accent-light);}
+
+/* ─── MODALS ─── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.65);
+  backdrop-filter:blur(4px);display:none;
+  align-items:center;justify-content:center;z-index:1000;
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:var(--bg-modal);border:1px solid var(--border-mid);
+  border-radius:var(--radius-lg);padding:28px;width:420px;
+  box-shadow:var(--glow-card);position:relative;
+  max-height:90vh;overflow-y:auto;
+}
+.modal-close{
+  position:absolute;top:14px;right:14px;
+  width:24px;height:24px;border-radius:6px;
+  background:none;border:none;cursor:pointer;
+  color:var(--text-muted);display:flex;align-items:center;justify-content:center;
+  font-size:18px;transition:background 0.15s;
+}
+.modal-close:hover{background:var(--bg-card);}
+.modal-icon{display:flex;justify-content:center;margin-bottom:12px;}
+.modal-icon svg{width:32px;height:32px;stroke:var(--accent);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+.modal-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;text-align:center;margin-bottom:20px;}
+.form-group{margin-bottom:14px;}
+.form-label{font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;display:block;}
+.form-input{
+  width:100%;padding:10px 14px;background:var(--bg-card);
+  border:1px solid var(--border-mid);border-radius:var(--radius-sm);
+  color:var(--text-primary);font-size:13px;font-family:'DM Sans',sans-serif;
+  outline:none;transition:border-color 0.15s,box-shadow 0.15s;
+}
+.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(139,92,246,0.12);}
+.form-input::placeholder{color:var(--text-muted);}
+textarea.form-input{resize:vertical;min-height:72px;}
+.form-input-wrap{position:relative;}
+.form-input-wrap .form-input{padding-right:70px;}
+.form-input-wrap .input-icons{
+  position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  display:flex;gap:4px;
+}
+.input-icon-btn{
+  background:none;border:none;cursor:pointer;color:var(--text-muted);
+  padding:3px;display:flex;align-items:center;transition:color 0.15s;
+}
+.input-icon-btn:hover{color:var(--accent-light);}
+.input-icon-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.modal-btns{display:flex;gap:8px;margin-top:20px;}
+.modal-btns .btn{flex:1;justify-content:center;}
+
+/* Toast */
+#toast-container{
+  position:fixed;bottom:20px;right:20px;z-index:2000;
+  display:flex;flex-direction:column;gap:8px;
+}
+.toast{
+  background:var(--bg-card);border:1px solid var(--border-mid);
+  border-radius:var(--radius-sm);padding:10px 16px;
+  font-size:12px;color:var(--text-primary);
+  box-shadow:var(--glow-card);animation:toastIn 0.2s ease;
+  display:flex;align-items:center;gap:8px;min-width:200px;
+}
+.toast.success{border-color:rgba(34,197,94,0.4);}
+.toast.warning{border-color:rgba(245,158,11,0.4);}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* Clipboard indicator */
+#clipboard-indicator{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--bg-card);border:1px solid var(--border-accent);
+  border-radius:var(--radius-sm);padding:8px 16px;font-size:12px;
+  color:var(--accent-light);z-index:2000;display:none;
+  box-shadow:var(--glow-purple-sm);
+}
+
+/* Search results */
+.search-results{
+  position:absolute;top:calc(var(--titlebar-height) + 4px);
+  left:50%;transform:translateX(-50%);
+  width:380px;background:var(--bg-modal);
+  border:1px solid var(--border-accent);border-radius:var(--radius-md);
+  box-shadow:var(--glow-purple-md);z-index:800;display:none;max-height:300px;overflow-y:auto;
+}
+.search-results.open{display:block;}
+.search-result-item{
+  padding:10px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;
+  border-bottom:1px solid var(--border-subtle);transition:background 0.1s;
+}
+.search-result-item:hover{background:var(--bg-card-hover);}
+.search-result-item:last-child{border-bottom:none;}
+
+/* Page specific padding fix for vault */
+#page-vault .page-header{padding:20px 20px 12px;}
+</style>
+</head>
+<body>
+
+<!-- Lock Screen -->
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon-wrap">
+      <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <div class="lock-title">Unlock Vault</div>
+    <div class="lock-sub">Enter your master password to unlock your vault</div>
+    <div class="lock-label">Master Password</div>
+    <div class="lock-input-wrap">
+      <input type="password" id="master-pwd" class="lock-input" placeholder="••••••••••••••" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button class="lock-eye" id="lock-eye-btn" onclick="toggleLockEye()">
+        <svg id="lock-eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <div class="lock-error" id="lock-error">Incorrect password. Try again.</div>
+    <button class="btn-unlock" id="unlock-btn" onclick="tryUnlock()">Unlock</button>
+    <div class="lock-alt" onclick="showToast('Choose a different vault file')">Choose Different Vault</div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <!-- Titlebar -->
+  <div id="titlebar">
+    <div class="title-logo" onclick="navigate('dashboard')">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <span class="logo-text">cypheria</span>
+    </div>
+    <div class="title-search" id="title-search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="Search entries..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" oninput="handleSearch(this.value)" onkeydown="searchKeydown(event)">
+      <span class="kbd-badge">Ctrl + K</span>
+    </div>
+    <div class="title-spacer"></div>
+    <div class="title-actions">
+      <button class="title-btn" onclick="navigate('lock')" title="Lock vault">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </button>
+      <button class="title-btn" onclick="navigate('settings')" title="Settings">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <div class="title-divider"></div>
+      <div class="win-controls">
+        <button class="win-btn win-close" title="Close"></button>
+        <button class="win-btn win-min" title="Minimize"></button>
+        <button class="win-btn win-max" title="Maximize"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Results -->
+  <div class="search-results" id="search-results"></div>
+
+  <!-- Main -->
+  <div id="main">
+    <!-- Sidebar -->
+    <nav id="sidebar">
+      <div class="nav-item active" id="nav-dashboard" onclick="navigate('dashboard')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item" id="nav-vault" onclick="navigate('vault')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Vault
+      </div>
+      <div class="nav-item" id="nav-favorites" onclick="navigate('favorites')">
+        <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Favorites
+      </div>
+      <div class="nav-item" id="nav-notes" onclick="navigate('notes')">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Notes
+      </div>
+      <div class="nav-item" id="nav-generator" onclick="navigate('generator')">
+        <svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="2"/><path d="M10 8h11M3 8h1M10 16h4M3 16h1M16 16a2 2 0 1 0 4 0 2 2 0 0 0-4 0"/></svg>
+        Generator
+      </div>
+      <div class="nav-item" id="nav-settings" onclick="navigate('settings')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+      <div class="nav-spacer"></div>
+      <div class="nav-item nav-lock" onclick="lockVault()">
+        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Lock
+      </div>
+    </nav>
+
+    <!-- Content -->
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Dashboard</div>
+            <div class="page-subtitle">Overview of your vault</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('add-entry-modal')">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Entry
+          </button>
+        </div>
+        <div class="page-body">
+          <div class="stat-grid">
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--color-blue-dim);">
+                <svg viewBox="0 0 24 24" style="stroke:var(--color-blue)"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+              <div class="stat-value">24</div>
+              <div class="stat-label">Total Entries</div>
+              <div class="stat-sub" style="color:var(--text-muted)">All items in your vault</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--color-amber-dim);">
+                <svg viewBox="0 0 24 24" style="stroke:var(--color-amber)"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </div>
+              <div class="stat-value">5</div>
+              <div class="stat-label">Favorites</div>
+              <div class="stat-sub" style="color:var(--text-muted)">Starred items</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--color-green-dim);">
+                <svg viewBox="0 0 24 24" style="stroke:var(--color-green)"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="stat-value">78%</div>
+              <div class="stat-label">Security Score</div>
+              <div class="stat-sub" style="color:var(--color-green)">Strong</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-icon" style="background:var(--color-red-dim);">
+                <svg viewBox="0 0 24 24" style="stroke:var(--color-red)"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="stat-value">2</div>
+              <div class="stat-label">Weak Passwords</div>
+              <div class="stat-sub" style="color:var(--color-red)">Need attention</div>
+            </div>
+          </div>
+
+          <div class="dash-bottom">
+            <div class="panel">
+              <div class="panel-header">
+                <span class="panel-title">Recent Entries</span>
+                <a class="panel-link" onclick="navigate('vault')">View All</a>
+              </div>
+              <div id="recent-entries"></div>
+            </div>
+            <div class="panel security-panel">
+              <div class="panel-header"><span class="panel-title">Security Overview</span></div>
+              <div class="ring-wrap">
+                <div class="ring-container">
+                  <svg class="ring-svg" width="120" height="120" viewBox="0 0 120 120">
+                    <defs>
+                      <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" style="stop-color:#22c55e"/>
+                        <stop offset="100%" style="stop-color:#16a34a"/>
+                      </linearGradient>
+                    </defs>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="8"/>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="url(#ringGrad)" stroke-width="8" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="69"/>
+                  </svg>
+                  <div class="ring-center">
+                    <span class="ring-pct" style="color:var(--text-primary)">78%</span>
+                    <span class="ring-label">Strong</span>
+                  </div>
+                </div>
+              </div>
+              <div class="sec-msg">You have a strong vault.<br>Keep it up!</div>
+              <button class="btn btn-secondary" style="width:100%;justify-content:center;" onclick="showToast('Security tips coming soon!')">View Security Tips</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VAULT -->
+      <div class="page" id="page-vault">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Vault</div>
+            <div class="page-subtitle">All your saved entries</div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('add-entry-modal')">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Entry
+          </button>
+        </div>
+        <div class="vault-layout">
+          <div class="vault-table-wrap">
+            <div class="table-toolbar">
+              <span style="font-size:12px;color:var(--text-muted)">Sort by:</span>
+              <select class="sort-select"><option>Title</option><option>Date</option><option>Username</option></select>
+              <div class="tb-spacer"></div>
+              <div class="icon-btn" title="List view"><svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></div>
+              <div class="icon-btn" title="Grid view"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Username</th>
+                  <th>Last Updated</th>
+                  <th>★</th>
+                </tr>
+              </thead>
+              <tbody id="vault-tbody"></tbody>
+            </table>
+          </div>
+          <div class="vault-detail" id="vault-detail">
+            <div style="text-align:center;color:var(--text-muted);margin-top:60px;">
+              <svg viewBox="0 0 24 24" style="width:40px;height:40px;stroke:var(--border-mid);fill:none;stroke-width:1.5;margin:0 auto 12px;display:block;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <div style="font-size:13px">Select an entry to view details</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAVORITES -->
+      <div class="page" id="page-favorites">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Favorites</div>
+            <div class="page-subtitle">Your starred entries</div>
+          </div>
+        </div>
+        <div style="overflow-y:auto;flex:1;">
+          <div class="table-toolbar">
+            <span style="font-size:12px;color:var(--text-muted)">Sort by:</span>
+            <select class="sort-select"><option>Title</option><option>Date</option></select>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Username</th>
+                <th>Last Updated</th>
+                <th>★</th>
+              </tr>
+            </thead>
+            <tbody id="fav-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- NOTES -->
+      <div class="page" id="page-notes">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Notes</div>
+            <div class="page-subtitle">Secure notes for you</div>
+          </div>
+          <button class="btn btn-primary" onclick="showToast('Add note coming soon!')">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Note
+          </button>
+        </div>
+        <div class="page-body">
+          <div class="notes-grid" id="notes-grid"></div>
+        </div>
+      </div>
+
+      <!-- GENERATOR -->
+      <div class="page" id="page-generator">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Generator</div>
+            <div class="page-subtitle">Generate strong passwords</div>
+          </div>
+        </div>
+        <div class="page-body">
+          <div class="gen-wrap">
+            <div class="gen-display">
+              <div class="gen-password" id="gen-password-display">N7f!Qx2#Lm9%Pz8@Rt4$</div>
+              <button class="icon-btn" onclick="copyGeneratedPassword()" title="Copy">
+                <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </button>
+            </div>
+            <div class="strength-bar"><div class="strength-fill" id="gen-strength-fill" style="width:95%;background:var(--color-green)"></div></div>
+            <div class="strength-label" id="gen-strength-label" style="color:var(--color-green)">Very Strong</div>
+            <div class="gen-row">
+              <span class="gen-row-label">Length</span>
+              <select class="gen-select" id="gen-length" onchange="generateNewPassword()">
+                <option>8</option><option>12</option><option>16</option>
+                <option selected>20</option><option>24</option><option>32</option>
+              </select>
+            </div>
+            <div class="checkbox-grid">
+              <label class="check-item"><input type="checkbox" id="gen-upper" checked onchange="generateNewPassword()"> Uppercase (A-Z)</label>
+              <label class="check-item"><input type="checkbox" id="gen-lower" checked onchange="generateNewPassword()"> Lowercase (a-z)</label>
+              <label class="check-item"><input type="checkbox" id="gen-numbers" checked onchange="generateNewPassword()"> Numbers (0-9)</label>
+              <label class="check-item"><input type="checkbox" id="gen-symbols" checked onchange="generateNewPassword()"> Symbols (!@#$...)</label>
+            </div>
+            <div class="gen-btns">
+              <button class="btn btn-primary" onclick="generateNewPassword()">
+                <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Generate New
+              </button>
+              <button class="btn btn-secondary" onclick="copyGeneratedPassword()">
+                <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="page-settings">
+        <div class="page-header">
+          <div>
+            <div class="page-title">Settings</div>
+          </div>
+        </div>
+        <div class="settings-layout">
+          <div class="settings-nav">
+            <div class="nav-item active" id="snav-general" onclick="settingsNav('general')">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              General
+            </div>
+            <div class="nav-item" id="snav-security" onclick="settingsNav('security')">
+              <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              Security
+            </div>
+            <div class="nav-item" id="snav-autolock" onclick="settingsNav('autolock')">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Auto Lock
+            </div>
+            <div class="nav-item" id="snav-backup" onclick="settingsNav('backup')">
+              <svg viewBox="0 0 24 24"><polyline points="20 7 20 3 4 3 4 7"/><rect x="9" y="7" width="6" height="14"/><polyline points="4 7 4 21 20 21 20 7"/></svg>
+              Backup
+            </div>
+            <div class="nav-item" id="snav-about" onclick="settingsNav('about')">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              About
+            </div>
+          </div>
+          <div class="settings-content">
+            <div id="settings-general">
+              <div class="settings-section-title">General</div>
+              <div class="settings-row">
+                <span class="settings-row-label">Theme</span>
+                <select class="settings-select"><option>Dark</option><option>Light</option></select>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">Launch at startup</span>
+                <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">Minimize to tray</span>
+                <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+              </div>
+              <div style="margin-top:28px;" class="settings-section-title">Security</div>
+              <div class="settings-row">
+                <span class="settings-row-label">Auto lock after</span>
+                <select class="settings-select"><option>1 minute</option><option>2 minutes</option><option selected>5 minutes</option><option>10 minutes</option><option>30 minutes</option></select>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">Show password by default</span>
+                <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <span class="settings-row-label">Clear clipboard after copy</span>
+                <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end content -->
+  </div><!-- end main -->
+</div><!-- end app -->
+
+<!-- MODALS -->
+
+<!-- Add Entry Modal -->
+<div class="modal-overlay" id="add-entry-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('add-entry-modal')">×</button>
+    <div class="modal-icon">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    </div>
+    <div class="modal-title">Add New Entry</div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input type="text" class="form-input" placeholder="e.g. Google" autocomplete="off" id="new-title">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-input" placeholder="e.g. user@gmail.com" autocomplete="off" id="new-username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <div class="form-input-wrap">
+        <input type="password" class="form-input" placeholder="••••••••••••" autocomplete="off" id="new-password">
+        <div class="input-icons">
+          <button class="input-icon-btn" onclick="toggleFormPwd('new-password')" type="button">
+            <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="input-icon-btn" onclick="fillGenPassword()" type="button">
+            <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Website</label>
+      <div class="form-input-wrap">
+        <input type="text" class="form-input" placeholder="e.g. https://accounts.google.com" autocomplete="off" id="new-website">
+        <div class="input-icons">
+          <button class="input-icon-btn" type="button">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes (Optional)</label>
+      <textarea class="form-input" placeholder="Add notes here..." rows="3" id="new-notes"></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal('add-entry-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewEntry()">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Entry Modal -->
+<div class="modal-overlay" id="view-entry-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('view-entry-modal')">×</button>
+    <div class="modal-icon">
+      <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>
+    <div class="modal-title">View Entry</div>
+    <div id="view-entry-content"></div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" style="flex:1;justify-content:center;" onclick="closeModal('view-entry-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+<!-- Clipboard indicator -->
+<div id="clipboard-indicator">📋 Clipboard clears in <span id="clip-countdown">30</span>s</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const vaultData = [
+  { id:'1', name:'Google',          user:'user@gmail.com',        pass:'Goog!eP@ssw0rd2024', site:'https://accounts.google.com', notes:'Personal Google account', date:'12/05/2024', fav:true,  color:'#4285f4', emoji:'G' },
+  { id:'2', name:'GitHub',          user:'dev.user',              pass:'GitHub#Dev$2024!!',  site:'https://github.com',           notes:'Developer account',       date:'12/05/2024', fav:false, color:'#333',    emoji:'GH'},
+  { id:'3', name:'Twitter',         user:'user@twitter.com',      pass:'Tw1tt3r!X@2024',     site:'https://twitter.com',          notes:'Social account',          date:'11/05/2024', fav:true,  color:'#1da1f2', emoji:'X' },
+  { id:'4', name:'Bank of America', user:'user@bankofamerica.com',pass:'B0fA$ecure#1234!',   site:'https://bankofamerica.com',    notes:'Primary bank account',    date:'11/05/2024', fav:true,  color:'#e31837', emoji:'B' },
+  { id:'5', name:'Notion',          user:'user.notion@gmail.com', pass:'N0t10n#Pass2024!',   site:'https://notion.so',            notes:'Workspace account',       date:'10/05/2024', fav:true,  color:'#000',    emoji:'N' },
+  { id:'6', name:'Spotify',         user:'user.spotify@gmail.com',pass:'Sp0t!fy#Mus1c24',    site:'https://spotify.com',          notes:'Music streaming',         date:'10/05/2024', fav:true,  color:'#1db954', emoji:'S' },
+  { id:'7', name:'LinkedIn',        user:'user@linkedin.com',     pass:'L1nk3d!n@2024#',     site:'https://linkedin.com',         notes:'Professional network',    date:'09/05/2024', fav:false, color:'#0077b5', emoji:'Li'},
+  { id:'8', name:'Dropbox',         user:'user@dropbox.com',      pass:'Dr0pb0x!F1les24',    site:'https://dropbox.com',          notes:'Cloud storage',           date:'08/05/2024', fav:false, color:'#0061ff', emoji:'D' },
+];
+
+const notesData = [
+  { title:'Wi-Fi Password',       preview:'Home Wi-Fi password\nNetwork: Home_Network\nPassword: ••••••••••',      date:'12/05/2024' },
+  { title:'Secure Backup Codes',  preview:'2FA Backup codes for important accounts.\n•••• •••• •••• ••••',          date:'11/05/2024' },
+  { title:'Recovery Phrase',      preview:'12-word recovery phrase for crypto wallet.\n•••• •••• •••• ••••',        date:'10/05/2024' },
+  { title:'Server Credentials',   preview:'Production server SSH access\nUser: admin\nPass: •••••••••',             date:'08/05/2024' },
+  { title:'Private API Key',      preview:'API key for internal service\n••••••••••••••••••••',                     date:'08/05/2024' },
+  { title:'Important Reminder',   preview:'Review security settings monthly and rotate passwords regularly.',        date:'07/05/2024' },
+];
+
+let selectedEntry = null;
+let clipboardTimer = null;
+let clipCountdownInterval = null;
+
+// ============================================================
+// INIT
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  renderRecent();
+  renderVaultTable();
+  renderFavorites();
+  renderNotes();
+  generateNewPassword();
+
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      document.getElementById('search-input').focus();
+    }
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+      document.getElementById('search-results').classList.remove('open');
+      document.getElementById('search-input').value = '';
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#title-search') && !e.target.closest('#search-results')) {
+      document.getElementById('search-results').classList.remove('open');
+    }
+  });
+});
+
+// ============================================================
+// LOCK
+// ============================================================
+let lockAttempts = 0;
+let lockCooldown = false;
+
+function tryUnlock() {
+  if (lockCooldown) return;
+  const pwd = document.getElementById('master-pwd').value;
+  if (pwd.length >= 4) {
+    // Simulate unlock — clear pwd immediately
+    document.getElementById('master-pwd').value = '';
+    document.getElementById('lock-screen').classList.add('hidden');
+    showToast('Vault unlocked successfully', 'success');
+    lockAttempts = 0;
+  } else {
+    lockAttempts++;
+    document.getElementById('lock-error').style.display = 'block';
+    document.getElementById('master-pwd').value = '';
+    if (lockAttempts >= 5) {
+      lockCooldown = true;
+      const btn = document.getElementById('unlock-btn');
+      btn.disabled = true;
+      let s = 30;
+      btn.textContent = `Wait ${s}s`;
+      const t = setInterval(() => {
+        s--;
+        btn.textContent = `Wait ${s}s`;
+        if (s <= 0) {
+          clearInterval(t);
+          btn.disabled = false;
+          btn.textContent = 'Unlock';
+          lockAttempts = 0;
+          lockCooldown = false;
+        }
+      }, 1000);
+    }
+  }
+}
+
+function lockVault() {
+  document.getElementById('lock-screen').classList.remove('hidden');
+  document.getElementById('master-pwd').value = '';
+  document.getElementById('lock-error').style.display = 'none';
+}
+
+function toggleLockEye() {
+  const inp = document.getElementById('master-pwd');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.activeElement === document.getElementById('master-pwd')) {
+    tryUnlock();
+  }
+});
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pg = document.getElementById('page-' + page);
+  if (pg) pg.classList.add('active');
+  const nav = document.getElementById('nav-' + page);
+  if (nav) nav.classList.add('active');
+
+  if (page === 'lock') { lockVault(); return; }
+  if (page === 'settings') {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('nav-settings').classList.add('active');
+  }
+}
+
+function settingsNav(section) {
+  document.querySelectorAll('.settings-nav .nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('snav-' + section).classList.add('active');
+}
+
+// ============================================================
+// RENDER FUNCTIONS
+// ============================================================
+function siteAvatar(entry, size = 28) {
+  const radius = size <= 28 ? 7 : 10;
+  return `<div style="width:${size}px;height:${size}px;border-radius:${radius}px;background:${entry.color}22;border:1px solid ${entry.color}44;display:flex;align-items:center;justify-content:center;font-size:${Math.floor(size*0.42)}px;font-weight:700;color:${entry.color};flex-shrink:0;">${entry.emoji}</div>`;
+}
+
+function renderRecent() {
+  const container = document.getElementById('recent-entries');
+  container.innerHTML = '';
+  vaultData.slice(0, 5).forEach(e => {
+    const div = document.createElement('div');
+    div.className = 'recent-row';
+    div.innerHTML = `
+      ${siteAvatar(e)}
+      <div class="recent-info">
+        <div class="recent-name">${sanitize(e.name)}</div>
+        <div class="recent-user">${sanitize(e.user)}</div>
+      </div>
+      <div class="recent-date">${e.date}</div>
+    `;
+    div.onclick = () => { navigate('vault'); setTimeout(() => selectEntry(e.id), 50); };
+    container.appendChild(div);
+  });
+}
+
+function renderVaultTable() {
+  const tbody = document.getElementById('vault-tbody');
+  tbody.innerHTML = '';
+  vaultData.forEach(e => {
+    const tr = document.createElement('tr');
+    tr.id = 'row-' + e.id;
+    tr.innerHTML = `
+      <td><div class="td-title">${siteAvatar(e, 24)}<span class="td-name">${sanitize(e.name)}</span></div></td>
+      <td class="td-username">${sanitize(e.user)}</td>
+      <td class="td-date">${e.date}</td>
+      <td class="td-star">
+        <button class="star-btn ${e.fav ? 'starred' : ''}" id="star-${e.id}" onclick="toggleFav(event,'${e.id}')">
+          <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+      </td>
+    `;
+    tr.onclick = () => selectEntry(e.id);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderFavorites() {
+  const tbody = document.getElementById('fav-tbody');
+  tbody.innerHTML = '';
+  vaultData.filter(e => e.fav).forEach(e => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><div class="td-title">${siteAvatar(e, 24)}<span class="td-name">${sanitize(e.name)}</span></div></td>
+      <td class="td-username">${sanitize(e.user)}</td>
+      <td class="td-date">${e.date}</td>
+      <td class="td-star">
+        <button class="star-btn starred">
+          <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderNotes() {
+  const grid = document.getElementById('notes-grid');
+  grid.innerHTML = '';
+  notesData.forEach(n => {
+    const card = document.createElement('div');
+    card.className = 'note-card';
+    const previewEl = document.createElement('div');
+    previewEl.className = 'note-preview';
+    previewEl.textContent = n.preview;
+    const titleEl = document.createElement('div');
+    titleEl.className = 'note-title';
+    titleEl.textContent = n.title;
+    const dateEl = document.createElement('div');
+    dateEl.className = 'note-date';
+    dateEl.textContent = n.date;
+    card.appendChild(titleEl);
+    card.appendChild(previewEl);
+    card.appendChild(dateEl);
+    grid.appendChild(card);
+  });
+}
+
+function selectEntry(id) {
+  const entry = vaultData.find(e => e.id === id);
+  if (!entry) return;
+  selectedEntry = entry;
+
+  document.querySelectorAll('#vault-tbody tr').forEach(tr => tr.classList.remove('selected'));
+  const row = document.getElementById('row-' + id);
+  if (row) row.classList.add('selected');
+
+  const detail = document.getElementById('vault-detail');
+  detail.innerHTML = `
+    <div class="detail-head">
+      ${siteAvatar(entry, 40)}
+      <div class="detail-name">${sanitize(entry.name)}</div>
+      <div class="detail-actions">
+        <div class="icon-btn ${entry.fav ? 'starred' : ''}" onclick="toggleFavDetail('${entry.id}')" id="detail-star">
+          <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:${entry.fav ? 'var(--color-amber)' : 'currentColor'};fill:${entry.fav ? 'var(--color-amber)' : 'none'};stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div class="icon-btn" onclick="openViewModal('${entry.id}')">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <div class="icon-btn">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        </div>
+      </div>
+    </div>
+    <div class="field-block">
+      <div class="field-label">Username</div>
+      <div class="field-value-row">
+        <div class="field-val" id="detail-username">${sanitize(entry.user)}</div>
+        <div class="field-actions">
+          <div class="icon-btn" onclick="copyField('${entry.user}','Username')" title="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <div class="field-block">
+      <div class="field-label">Password</div>
+      <div class="field-value-row">
+        <div class="field-val" id="detail-pass" style="font-family:'Courier New',monospace;letter-spacing:0.05em">••••••••••••••••</div>
+        <div class="field-actions">
+          <div class="icon-btn" id="detail-eye-btn" onclick="toggleDetailPwd('${entry.id}')" title="Show/Hide"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+          <div class="icon-btn" onclick="copyField('${entry.pass}','Password')" title="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <div class="field-block">
+      <div class="field-label">Website</div>
+      <div class="field-value-row">
+        <div class="field-val link" id="detail-site">${sanitize(entry.site)}</div>
+        <div class="field-actions">
+          <div class="icon-btn" title="Open website"><svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></div>
+        </div>
+      </div>
+    </div>
+    <div class="field-block">
+      <div class="field-label">Notes</div>
+      <div class="field-value-row">
+        <div class="field-val" id="detail-notes">${sanitize(entry.notes)}</div>
+      </div>
+    </div>
+    <div class="detail-footer">
+      <div class="detail-meta">Created: ${entry.date}</div>
+      <div class="detail-meta">Updated: ${entry.date}</div>
+    </div>
+  `;
+
+  let pwdVisible = false;
+  let pwdTimer = null;
+  window.toggleDetailPwd = function(id) {
+    const el = document.getElementById('detail-pass');
+    const e = vaultData.find(x => x.id === id);
+    if (!e) return;
+    if (!pwdVisible) {
+      el.textContent = e.pass;
+      pwdVisible = true;
+      if (pwdTimer) clearTimeout(pwdTimer);
+      pwdTimer = setTimeout(() => {
+        el.textContent = '••••••••••••••••';
+        pwdVisible = false;
+      }, 10000);
+    } else {
+      el.textContent = '••••••••••••••••';
+      pwdVisible = false;
+      if (pwdTimer) clearTimeout(pwdTimer);
+    }
+  };
+}
+
+function toggleFav(e, id) {
+  e.stopPropagation();
+  const entry = vaultData.find(x => x.id === id);
+  if (!entry) return;
+  entry.fav = !entry.fav;
+  const btn = document.getElementById('star-' + id);
+  if (btn) btn.classList.toggle('starred', entry.fav);
+  renderFavorites();
+}
+
+function toggleFavDetail(id) {
+  const entry = vaultData.find(x => x.id === id);
+  if (!entry) return;
+  entry.fav = !entry.fav;
+  selectEntry(id);
+  const row = document.getElementById('star-' + id);
+  if (row) row.classList.toggle('starred', entry.fav);
+}
+
+// ============================================================
+// MODALS
+// ============================================================
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function openViewModal(id) {
+  const entry = vaultData.find(e => e.id === id);
+  if (!entry) return;
+  const content = document.getElementById('view-entry-content');
+  content.innerHTML = '';
+
+  const fields = [
+    { label: 'Title', val: entry.name, mask: false },
+    { label: 'Username', val: entry.user, mask: false },
+    { label: 'Password', val: entry.pass, mask: true },
+    { label: 'Website', val: entry.site, mask: false },
+    { label: 'Notes', val: entry.notes, mask: false },
+  ];
+
+  fields.forEach(f => {
+    const block = document.createElement('div');
+    block.className = 'field-block';
+    const label = document.createElement('div');
+    label.className = 'field-label';
+    label.textContent = f.label;
+    const row = document.createElement('div');
+    row.className = 'field-value-row';
+    const val = document.createElement('div');
+    val.className = 'field-val';
+    val.textContent = f.mask ? '••••••••••••••••' : f.val;
+    if (f.mask) val.style.fontFamily = "'Courier New', monospace";
+
+    const actions = document.createElement('div');
+    actions.className = 'field-actions';
+    if (f.mask) {
+      const eyeBtn = document.createElement('div');
+      eyeBtn.className = 'icon-btn';
+      eyeBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+      let visible = false, timer = null;
+      eyeBtn.onclick = () => {
+        visible = !visible;
+        val.textContent = visible ? f.val : '••••••••••••••••';
+        if (visible) {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => { val.textContent = '••••••••••••••••'; visible = false; }, 10000);
+        }
+      };
+      actions.appendChild(eyeBtn);
+    }
+    const copyBtn = document.createElement('div');
+    copyBtn.className = 'icon-btn';
+    copyBtn.innerHTML = `<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    copyBtn.onclick = () => copyField(f.val, f.label);
+    actions.appendChild(copyBtn);
+
+    row.appendChild(val);
+    row.appendChild(actions);
+    block.appendChild(label);
+    block.appendChild(row);
+    content.appendChild(block);
+  });
+
+  openModal('view-entry-modal');
+}
+
+function saveNewEntry() {
+  const title = document.getElementById('new-title').value.trim();
+  const user = document.getElementById('new-username').value.trim();
+  const pass = document.getElementById('new-password').value;
+  const site = document.getElementById('new-website').value.trim();
+  const notes = document.getElementById('new-notes').value.trim();
+
+  if (!title) { showToast('Please enter a title', 'warning'); return; }
+
+  const newEntry = {
+    id: Date.now().toString(),
+    name: title, user: user || '—', pass: pass || '',
+    site: site || '—', notes: notes || '—',
+    date: new Date().toLocaleDateString('en-GB').replace(/\//g, '/'),
+    fav: false, color: '#8b5cf6', emoji: title[0].toUpperCase()
+  };
+
+  vaultData.unshift(newEntry);
+  renderRecent();
+  renderVaultTable();
+  closeModal('add-entry-modal');
+  document.getElementById('new-title').value = '';
+  document.getElementById('new-username').value = '';
+  document.getElementById('new-password').value = '';
+  document.getElementById('new-website').value = '';
+  document.getElementById('new-notes').value = '';
+  showToast('Entry saved successfully', 'success');
+}
+
+function toggleFormPwd(id) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function fillGenPassword() {
+  const gen = document.getElementById('gen-password-display');
+  const pwd = gen ? gen.textContent : generatePassword({ length: 20, upper: true, lower: true, numbers: true, symbols: true });
+  const inp = document.getElementById('new-password');
+  if (inp) inp.value = pwd;
+}
+
+// ============================================================
+// CLIPBOARD
+// ============================================================
+function copyField(value, label) {
+  if (!navigator.clipboard) { showToast('Clipboard not available'); return; }
+  navigator.clipboard.writeText(value).then(() => {
+    showToast(`${label} copied to clipboard`, 'success');
+    startClipboardCountdown();
+  });
+}
+
+function startClipboardCountdown() {
+  if (clipboardTimer) clearTimeout(clipboardTimer);
+  if (clipCountdownInterval) clearInterval(clipCountdownInterval);
+
+  const indicator = document.getElementById('clipboard-indicator');
+  const counter = document.getElementById('clip-countdown');
+  indicator.style.display = 'block';
+  let secs = 30;
+  counter.textContent = secs;
+
+  clipCountdownInterval = setInterval(() => {
+    secs--;
+    counter.textContent = secs;
+    if (secs <= 0) {
+      clearInterval(clipCountdownInterval);
+      indicator.style.display = 'none';
+    }
+  }, 1000);
+
+  clipboardTimer = setTimeout(() => {
+    navigator.clipboard.writeText('');
+    indicator.style.display = 'none';
+    clearInterval(clipCountdownInterval);
+  }, 30000);
+}
+
+// ============================================================
+// GENERATOR (crypto-secure)
+// ============================================================
+function generatePassword(options) {
+  const { length, upper, lower, numbers, symbols } = options;
+  const charSets = [];
+  if (upper)   charSets.push('ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+  if (lower)   charSets.push('abcdefghijklmnopqrstuvwxyz');
+  if (numbers) charSets.push('0123456789');
+  if (symbols) charSets.push('!@#$%^&*()_+-=[]{}|;:,.<>?');
+  if (charSets.length === 0) return '';
+  const allChars = charSets.join('');
+  const randomValues = new Uint32Array(length);
+  crypto.getRandomValues(randomValues);
+  let password = '';
+  for (let i = 0; i < length; i++) {
+    password += allChars[randomValues[i] % allChars.length];
+  }
+  return password;
+}
+
+function calcStrength(pwd) {
+  let score = 0;
+  if (pwd.length >= 8)  score += 20;
+  if (pwd.length >= 16) score += 20;
+  if (/[A-Z]/.test(pwd)) score += 15;
+  if (/[a-z]/.test(pwd)) score += 15;
+  if (/[0-9]/.test(pwd)) score += 15;
+  if (/[^A-Za-z0-9]/.test(pwd)) score += 15;
+  return Math.min(score, 100);
+}
+
+function generateNewPassword() {
+  const length = parseInt(document.getElementById('gen-length').value);
+  const upper   = document.getElementById('gen-upper').checked;
+  const lower   = document.getElementById('gen-lower').checked;
+  const numbers = document.getElementById('gen-numbers').checked;
+  const symbols = document.getElementById('gen-symbols').checked;
+  const pwd = generatePassword({ length, upper, lower, numbers, symbols });
+  if (!pwd) return;
+  document.getElementById('gen-password-display').textContent = pwd;
+  const score = calcStrength(pwd);
+  const fill = document.getElementById('gen-strength-fill');
+  const label = document.getElementById('gen-strength-label');
+  fill.style.width = score + '%';
+  if (score < 40)  { fill.style.background = 'var(--color-red)';   label.style.color = 'var(--color-red)';   label.textContent = 'Weak'; }
+  else if (score < 60) { fill.style.background = 'var(--color-amber)'; label.style.color = 'var(--color-amber)'; label.textContent = 'Moderate'; }
+  else if (score < 80) { fill.style.background = 'var(--color-blue)';  label.style.color = 'var(--color-blue)';  label.textContent = 'Strong'; }
+  else { fill.style.background = 'var(--color-green)'; label.style.color = 'var(--color-green)'; label.textContent = 'Very Strong'; }
+}
+
+function copyGeneratedPassword() {
+  const pwd = document.getElementById('gen-password-display').textContent;
+  copyField(pwd, 'Password');
+}
+
+// ============================================================
+// SEARCH
+// ============================================================
+function handleSearch(val) {
+  const results = document.getElementById('search-results');
+  if (!val.trim()) { results.classList.remove('open'); return; }
+  const matches = vaultData.filter(e =>
+    e.name.toLowerCase().includes(val.toLowerCase()) ||
+    e.user.toLowerCase().includes(val.toLowerCase())
+  );
+  results.innerHTML = '';
+  if (matches.length === 0) {
+    results.innerHTML = '<div style="padding:14px 16px;color:var(--text-muted);font-size:13px;">No results found</div>';
+  } else {
+    matches.forEach(e => {
+      const item = document.createElement('div');
+      item.className = 'search-result-item';
+      item.innerHTML = `${siteAvatar(e, 24)}<div><div style="font-size:13px;font-weight:500">${sanitize(e.name)}</div><div style="font-size:11px;color:var(--text-muted)">${sanitize(e.user)}</div></div>`;
+      item.onclick = () => {
+        results.classList.remove('open');
+        document.getElementById('search-input').value = '';
+        navigate('vault');
+        setTimeout(() => selectEntry(e.id), 50);
+      };
+      results.appendChild(item);
+    });
+  }
+  results.classList.add('open');
+}
+
+function searchKeydown(e) {
+  if (e.key === 'Escape') {
+    document.getElementById('search-results').classList.remove('open');
+    e.target.value = '';
+  }
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type = '') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  const icon = type === 'success' ? '✓' : type === 'warning' ? '⚠' : 'ℹ';
+  toast.innerHTML = `<span style="opacity:0.7">${icon}</span><span>${sanitize(msg)}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// ============================================================
+// SECURITY UTILITY
+// ============================================================
+function sanitize(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>
