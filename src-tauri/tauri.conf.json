@@ -4,7 +4,7 @@
   "identifier": "com.cypheria.app",
   "build": {
     "beforeDevCommand": "",
-    "devUrl": "../index.html",
+    "devUrl": "http://tauri.localhost",
     "beforeBuildCommand": "",
     "frontendDist": "../"
   },
