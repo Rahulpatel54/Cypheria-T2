@@ -27,6 +27,11 @@ pub fn run() {
     let autolock = Arc::new(session::autolock::AutoLockTimer::new(300)); // 5-minute default
 
     tauri::Builder::default()
+        // ── Plugins ────────────────────────────────────────────────────────
+        // The dialog plugin MUST be registered here before any frontend call
+        // to `plugin:dialog|save` / `plugin:dialog|open` will work.
+        .plugin(tauri_plugin_dialog::init())
+        // ── Managed state ─────────────────────────────────────────────────
         .manage(session.clone())
         .manage(autolock.clone())
         .invoke_handler(tauri::generate_handler![

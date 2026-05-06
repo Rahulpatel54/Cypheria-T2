@@ -1210,21 +1210,30 @@ async function suggestPath() {
 async function browseSavePath() {
   if (!_invoke) { showToast('File dialog requires Tauri backend', 'warning'); return; }
   try {
-    const name = (document.getElementById('setup-name').value.trim() || 'MyVault').replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const name = (document.getElementById('setup-name').value.trim() || 'MyVault')
+      .replace(/[^a-zA-Z0-9_\-]/g, '_');
+
+    // Tauri v2 plugin:dialog|save — args mirror SaveDialogOptions
     const path = await rawInvoke('plugin:dialog|save', {
-      title: 'Save Vault As',
+      title:       'Save Vault As',
       defaultPath: name + '.qvault',
-      filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+      filters:     [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
     });
+
     if (path && typeof path === 'string') {
-      document.getElementById('setup-path').value = path.endsWith('.qvault') ? path : path + '.qvault';
+      const finalPath = path.endsWith('.qvault') ? path : path + '.qvault';
+      document.getElementById('setup-path').value = finalPath;
       document.getElementById('path-hint').textContent = '✓ Path selected';
       document.getElementById('path-hint').style.color = 'var(--color-green)';
     }
   } catch (e) {
-    showToast('Could not open file dialog', 'error');
+    // Surface the real Tauri error so it's visible in DevTools
+    console.error('[Cypheria] browseSavePath failed:', e);
+    showToast('Could not open file dialog: ' + String(e).slice(0, 100), 'error');
   }
 }
+
+
 
 async function createVault() {
   const name    = document.getElementById('setup-name').value.trim();
@@ -1367,25 +1376,30 @@ async function lockVaultUI() {
 }
 
 async function openDifferentVault() {
-  const choice = confirm('Open an existing vault? (OK) or Create a new vault? (Cancel)');
+  const choice = confirm('Open an existing vault? (OK)\nor Create a new vault? (Cancel)');
   if (choice) {
-    // Open existing
     if (!_invoke) { showToast('File dialog requires Tauri backend', 'warning'); return; }
     try {
       const p = await rawInvoke('plugin:dialog|open', {
-        title: 'Open Vault', multiple: false, directory: false,
-        filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+        title:     'Open Vault',
+        multiple:  false,
+        directory: false,
+        filters:   [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
       });
       if (p) {
         const path = typeof p === 'string' ? p : p[0];
         const canonical = await rawInvoke('open_vault', { vaultPath: path });
         currentVaultPath = canonical;
         localStorage.setItem('cypheria_vault_path', canonical);
-        document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault','');
+        document.getElementById('lock-vault-name').textContent =
+          canonical.split(/[\\/]/).pop().replace('.qvault', '');
         document.getElementById('lock-error').textContent = '';
         showToast('Vault loaded — enter your password', 'success');
       }
-    } catch (e) { showToast('Could not open vault: ' + String(e).slice(0,80), 'error'); }
+    } catch (e) {
+      console.error('[Cypheria] openDifferentVault failed:', e);
+      showToast('Could not open vault: ' + String(e).slice(0, 80), 'error');
+    }
   } else {
     localStorage.removeItem('cypheria_vault_path');
     currentVaultPath = null;
