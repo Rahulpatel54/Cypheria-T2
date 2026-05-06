@@ -11,5 +11,5 @@ target/
 .idea/
 
 # ⚡ Tauri build outputs
-dist/
+#dist/
 build/
