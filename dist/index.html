@@ -1020,7 +1020,6 @@ textarea.form-input{resize:vertical;min-height:72px;}
 'use strict';
 
 // ─── GLOBALS ───────────────────────────────────────────────────────────────
-let setupStarted = false;
 let __invoke = null;
 let vaultEntries = [];
 let vaultNotes   = [];
@@ -1036,8 +1035,6 @@ let autoLockSecs     = 300;
 let clipboardSecs    = 30;
 
 // ─── TAURI v2 BRIDGE ───────────────────────────────────────────────────────
-// Tauri v2: invoke is on window.__TAURI_INTERNALS__.invoke
-// The dialog plugin is accessed via @tauri-apps/plugin-dialog (loaded as plugin)
 async function initTauri() {
   try {
     if (window.__TAURI_INTERNALS__) {
@@ -1054,6 +1051,11 @@ async function initTauri() {
   }
 }
 
+// FIX: vaultCall only for session-guarded commands that require unlock.
+// Non-session commands (open_vault, create_vault, unlock_vault, lock_vault)
+// must use __invoke directly to avoid:
+//   1. Premature bumpActivity() calls setting inactivity timers before vault exists
+//   2. Error interception showing lock screen during setup flow
 async function vaultCall(cmd, args = {}) {
   if (!__invoke) throw new Error('Backend not available');
   try {
@@ -1069,28 +1071,11 @@ async function vaultCall(cmd, args = {}) {
   }
 }
 
-// Tauri v2 dialog plugin — uses the plugin dialog API
-async function tauriDialog(type, options = {}) {
-  try {
-    // Tauri v2 plugin-dialog registers commands as plugin:dialog|*
-    if (__invoke) {
-      if (type === 'save') {
-        return await __invoke('plugin:dialog|save', options);
-      } else if (type === 'open') {
-        return await __invoke('plugin:dialog|open', options);
-      } else if (type === 'ask') {
-        return await __invoke('plugin:dialog|message', {
-          ...options,
-          kind: 'info',
-          okButtonLabel: options.okLabel || 'OK',
-          cancelButtonLabel: options.cancelLabel || 'Cancel',
-        });
-      }
-    }
-  } catch(e) {
-    console.warn('Dialog error:', e);
-  }
-  return null;
+// FIX: Direct invoke for commands that don't need session guard or activity tracking.
+// Use this for: open_vault, create_vault, unlock_vault, lock_vault, generate_password
+async function directInvoke(cmd, args = {}) {
+  if (!__invoke) throw new Error('Backend not available');
+  return await __invoke(cmd, args);
 }
 
 // ─── WINDOW CONTROLS ───────────────────────────────────────────────────────
@@ -1105,10 +1090,18 @@ async function appClose() {
 }
 
 // ─── INACTIVITY / AUTO-LOCK ────────────────────────────────────────────────
+// FIX: Only bump activity when the vault is actually unlocked.
+// Calling this during setup/lock screen causes phantom timers that trigger
+// lockVaultUI() at inappropriate times, overlapping the setup screen.
 function bumpActivity() {
   if (inactivityTimer) clearTimeout(inactivityTimer);
   if (autoLockSecs > 0) {
-    inactivityTimer = setTimeout(() => lockVaultUI(), autoLockSecs * 1000);
+    inactivityTimer = setTimeout(() => {
+      // FIX: Only lock if actually unlocked — don't interfere with setup flow
+      if (currentVaultPath && document.getElementById('lock-screen').classList.contains('hidden')) {
+        lockVaultUI();
+      }
+    }, autoLockSecs * 1000);
   }
 }
 
@@ -1118,7 +1111,11 @@ function bumpActivity() {
 
 let blurTimer = null;
 window.addEventListener('blur', () => {
-  if (autoLockSecs > 0) blurTimer = setTimeout(() => lockVaultUI(), autoLockSecs * 1000);
+  if (autoLockSecs > 0) blurTimer = setTimeout(() => {
+    if (currentVaultPath && document.getElementById('lock-screen').classList.contains('hidden')) {
+      lockVaultUI();
+    }
+  }, autoLockSecs * 1000);
 });
 window.addEventListener('focus', () => {
   if (blurTimer) clearTimeout(blurTimer);
@@ -1127,13 +1124,6 @@ window.addEventListener('focus', () => {
 
 async function setupEventListeners() {
   try {
-    if (__invoke) {
-      await __invoke('plugin:event|listen', {
-        event: 'vault-auto-locked',
-        handler: '__TAURI_DUMMY__',
-      }).catch(() => {});
-    }
-    // Use Tauri v2 event listening if available
     if (window.__TAURI_INTERNALS__?.listen) {
       await window.__TAURI_INTERNALS__.listen('vault-auto-locked', () => {
         showLockScreen();
@@ -1143,7 +1133,7 @@ async function setupEventListeners() {
         showLockScreen();
       });
     } else if (window.__TAURI__?.event?.listen) {
-      await window.__TAURI__.event.listen('vault-auto-locked', () => {
+      await window.__TAURI__?.event?.listen('vault-auto-locked', () => {
         showLockScreen();
         showToast('Vault locked due to inactivity', 'warning');
       });
@@ -1187,37 +1177,37 @@ async function init() {
   setLoading(false);
 
   if (!ok) {
-    // Browser preview mode
+    // Browser preview mode — no Tauri backend
     console.warn('[Cypheria] Running without Tauri backend');
-    showLockScreen();
+    showSetupScreen();
     document.getElementById('lock-vault-name').textContent = 'Demo Mode (no backend)';
     document.getElementById('unlock-btn').disabled = false;
     return;
   }
 
   await setupEventListeners();
+  if (ok) {
   await checkInitialState();
+  } else {
+  showSetupScreen();
+  }
 }
 
 // ─── FIRST-RUN DETECTION ───────────────────────────────────────────────────
-// Check if we have a stored vault path from a previous session.
-// If not, determine if it's first launch → show setup.
-// If yes, show lock screen with that vault.
 async function checkInitialState() {
-  // Try to read the last used vault path from a simple backend call.
-  // We use a dedicated command for this — or fall back to checking local storage
-  // (acceptable here since it's just a file path, not secret data).
   const storedPath = localStorage.getItem('cypheria_last_vault');
 
   if (!storedPath) {
-    // First launch: no vault known → show setup
+    // First launch — no known vault, show setup
     showSetupScreen();
     return;
   }
-
-  // Verify the stored path still points to a valid vault file
+  if (!__invoke) {
+    showSetupScreen();
+    return;
+  }
   try {
-    const canonical = await vaultCall('open_vault', { vaultPath: storedPath });
+    const canonical = await directInvoke('open_vault', { vaultPath: storedPath });
     currentVaultPath = canonical;
     localStorage.setItem('cypheria_last_vault', canonical);
     const name = canonical.split(/[\\/]/).pop().replace('.qvault', '');
@@ -1225,8 +1215,9 @@ async function checkInitialState() {
     document.getElementById('unlock-btn').disabled = false;
     showLockScreen();
   } catch(e) {
-    // Stored path is stale or file was moved
+    // Stored path is stale or file was moved/deleted
     localStorage.removeItem('cypheria_last_vault');
+    currentVaultPath = null;
     showSetupScreen();
   }
 }
@@ -1235,18 +1226,22 @@ async function checkInitialState() {
 let setupStep = 1;
 
 function showSetupScreen() {
-  if (setupStarted) return; // don't reset if user already clicked
   document.getElementById('setup-screen').classList.remove('hidden');
-  document.getElementById('lock-screen').classList.add('hidden');
+  document.getElementById('lock-screen').classList.add('hidden');  // FIX: hide lock screen too
   document.getElementById('loading-overlay').classList.add('hidden');
   setupStep = 1;
   document.getElementById('setup-step-1').style.display = '';
   document.getElementById('setup-step-2').style.display = 'none';
   document.getElementById('setup-step-3').style.display = 'none';
+  // Reset error state
+  const errEl = document.getElementById('setup-error');
+  if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+  // Reset create button
+  const btn = document.getElementById('setup-create-btn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Create Vault'; }
 }
 
 function setupNext() {
-  setupStarted = true; // lock out showSetupScreen resets
   if (setupStep === 1) {
     setupStep = 2;
     document.getElementById('setup-step-1').style.display = 'none';
@@ -1276,7 +1271,6 @@ function setupBack() {
   }
 }
 
-// Suggest a default vault save path
 async function suggestDefaultPath() {
   try {
     let homePath = null;
@@ -1299,7 +1293,6 @@ async function browseVaultPath() {
     const vaultName = document.getElementById('setup-vault-name').value.trim() || 'MyVault';
     const safeName = vaultName.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-    // Tauri v2 plugin-dialog save command
     let path = null;
     if (__invoke) {
       try {
@@ -1314,7 +1307,6 @@ async function browseVaultPath() {
     }
 
     if (path && typeof path === 'string') {
-      // Ensure .qvault extension
       if (!path.endsWith('.qvault')) path += '.qvault';
       document.getElementById('setup-vault-path').value = path;
       document.getElementById('setup-path-hint').textContent = '✓ Path selected';
@@ -1347,15 +1339,16 @@ async function createVault() {
   btn.textContent = 'Creating vault…';
 
   try {
-    // Tauri v2 commands use camelCase → snake_case auto-conversion
-    await vaultCall('create_vault', {
+    // FIX: Use directInvoke for create_vault and unlock_vault — these are
+    // pre-session commands and must NOT go through vaultCall() which would
+    // set inactivity timers and intercept errors incorrectly.
+    await directInvoke('create_vault', {
       password: pwd,
       vaultPath: path,
       vaultName: name,
     });
 
-    // Unlock immediately after creation
-    await vaultCall('unlock_vault', {
+    await directInvoke('unlock_vault', {
       password: pwd,
       vaultPath: path,
     });
@@ -1367,6 +1360,7 @@ async function createVault() {
     currentVaultPath = path;
     localStorage.setItem('cypheria_last_vault', path);
 
+    // FIX: Hide setup screen before showing app
     document.getElementById('setup-screen').classList.add('hidden');
     showToast('Vault created successfully!', 'success');
     await afterUnlock();
@@ -1395,9 +1389,15 @@ function checkSetupPassword() {
 }
 
 // ─── LOCK / UNLOCK ─────────────────────────────────────────────────────────
+// FIX: showLockScreen now hides the setup screen first.
+// Previously both screens could be visible simultaneously — setup at z:600
+// sits above lock at z:500, but the blurred #app and focused password input
+// created a broken mixed state. Also clear any pending inactivity timer
+// since we're already going to the lock screen.
 function showLockScreen() {
+  if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; }
+  document.getElementById('setup-screen').classList.add('hidden');  // FIX: always hide setup
   document.getElementById('lock-screen').classList.remove('hidden');
-  document.getElementById('setup-screen').classList.add('hidden');
   document.getElementById('master-pwd').value = '';
   document.getElementById('lock-error').textContent = '';
   document.getElementById('lock-attempts-display').textContent = '';
@@ -1436,7 +1436,11 @@ async function tryUnlock() {
   btn.textContent = 'Unlocking…';
 
   try {
-    await vaultCall('unlock_vault', { password: pwd, vaultPath: currentVaultPath });
+    // FIX: Use directInvoke for unlock_vault — it is a pre-session command.
+    // Using vaultCall() here would set the inactivity timer BEFORE the vault
+    // is confirmed unlocked, and would intercept any error as "vault locked"
+    // causing an infinite lock-screen loop.
+    await directInvoke('unlock_vault', { password: pwd, vaultPath: currentVaultPath });
     pwdInput.value = '';
     lockAttempts = 0;
     hideLockScreen();
@@ -1493,12 +1497,9 @@ function startLockCooldownTimer(seconds) {
 }
 
 async function chooseVault() {
-  // Show a choice: open existing vault or create a new one
-  // We implement this inline without Tauri dialog.ask (which may vary by platform)
   const choice = confirm('Open an existing vault?\n\nClick OK to open existing, Cancel to create a new vault.');
 
   if (choice) {
-    // Open existing vault
     try {
       let path = null;
       if (__invoke) {
@@ -1512,7 +1513,8 @@ async function chooseVault() {
       if (path) {
         const p = typeof path === 'string' ? path : path[0];
         try {
-          const canonical = await vaultCall('open_vault', { vaultPath: p });
+          // FIX: directInvoke for open_vault — no session, no activity timer needed
+          const canonical = await directInvoke('open_vault', { vaultPath: p });
           currentVaultPath = canonical;
           localStorage.setItem('cypheria_last_vault', canonical);
           const name = canonical.split(/[\\/]/).pop().replace('.qvault', '');
@@ -1528,7 +1530,6 @@ async function chooseVault() {
       showToast('Could not open file dialog', 'error');
     }
   } else {
-    // Create new vault
     localStorage.removeItem('cypheria_last_vault');
     currentVaultPath = null;
     showSetupScreen();
@@ -1536,10 +1537,14 @@ async function chooseVault() {
 }
 
 async function lockVaultUI() {
-  try { await vaultCall('lock_vault'); } catch(e) {}
+  // FIX: directInvoke for lock_vault — don't use vaultCall which would
+  // bumpActivity() (setting another inactivity timer) and intercept the error
+  try { await directInvoke('lock_vault'); } catch(e) {}
   vaultEntries = [];
   vaultNotes = [];
   selectedEntryId = null;
+  // Clear inactivity timer since we're now locked
+  if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; }
   showLockScreen();
 }
 
@@ -1551,13 +1556,13 @@ function toggleLockEye() {
 // After successful unlock — load all data and show app
 async function afterUnlock() {
   hideLockScreen();
+  // FIX: Start activity tracking only AFTER successful unlock
   bumpActivity();
   setLoading(true, 'Loading vault…');
 
   try {
     await Promise.all([loadEntries(), loadNotes(), loadSettings()]);
   } catch(e) {
-    // Partial load is OK
     console.warn('Partial load after unlock:', e);
   }
 
@@ -1565,15 +1570,6 @@ async function afterUnlock() {
   navigate('dashboard');
   showToast('Vault unlocked', 'success');
 }
-
-// ─── PERSIST AFTER MUTATIONS ────────────────────────────────────────────────
-// The backend's with_session guard doesn't auto-persist. We need to trigger
-// persist explicitly. This is done in each write command on the Rust side
-// (add_entry, update_entry, delete_entry, toggle_favorite, save_note, delete_note,
-// save_settings, change_master_password).
-//
-// IMPORTANT: The Rust commands must call persist_vault after every mutation.
-// The frontend just calls the commands and reloads data.
 
 // ─── NAVIGATION ────────────────────────────────────────────────────────────
 function navigate(page) {
@@ -1899,7 +1895,6 @@ async function selectEntry(id) {
   head.appendChild(actions);
   detail.appendChild(head);
 
-  // Fields
   const fields = [
     { label: 'Username', value: entry.username || '—', copy: !!entry.username },
     { label: 'Password', value: null, isPassword: true, entryId: entry.id },
@@ -2072,7 +2067,6 @@ async function saveEditEntry() {
   try {
     let finalPwd = password;
     if (!finalPwd) {
-      // Keep current password — fetch it
       try { finalPwd = await vaultCall('get_entry_password', { entryId: id }); }
       catch(e) { finalPwd = ''; }
     }
@@ -2174,7 +2168,10 @@ async function generateNewPassword() {
   }
 
   try {
-    const result = await vaultCall('generate_password', {
+    // FIX: Use directInvoke for generate_password — it has no session requirement
+    // and we don't want bumpActivity() resetting the inactivity timer here since
+    // the generator can be used before/during vault setup in some flows.
+    const result = await directInvoke('generate_password', {
       options: { length, upper, lower, numbers, symbols }
     });
     let pwd, entropy, strength;
@@ -2474,7 +2471,7 @@ document.addEventListener('DOMContentLoaded', () => {
   init().catch(err => {
     console.error('[Cypheria] Init error:', err);
     setLoading(false);
-    if (!setupStarted) showSetupScreen();
+    showSetupScreen();
   });
 });
 </script>
