@@ -1190,20 +1190,28 @@ function showSetupError(msg) {
 
 async function suggestPath() {
   if (!_invoke) return;
+  const nameRaw = document.getElementById('setup-name').value.trim() || 'MyVault';
+  const name    = nameRaw.replace(/[^a-zA-Z0-9_\-]/g, '_');
+  const pathEl  = document.getElementById('setup-path');
+  const hint    = document.getElementById('path-hint');
+ 
+  if (pathEl.value) return; // user already chose a path
+ 
   try {
-    const homePath = await rawInvoke('plugin:path|resolve_directory', { directory: 6 });
-    const name = (document.getElementById('setup-name').value.trim() || 'MyVault').replace(/[^a-zA-Z0-9_\-]/g, '_');
-    if (homePath && typeof homePath === 'string') {
-      const sep = homePath.includes('/') ? '/' : '\\';
-      const proposed = `${homePath}${sep}${name}.qvault`;
-      if (!document.getElementById('setup-path').value) {
-        document.getElementById('setup-path').value = proposed;
-        document.getElementById('path-hint').textContent = '✓ Default path set — click Browse to change';
-        document.getElementById('path-hint').style.color = 'var(--color-green)';
-      }
+    // BaseDirectory 4 = Data = C:\Users\<user>\AppData\Roaming on Windows
+    const base = await rawInvoke('plugin:path|resolve_directory', { directory: 4 });
+    if (base && typeof base === 'string') {
+      const sep      = base.includes('/') ? '/' : '\\';
+      const proposed = `${base}${sep}Cypheria${sep}${name}.qvault`;
+      pathEl.value   = proposed;
+      hint.textContent  = '✓ Default: AppData\\Roaming\\Cypheria — click Browse to change';
+      hint.style.color  = 'var(--color-green)';
     }
   } catch (_) {
-    // silently ignore — path plugin may not be available
+    // Hard fallback — generic Windows AppData path
+    pathEl.value         = `C:\\Users\\User\\AppData\\Roaming\\Cypheria\\${name}.qvault`;
+    hint.textContent     = 'Default path set — click Browse to change';
+    hint.style.color     = 'var(--color-green)';
   }
 }
 
@@ -1212,27 +1220,27 @@ async function browseSavePath() {
   try {
     const name = (document.getElementById('setup-name').value.trim() || 'MyVault')
       .replace(/[^a-zA-Z0-9_\-]/g, '_');
-
-    // Tauri v2 plugin:dialog|save — args mirror SaveDialogOptions
+ 
+    // Tauri v2: ALL dialog args must be nested inside `options`
     const path = await rawInvoke('plugin:dialog|save', {
-      title:       'Save Vault As',
-      defaultPath: name + '.qvault',
-      filters:     [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+      options: {
+        title:       'Save Vault As',
+        defaultPath: name + '.qvault',
+        filters:     [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+      },
     });
-
+ 
     if (path && typeof path === 'string') {
       const finalPath = path.endsWith('.qvault') ? path : path + '.qvault';
-      document.getElementById('setup-path').value = finalPath;
+      document.getElementById('setup-path').value      = finalPath;
       document.getElementById('path-hint').textContent = '✓ Path selected';
       document.getElementById('path-hint').style.color = 'var(--color-green)';
     }
   } catch (e) {
-    // Surface the real Tauri error so it's visible in DevTools
     console.error('[Cypheria] browseSavePath failed:', e);
-    showToast('Could not open file dialog: ' + String(e).slice(0, 100), 'error');
+    showToast('Could not open file dialog: ' + String(e).slice(0, 120), 'error');
   }
 }
-
 
 
 async function createVault() {
@@ -1380,14 +1388,17 @@ async function openDifferentVault() {
   if (choice) {
     if (!_invoke) { showToast('File dialog requires Tauri backend', 'warning'); return; }
     try {
+      // Tauri v2: ALL dialog args must be nested inside `options`
       const p = await rawInvoke('plugin:dialog|open', {
-        title:     'Open Vault',
-        multiple:  false,
-        directory: false,
-        filters:   [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+        options: {
+          title:     'Open Vault',
+          multiple:  false,
+          directory: false,
+          filters:   [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+        },
       });
       if (p) {
-        const path = typeof p === 'string' ? p : p[0];
+        const path      = typeof p === 'string' ? p : p[0];
         const canonical = await rawInvoke('open_vault', { vaultPath: path });
         currentVaultPath = canonical;
         localStorage.setItem('cypheria_vault_path', canonical);
@@ -1406,6 +1417,7 @@ async function openDifferentVault() {
     showSetupScreen();
   }
 }
+
 
 // ─── AFTER UNLOCK ────────────────────────────────
 async function afterUnlock() {
@@ -2068,7 +2080,13 @@ function wireEvents(){
   document.getElementById('btn-get-started').addEventListener('click', () => gotoSetupStep(2));
   document.getElementById('btn-open-existing').addEventListener('click', () => {
     if (!_invoke) { showToast('Requires Tauri backend', 'warning'); return; }
-    rawInvoke('plugin:dialog|open',{title:'Open Vault',multiple:false,directory:false,filters:[{name:'Cypheria Vault',extensions:['qvault']}]})
+    rawInvoke('plugin:dialog|open', {
+      options: {
+         title:     'Open Vault',
+         multiple:  false,
+         directory: false,
+         filters:   [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+      },})
       .then(async p=>{
         if(!p)return;
         const path=typeof p==='string'?p:p[0];
