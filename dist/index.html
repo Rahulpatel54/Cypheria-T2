@@ -1248,9 +1248,8 @@ function setupNext() {
     setupStep = 2;
     document.getElementById('setup-step-1').style.display = 'none';
     document.getElementById('setup-step-2').style.display = '';
-    // Auto-suggest a default path using home directory
     if (!document.getElementById('setup-vault-path').value) {
-      suggestDefaultPath();
+      suggestDefaultPath().catch(() => {}); // non-blocking, ignore errors
     }
   } else if (setupStep === 2) {
     const name = document.getElementById('setup-vault-name').value.trim();
@@ -1279,22 +1278,19 @@ function setupBack() {
 // Suggest a default vault save path
 async function suggestDefaultPath() {
   try {
-    // Use Tauri v2 path API to get home dir
     let homePath = null;
     if (__invoke) {
       try {
-        homePath = await __invoke('plugin:path|resolve_directory', { directory: 6 }); // 6 = HomeDir
-      } catch(e) {}
+        homePath = await __invoke('plugin:path|resolve_directory', { directory: 6 });
+      } catch(e) { /* ignore */ }
     }
     const name = document.getElementById('setup-vault-name').value.trim() || 'MyVault';
     const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
-    if (homePath) {
+    if (homePath && typeof homePath === 'string') {
       const sep = homePath.includes('/') ? '/' : '\\';
       document.getElementById('setup-vault-path').value = `${homePath}${sep}${safeName}.qvault`;
     }
-  } catch(e) {
-    // OK to fail silently — user can browse manually
-  }
+  } catch(e) { /* silently ignore */ }
 }
 
 async function browseVaultPath() {
