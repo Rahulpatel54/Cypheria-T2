@@ -1020,6 +1020,7 @@ textarea.form-input{resize:vertical;min-height:72px;}
 'use strict';
 
 // ─── GLOBALS ───────────────────────────────────────────────────────────────
+let setupStarted = false;
 let __invoke = null;
 let vaultEntries = [];
 let vaultNotes   = [];
@@ -1234,6 +1235,7 @@ async function checkInitialState() {
 let setupStep = 1;
 
 function showSetupScreen() {
+  if (setupStarted) return; // don't reset if user already clicked
   document.getElementById('setup-screen').classList.remove('hidden');
   document.getElementById('lock-screen').classList.add('hidden');
   document.getElementById('loading-overlay').classList.add('hidden');
@@ -1244,13 +1246,12 @@ function showSetupScreen() {
 }
 
 function setupNext() {
+  setupStarted = true; // lock out showSetupScreen resets
   if (setupStep === 1) {
     setupStep = 2;
     document.getElementById('setup-step-1').style.display = 'none';
     document.getElementById('setup-step-2').style.display = '';
-    if (!document.getElementById('setup-vault-path').value) {
-      suggestDefaultPath().catch(() => {}); // non-blocking, ignore errors
-    }
+    suggestDefaultPath().catch(() => {});
   } else if (setupStep === 2) {
     const name = document.getElementById('setup-vault-name').value.trim();
     const path = document.getElementById('setup-vault-path').value.trim();
@@ -2473,7 +2474,7 @@ document.addEventListener('DOMContentLoaded', () => {
   init().catch(err => {
     console.error('[Cypheria] Init error:', err);
     setLoading(false);
-    showSetupScreen();
+    if (!setupStarted) showSetupScreen();
   });
 });
 </script>
