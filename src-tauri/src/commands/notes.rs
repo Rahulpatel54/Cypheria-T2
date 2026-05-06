@@ -7,7 +7,6 @@ use crate::{
     vault::notes,
 };
 
-/// Get all notes (title + content decrypted).
 #[tauri::command]
 pub async fn get_all_notes(
     session: State<'_, Arc<SessionManager>>,
@@ -15,7 +14,7 @@ pub async fn get_all_notes(
 ) -> Result<Vec<NoteView>, CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|key_store, vault_store| async move {
+        .with_session(|key_store, vault_store| {
             vault_store
                 .data
                 .notes
@@ -26,7 +25,6 @@ pub async fn get_all_notes(
         .await
 }
 
-/// Save a note — add if new, update (with key rotation) if existing.
 #[tauri::command]
 pub async fn save_note(
     note_id: Option<String>,
@@ -36,7 +34,7 @@ pub async fn save_note(
 ) -> Result<String, CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|key_store, vault_store| async move {
+        .with_session(|key_store, vault_store| {
             match note_id {
                 Some(id) => {
                     notes::update_note(key_store.vault_key_bytes(), &mut vault_store.data, &id, input)?;
@@ -50,7 +48,6 @@ pub async fn save_note(
         .await
 }
 
-/// Delete a note permanently.
 #[tauri::command]
 pub async fn delete_note(
     note_id: String,
@@ -59,7 +56,7 @@ pub async fn delete_note(
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|_key_store, vault_store| async move {
+        .with_session(|_key_store, vault_store| {
             let pre_len = vault_store.data.notes.len();
             vault_store.data.notes.retain(|n| n.id != note_id);
             if vault_store.data.notes.len() == pre_len {
