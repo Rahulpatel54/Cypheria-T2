@@ -43,7 +43,7 @@ impl AutoLockTimer {
     /// Takes an AppHandle so it can emit the "vault-auto-locked" event.
     pub fn start(self: Arc<Self>, session: Arc<SessionManager>, app: tauri::AppHandle) {
         let timer_ref = self.clone();
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             loop {
                 sleep(Duration::from_secs(10)).await; // Poll every 10 seconds
 
