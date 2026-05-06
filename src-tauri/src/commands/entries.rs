@@ -1,9 +1,4 @@
 //! Entry commands — CRUD operations exposed to the frontend via Tauri IPC.
-//!
-//! Every command:
-//!   1. Bumps the auto-lock activity timer
-//!   2. Goes through session.with_session() guard (fails if locked)
-//!   3. Persists the vault after any mutation
 
 use std::sync::Arc;
 use tauri::State;
@@ -11,18 +6,16 @@ use crate::{
     error::CypheriaError,
     models::entry::{EntryInput, EntryView},
     session::{manager::SessionManager, autolock::AutoLockTimer},
-    vault::{entry, store::persist_vault},
+    vault::entry,
 };
 
-/// Returns all entries with credentials (PASSWORD EXCLUDED).
-/// Passwords are intentionally withheld — use `get_entry_password` for those.
 #[tauri::command]
 pub async fn get_all_entries(
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<Vec<EntryView>, CypheriaError> {
     autolock.bump_activity();
-    session.with_session(|key_store, vault_store| async move {
+    session.with_session(|key_store, vault_store| {
         vault_store
             .data
             .entries
@@ -33,8 +26,6 @@ pub async fn get_all_entries(
     .await
 }
 
-/// Get password for a single entry. Separate command for audit isolation.
-/// UUID v4 format is validated before any decryption.
 #[tauri::command]
 pub async fn get_entry_password(
     entry_id: String,
@@ -42,18 +33,16 @@ pub async fn get_entry_password(
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<String, CypheriaError> {
     autolock.bump_activity();
-    // Validate UUID v4 format: 8-4-4-4-12 hex chars + dashes = 36 chars
     if entry_id.len() != 36 {
         return Err(CypheriaError::InvalidInput("Invalid entry ID format".into()));
     }
     session
-        .with_session(|key_store, vault_store| async move {
+        .with_session(|key_store, vault_store| {
             entry::get_entry_password(key_store.vault_key_bytes(), &vault_store.data, &entry_id)
         })
         .await
 }
 
-/// Add a new encrypted entry. Persists vault after insert.
 #[tauri::command]
 pub async fn add_entry(
     input: EntryInput,
@@ -61,19 +50,13 @@ pub async fn add_entry(
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<String, CypheriaError> {
     autolock.bump_activity();
-    let id = session
-        .with_session(|key_store, vault_store| async move {
-            let id = entry::add_entry(key_store.vault_key_bytes(), &mut vault_store.data, input)?;
-            persist_vault(key_store, &vault_store.data, &vault_store.header, &vault_store.header.vault_name.as_ref().map(|_| std::path::PathBuf::new()).unwrap_or_default()).await.ok();
-            Ok(id)
+    session
+        .with_session(|key_store, vault_store| {
+            entry::add_entry(key_store.vault_key_bytes(), &mut vault_store.data, input)
         })
-        .await?;
-
-    // Persist is attempted inside with_session; errors are non-fatal (data is in memory)
-    Ok(id)
+        .await
 }
 
-/// Update an existing entry. Rotates Entry Key (forward secrecy). Persists vault.
 #[tauri::command]
 pub async fn update_entry(
     entry_id: String,
@@ -83,13 +66,12 @@ pub async fn update_entry(
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|key_store, vault_store| async move {
+        .with_session(|key_store, vault_store| {
             entry::update_entry(key_store.vault_key_bytes(), &mut vault_store.data, &entry_id, input)
         })
         .await
 }
 
-/// Delete an entry permanently. Persists vault.
 #[tauri::command]
 pub async fn delete_entry(
     entry_id: String,
@@ -98,7 +80,7 @@ pub async fn delete_entry(
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|_key_store, vault_store| async move {
+        .with_session(|_key_store, vault_store| {
             let pre_len = vault_store.data.entries.len();
             vault_store.data.entries.retain(|e| e.id != entry_id);
             if vault_store.data.entries.len() == pre_len {
@@ -109,7 +91,6 @@ pub async fn delete_entry(
         .await
 }
 
-/// Toggle favorite flag (non-sensitive metadata — no re-encryption needed).
 #[tauri::command]
 pub async fn toggle_favorite(
     entry_id: String,
@@ -118,7 +99,7 @@ pub async fn toggle_favorite(
 ) -> Result<bool, CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|_key_store, vault_store| async move {
+        .with_session(|_key_store, vault_store| {
             let e = vault_store
                 .data
                 .entries
