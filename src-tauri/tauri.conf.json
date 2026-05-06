@@ -4,9 +4,8 @@
   "identifier": "com.cypheria.app",
   "build": {
     "beforeDevCommand": "",
-    "devUrl": "http://tauri.localhost",
     "beforeBuildCommand": "",
-    "frontendDist": "../"
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
