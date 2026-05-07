@@ -8,10 +8,12 @@
 ///   generator   — generate_password (server-side CSPRNG with rejection sampling)
 ///   settings    — get_settings, save_settings
 ///   vault_mgmt  — open_vault, export_vault
+///   vault_path  — get_last_vault_path, set_last_vault_path, clear_last_vault_path
+///                 (persist last-used vault path in OS app-data; no localStorage used)
 ///
 /// SECURITY CONTRACT:
 ///   Every command in this layer MUST:
-///     1. Call `autolock.bump_activity()` as its first action.
+///     1. Call `autolock.bump_activity()` as its first action (where session-guarded).
 ///     2. Route all vault access through `session.with_session()`.
 ///     3. Validate all untrusted inputs before any processing.
 ///     4. Never log passwords, key bytes, or plaintext credential data.
@@ -22,3 +24,4 @@ pub mod notes;
 pub mod generator;
 pub mod settings;
 pub mod vault_mgmt;
+pub mod vault_path;
