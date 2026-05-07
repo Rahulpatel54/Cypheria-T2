@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use tauri::State;
+use zeroize::Zeroize;
 use crate::{
     error::CypheriaError,
     models::settings::Settings,
@@ -14,10 +15,20 @@ pub async fn get_settings(
     autolock.bump_activity();
     session
         .with_session(|key_store, vault_store| {
-            let plaintext = crate::crypto::aes::decrypt(
+            // BUG-004 fix: use a domain-separated subkey instead of the raw master key.
+            // This prevents cross-purpose key reuse between settings and other domains.
+            let mut settings_key = [0u8; 32];
+            crate::crypto::kdf::derive_subkey(
                 key_store.master_key_bytes(),
+                b"SETTINGS_ENCRYPTION",
+                &mut settings_key,
+            );
+            let result = crate::crypto::aes::decrypt(
+                &settings_key,
                 &vault_store.data.settings.payload_encrypted,
-            )?;
+            );
+            settings_key.zeroize();
+            let plaintext = result?;
             serde_json::from_slice(&plaintext).or_else(|_| Ok(Settings::default()))
         })
         .await
@@ -35,8 +46,16 @@ pub async fn save_settings(
     session
         .with_session_mut(|key_store, vault_store| {
             let json = serde_json::to_vec(&settings).map_err(|_| CypheriaError::SerdeError)?;
-            vault_store.data.settings.payload_encrypted =
-                crate::crypto::aes::encrypt(key_store.master_key_bytes(), &json)?;
+            // BUG-004 fix: use a domain-separated subkey instead of the raw master key.
+            let mut settings_key = [0u8; 32];
+            crate::crypto::kdf::derive_subkey(
+                key_store.master_key_bytes(),
+                b"SETTINGS_ENCRYPTION",
+                &mut settings_key,
+            );
+            let result = crate::crypto::aes::encrypt(&settings_key, &json);
+            settings_key.zeroize();
+            vault_store.data.settings.payload_encrypted = result?;
             Ok(())
         })
         .await?;

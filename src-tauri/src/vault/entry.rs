@@ -72,13 +72,19 @@ pub fn add_entry(
 /// CRITICAL: The `password` field is intentionally EXCLUDED from the returned EntryView.
 /// The frontend must call `get_entry_password()` separately and explicitly to retrieve it.
 /// This ensures passwords are never transmitted as part of bulk list operations.
+///
+/// ERR-006 fix: `ek_bytes` is zeroized unconditionally before any `?` propagation,
+/// so the key material is always cleared even when `aes::decrypt` returns an error.
 pub fn decrypt_entry(
     vault_key: &[u8; 32],
     encrypted_entry: &EncryptedEntry,
 ) -> Result<EntryView, CypheriaError> {
     let mut ek_bytes = aes::unwrap_key(vault_key, &encrypted_entry.ek_wrapped)?;
-    let plaintext    = aes::decrypt(&ek_bytes, &encrypted_entry.payload_encrypted)?;
-    ek_bytes.zeroize();
+
+    // Decrypt, then immediately zeroize the key before touching the result.
+    let decrypt_result = aes::decrypt(&ek_bytes, &encrypted_entry.payload_encrypted);
+    ek_bytes.zeroize(); // always runs, even on error
+    let plaintext = decrypt_result?;
 
     let payload: EntryPayload =
         serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;
@@ -107,6 +113,8 @@ pub fn decrypt_entry(
 ///   - The full entry list never contains raw password bytes
 ///   - Password access is a distinct, intentional operation
 ///   - Future audit logging can target this command specifically
+///
+/// ERR-006 fix: `ek_bytes` is zeroized unconditionally before any `?` propagation.
 pub fn get_entry_password(
     vault_key: &[u8; 32],
     vault_data: &VaultData,
@@ -119,8 +127,11 @@ pub fn get_entry_password(
         .ok_or_else(|| CypheriaError::EntryNotFound(entry_id.to_string()))?;
 
     let mut ek_bytes = aes::unwrap_key(vault_key, &encrypted_entry.ek_wrapped)?;
-    let plaintext    = aes::decrypt(&ek_bytes, &encrypted_entry.payload_encrypted)?;
-    ek_bytes.zeroize();
+
+    // Decrypt, then immediately zeroize the key before touching the result.
+    let decrypt_result = aes::decrypt(&ek_bytes, &encrypted_entry.payload_encrypted);
+    ek_bytes.zeroize(); // always runs, even on error
+    let plaintext = decrypt_result?;
 
     let payload: EntryPayload =
         serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;

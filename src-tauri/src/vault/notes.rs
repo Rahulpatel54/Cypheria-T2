@@ -46,13 +46,19 @@ pub fn add_note(
 }
 
 /// Decrypt a note for display.
+///
+/// ERR-006 fix: `nk_bytes` is now zeroized unconditionally before any `?` propagation,
+/// so the key material is always cleared even when `aes::decrypt` returns an error.
 pub fn decrypt_note(
     vault_key: &[u8; 32],
     encrypted_note: &EncryptedNote,
 ) -> Result<NoteView, CypheriaError> {
     let mut nk_bytes = aes::unwrap_key(vault_key, &encrypted_note.ek_wrapped)?;
-    let plaintext    = aes::decrypt(&nk_bytes, &encrypted_note.payload_encrypted)?;
-    nk_bytes.zeroize();
+
+    // Decrypt, then immediately zeroize the key before touching the result.
+    let decrypt_result = aes::decrypt(&nk_bytes, &encrypted_note.payload_encrypted);
+    nk_bytes.zeroize(); // always runs, even on error
+    let plaintext = decrypt_result?;
 
     let payload: NotePayload =
         serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;
