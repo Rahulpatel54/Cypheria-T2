@@ -34,7 +34,7 @@ pub async fn save_note(
 ) -> Result<String, CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|key_store, vault_store| {
+        .with_session_mut(|key_store, vault_store| {
             match note_id {
                 Some(id) => {
                     notes::update_note(key_store.vault_key_bytes(), &mut vault_store.data, &id, input)?;
@@ -56,7 +56,7 @@ pub async fn delete_note(
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|_key_store, vault_store| {
+        .with_session_mut(|_key_store, vault_store| {
             let pre_len = vault_store.data.notes.len();
             vault_store.data.notes.retain(|n| n.id != note_id);
             if vault_store.data.notes.len() == pre_len {

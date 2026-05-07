@@ -176,7 +176,9 @@ pub async fn persist_vault(
     file.extend_from_slice(&data_len);
     file.extend_from_slice(&encrypted_data);
 
-    // Atomic write: .tmp → rename
+     if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
     let tmp_path = path.with_extension("qvault.tmp");
     tokio::fs::write(&tmp_path, &file).await?;
     tokio::fs::rename(&tmp_path, path).await?;

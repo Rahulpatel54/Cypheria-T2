@@ -51,7 +51,7 @@ pub async fn add_entry(
 ) -> Result<String, CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|key_store, vault_store| {
+        .with_session_mut(|key_store, vault_store| {
             entry::add_entry(key_store.vault_key_bytes(), &mut vault_store.data, input)
         })
         .await
@@ -66,7 +66,7 @@ pub async fn update_entry(
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|key_store, vault_store| {
+        .with_session_mut(|key_store, vault_store| {
             entry::update_entry(key_store.vault_key_bytes(), &mut vault_store.data, &entry_id, input)
         })
         .await
@@ -80,7 +80,7 @@ pub async fn delete_entry(
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|_key_store, vault_store| {
+        .with_session_mut(|_key_store, vault_store| {
             let pre_len = vault_store.data.entries.len();
             vault_store.data.entries.retain(|e| e.id != entry_id);
             if vault_store.data.entries.len() == pre_len {
@@ -99,7 +99,7 @@ pub async fn toggle_favorite(
 ) -> Result<bool, CypheriaError> {
     autolock.bump_activity();
     session
-        .with_session(|_key_store, vault_store| {
+        .with_session_mut(|_key_store, vault_store| {
             let e = vault_store
                 .data
                 .entries

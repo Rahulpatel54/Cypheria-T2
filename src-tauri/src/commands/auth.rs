@@ -55,7 +55,7 @@ pub async fn change_master_password(
         return Err(CypheriaError::InvalidInput("New password must be at least 8 characters".into()));
     }
 
-    let result = session.with_session(|key_store, vault_store| {
+     let result = session.with_session_mut(|key_store, vault_store| {
         use crate::crypto::{kdf, aes, kyber, rng};
         use subtle::ConstantTimeEq;
 

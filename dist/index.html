@@ -367,7 +367,7 @@ textarea.form-input{resize:vertical;min-height:72px;}
 .empty-state p{font-size:14px;text-align:center;line-height:1.6;}
 
 /* ═══════════════════════════════════════════════════
-   SETUP FORM STYLES (reuse lock-input inside setup)
+   SETUP FORM STYLES
 ═══════════════════════════════════════════════════ */
 .setup-form-group{text-align:left;margin-bottom:14px;}
 .setup-form-group label{display:block;font-size:12px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;}
@@ -1161,7 +1161,6 @@ function gotoSetupStep(n) {
     if (el) el.style.display = i === n ? '' : 'none';
   });
   if (n === 1) {
-    // reset
     document.getElementById('setup-name').value = 'My Vault';
     document.getElementById('setup-path').value = '';
     document.getElementById('setup-pwd').value  = '';
@@ -1194,25 +1193,35 @@ async function suggestPath() {
   const name    = nameRaw.replace(/[^a-zA-Z0-9_\-]/g, '_');
   const pathEl  = document.getElementById('setup-path');
   const hint    = document.getElementById('path-hint');
- 
+
   if (pathEl.value) return; // user already chose a path
- 
+
   try {
-    // BaseDirectory 4 = Data = C:\Users\<user>\AppData\Roaming on Windows
-    const base = await rawInvoke('plugin:path|resolve_directory', { directory: 4 });
+    // BUG FIX: Try Documents (dir 6) first — it always exists, no create_dir_all needed
+    // Fallback to AppData (dir 4) which needs create_dir_all (handled in Rust now)
+    let base = null;
+    for (const dir of [6, 4, 9]) {
+      try {
+        base = await rawInvoke('plugin:path|resolve_directory', { directory: dir });
+        if (base && typeof base === 'string') break;
+      } catch (_) {}
+    }
     if (base && typeof base === 'string') {
       const sep      = base.includes('/') ? '/' : '\\';
       const proposed = `${base}${sep}Cypheria${sep}${name}.qvault`;
       pathEl.value   = proposed;
-      hint.textContent  = '✓ Default: AppData\\Roaming\\Cypheria — click Browse to change';
+      hint.textContent  = '✓ Default: Documents/Cypheria — click Browse to change';
       hint.style.color  = 'var(--color-green)';
+    } else {
+      throw new Error('no base dir resolved');
     }
   } catch (_) {
-    // Hard fallback — generic Windows AppData path
-    pathEl.value         = `C:\\Users\\User\\AppData\\Roaming\\Cypheria\\${name}.qvault`;
-    hint.textContent     = 'Default path set — click Browse to change';
-    hint.style.color     = 'var(--color-green)';
+    // Can't resolve path — force user to pick manually
+    pathEl.value         = '';
+    hint.textContent     = 'Could not detect your Documents folder. Please click Browse to choose a save location.';
+    hint.style.color     = 'var(--color-amber)';
   }
+
 }
 
 async function browseSavePath() {
@@ -1220,8 +1229,7 @@ async function browseSavePath() {
   try {
     const name = (document.getElementById('setup-name').value.trim() || 'MyVault')
       .replace(/[^a-zA-Z0-9_\-]/g, '_');
- 
-    // Tauri v2: ALL dialog args must be nested inside `options`
+
     const path = await rawInvoke('plugin:dialog|save', {
       options: {
         title:       'Save Vault As',
@@ -1229,7 +1237,7 @@ async function browseSavePath() {
         filters:     [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
       },
     });
- 
+
     if (path && typeof path === 'string') {
       const finalPath = path.endsWith('.qvault') ? path : path + '.qvault';
       document.getElementById('setup-path').value      = finalPath;
@@ -1241,7 +1249,6 @@ async function browseSavePath() {
     showToast('Could not open file dialog: ' + String(e).slice(0, 120), 'error');
   }
 }
-
 
 async function createVault() {
   const name    = document.getElementById('setup-name').value.trim();
@@ -1272,8 +1279,8 @@ async function createVault() {
     currentVaultPath = path;
     localStorage.setItem('cypheria_vault_path', path);
 
+    // BUG FIX: Hide setup screen BEFORE afterUnlock so #app becomes visible
     document.getElementById('setup-screen').classList.add('hidden');
-    hideLoading();
 
     appUnlocked = true;
     bumpInactivity();
@@ -1388,7 +1395,6 @@ async function openDifferentVault() {
   if (choice) {
     if (!_invoke) { showToast('File dialog requires Tauri backend', 'warning'); return; }
     try {
-      // Tauri v2: ALL dialog args must be nested inside `options`
       const p = await rawInvoke('plugin:dialog|open', {
         options: {
           title:     'Open Vault',
@@ -1418,10 +1424,14 @@ async function openDifferentVault() {
   }
 }
 
-
 // ─── AFTER UNLOCK ────────────────────────────────
+// BUG FIX 1: Show #app visible class here so the main UI is always revealed after unlock
 async function afterUnlock() {
   showLoading('Loading vault…');
+  // Ensure overlays are hidden and app shell is visible
+  document.getElementById('lock-screen').classList.add('hidden');
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('app').classList.add('visible');
   navigate('dashboard');
   try {
     await Promise.all([loadEntries(), loadNotes(), loadSettings()]);
@@ -1638,7 +1648,6 @@ async function selectEntry(id) {
   const detail = document.getElementById('vault-detail');
   detail.innerHTML = '';
 
-  // Head
   const head = document.createElement('div'); head.className = 'detail-head';
   const icon = document.createElement('div'); icon.className = 'detail-icon';
   icon.style.cssText = `background:${entry.color||'#8b5cf6'}22;border-color:${entry.color||'#8b5cf6'}44;color:${entry.color||'#8b5cf6'};`;
@@ -1655,7 +1664,6 @@ async function selectEntry(id) {
   head.appendChild(icon); head.appendChild(nameEl); head.appendChild(acts);
   detail.appendChild(head);
 
-  // Fields
   const fields = [
     {label:'Username', value:entry.username||'—', copy:!!entry.username},
     {label:'Password', isPassword:true, entryId:entry.id},
@@ -1673,7 +1681,6 @@ async function selectEntry(id) {
       val.textContent='••••••••••••••••';
       let visible=false; let reMaskTimer=null; let cachedPwd=null;
       const fa=document.createElement('div'); fa.className='field-actions';
-      // eye
       const eyeB=document.createElement('div');eyeB.className='icon-btn';eyeB.title='Show/hide';
       eyeB.innerHTML='<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
       eyeB.onclick=async()=>{
@@ -1685,7 +1692,6 @@ async function selectEntry(id) {
           reMaskTimer=setTimeout(()=>{val.textContent='••••••••••••••••';visible=false;cachedPwd=null;},10000);
         }
       };
-      // copy pwd
       const cpyB=document.createElement('div');cpyB.className='icon-btn';cpyB.title='Copy password';
       cpyB.innerHTML='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
       cpyB.onclick=async()=>{
@@ -1708,7 +1714,6 @@ async function selectEntry(id) {
     detail.appendChild(block);
   });
 
-  // Footer
   const footer=document.createElement('div');footer.className='detail-footer';
   const c=document.createElement('div');c.className='detail-meta';c.textContent='Created: '+fmtDate(entry.created_at);
   const u=document.createElement('div');u.className='detail-meta';u.textContent='Updated: '+fmtDate(entry.updated_at);
@@ -1853,7 +1858,6 @@ function generatePassword() {
   const numbers = document.getElementById('gen-numbers')?.checked??true;
   const symbols = document.getElementById('gen-symbols')?.checked??true;
   if(!upper&&!lower&&!numbers&&!symbols){showToast('Select at least one character set','warning');return;}
-  // Try backend first, fall back to client-side
   if (_invoke) {
     rawInvoke('generate_password',{options:{length,upper,lower,numbers,symbols}})
       .then(r=>{
@@ -1886,7 +1890,6 @@ function clientGenPassword(length,upper,lower,numbers,symbols){
   const max=Math.floor(0x100000000/chars.length)*chars.length;
   let out='',i=0;
   while(out.length<length&&i<arr.length){if(arr[i]<max)out+=chars[arr[i]%chars.length];i++;}
-  // fallback if not enough accepted values (extremely rare)
   while(out.length<length){const b=new Uint32Array(1);crypto.getRandomValues(b);if(b[0]<max)out+=chars[b[0]%chars.length];}
   return out;
 }
@@ -2048,10 +2051,11 @@ function switchSettingsTab(tab){
   });
 }
 
-// ─── WINDOW CONTROLS ─────────────────────────────
+// ─── WINDOW CONTROLS — BUG FIX 3 ────────────────
+// Tauri v2 window commands are invoked directly (not via plugin:window| prefix)
 function winAction(action){
   if(!_invoke)return;
-  rawInvoke(`plugin:window|${action}`,{label:'main'}).catch(()=>{});
+  rawInvoke(`plugin:window|${action}`,{}).catch(()=>{});
 }
 
 // ─── SETUP PASSWORD STRENGTH ─────────────────────
@@ -2124,6 +2128,7 @@ function wireEvents(){
   document.getElementById('logo-link').addEventListener('click', ()=>navigate('dashboard'));
   document.getElementById('tb-settings').addEventListener('click', ()=>navigate('settings'));
   document.getElementById('tb-lock').addEventListener('click', lockVaultUI);
+  // BUG FIX 3: Window control buttons now use correct Tauri v2 command names
   document.getElementById('win-close').addEventListener('click', ()=>winAction('close'));
   document.getElementById('win-min').addEventListener('click', ()=>winAction('minimize'));
   document.getElementById('win-max').addEventListener('click', ()=>winAction('toggle_maximize'));
@@ -2251,7 +2256,6 @@ async function boot() {
   hideLoading();
 
   if (!hasTauri) {
-    // Browser/dev preview — show setup screen with demo mode notice
     showSetupScreen();
     showToast('Running without Tauri backend (preview mode)', 'warning');
     return;

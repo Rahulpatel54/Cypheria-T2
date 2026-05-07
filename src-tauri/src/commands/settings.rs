@@ -33,7 +33,7 @@ pub async fn save_settings(
     let new_timeout = settings.auto_lock_secs;
 
     session
-        .with_session(|key_store, vault_store| {
+        .with_session_mut(|key_store, vault_store| {
             let json = serde_json::to_vec(&settings).map_err(|_| CypheriaError::SerdeError)?;
             vault_store.data.settings.payload_encrypted =
                 crate::crypto::aes::encrypt(key_store.master_key_bytes(), &json)?;

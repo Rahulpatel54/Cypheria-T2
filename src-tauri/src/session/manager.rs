@@ -113,6 +113,36 @@ impl SessionManager {
         }
     }
 
+    pub async fn with_session_mut<T, F>(&self, f: F) -> Result<T, CypheriaError>
+    where
+        F: FnOnce(&ActiveKeyStore, &mut VaultStore) -> Result<T, CypheriaError>,
+    {
+        let mut state = self.state.write().await;
+        match &mut *state {
+            SessionState::Unlocked { key_store, vault_store, vault_path, .. } => {
+                let result = f(key_store, vault_store)?;
+                // Persist to disk after every mutation
+                crate::vault::store::persist_vault(
+                    key_store,
+                    &vault_store.data,
+                    &vault_store.header,
+                    vault_path,
+                )
+                .await?;
+                Ok(result)
+            }
+            SessionState::RateLimited { locked_until, .. } => {
+                if Instant::now() < *locked_until {
+                    let remaining = locked_until.duration_since(Instant::now()).as_secs();
+                    Err(CypheriaError::RateLimited(remaining))
+                } else {
+                    Err(CypheriaError::VaultLocked)
+                }
+            }
+            SessionState::Locked => Err(CypheriaError::VaultLocked),
+        }
+    }
+
     pub async fn vault_path(&self) -> Option<std::path::PathBuf> {
         let state = self.state.read().await;
         if let SessionState::Unlocked { vault_path, .. } = &*state {
