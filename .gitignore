@@ -13,3 +13,5 @@ target/
 # ⚡ Tauri build outputs
 # dist/
 build/
+release/
+cypheria.exe

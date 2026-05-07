@@ -219,7 +219,7 @@ tbody td{padding:12px 20px;}
 .notes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
 .note-card{background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;cursor:pointer;transition:border-color 0.2s,box-shadow 0.2s;display:flex;flex-direction:column;gap:6px;position:relative;}
 .note-card:hover{border-color:var(--border-accent);box-shadow:var(--glow-purple-md);}
-.note-title{font-size:14px;font-weight:600;color:var(--text-primary);}
+.note-title{font-size:14px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
 .note-preview{font-size:12px;color:var(--text-secondary);line-height:1.5;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;}
 .note-date{font-size:11px;color:var(--text-muted);}
 .note-delete{position:absolute;top:10px;right:10px;opacity:0;transition:opacity 0.15s;}
@@ -1069,6 +1069,7 @@ let clipInterval     = null;
 let inactivityTimer  = null;
 let settingsDebounce = null;
 let confirmCallback  = null;
+const passwordRevealTimers = new Map();
 let appUnlocked      = false;
 
 // ─── TAURI BRIDGE ────────────────────────────────
@@ -1386,6 +1387,9 @@ function startLockCooldown(seconds) {
 async function lockVaultUI() {
   try { await rawInvoke('lock_vault'); } catch (_) {}
   appUnlocked = false;
+  if (settingsDebounce) { clearTimeout(settingsDebounce); settingsDebounce = null; }
+  passwordRevealTimers.forEach(tid => clearTimeout(tid));
+  passwordRevealTimers.clear();
   if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; }
   showLockScreen();
 }
@@ -1540,9 +1544,12 @@ function makeAvatar(entry, size = 28) {
 }
 
 function fmtDate(iso) {
-  if (!iso) return '—';
-  try { return new Date(iso).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
-  catch { return iso; }
+    if (!iso) return '—';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '—';
+        return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+    } catch { return '—'; }
 }
 
 // ─── DASHBOARD ───────────────────────────────────
@@ -1689,7 +1696,12 @@ async function selectEntry(id) {
           eyeB.style.opacity='0.5';
           if(!cachedPwd){try{cachedPwd=await vaultCall('get_entry_password',{entryId:f.entryId});}catch(e){eyeB.style.opacity='';showToast('Failed to reveal password','error');return;}}
           val.textContent=cachedPwd;visible=true;eyeB.style.opacity='';
-          reMaskTimer=setTimeout(()=>{val.textContent='••••••••••••••••';visible=false;cachedPwd=null;},10000);
+          if (passwordRevealTimers.has(entry.id)) { clearTimeout(passwordRevealTimers.get(entry.id)); }
+          const tid = setTimeout(() => {
+              val.textContent='••••••••••••••••'; visible=false; cachedPwd=null;
+              passwordRevealTimers.delete(entry.id);
+          }, 10000);
+          passwordRevealTimers.set(entry.id, tid);
         }
       };
       const cpyB=document.createElement('div');cpyB.className='icon-btn';cpyB.title='Copy password';
@@ -1775,7 +1787,20 @@ async function saveEditEntry() {
   try {
     const existing=vaultEntries.find(e=>e.id===id);
     let finalPwd=password;
-    if(!finalPwd){try{finalPwd=await vaultCall('get_entry_password',{entryId:id});}catch(_){finalPwd='';}}
+    if (!finalPwd) {
+    try {
+        finalPwd = await vaultCall('get_entry_password', { entryId: id });
+    } catch(e) {
+        document.getElementById('edit-error').textContent = 'Could not retrieve existing password. Please enter the password manually to save.';
+        btn.disabled = false;
+        return;
+    }
+}
+if (!finalPwd) {
+    document.getElementById('edit-error').textContent = 'Password cannot be empty. Enter a new password or the existing one.';
+    btn.disabled = false;
+    return;
+}
     const input={name:title,username,password:finalPwd,website,notes,is_favorite:existing?.is_favorite??false,category:existing?.category||'general',color:existing?.color||'#8b5cf6',emoji:existing?.emoji||title.charAt(0).toUpperCase()};
     await vaultCall('update_entry',{entryId:id,input});
     closeModal('modal-edit-entry');
@@ -1788,11 +1813,18 @@ async function saveEditEntry() {
 }
 
 async function toggleFavorite(id) {
-  try {
-    await vaultCall('toggle_favorite',{entryId:id});
-    await loadEntries();
-    if(selectedEntryId===id) selectEntry(id);
-  } catch(_){showToast('Failed to update favorite','error');}
+    try {
+        const newState = await vaultCall('toggle_favorite', {entryId: id});
+        const entry = vaultEntries.find(e => e.id === id);
+        if (entry) entry.is_favorite = newState;
+        const btn = document.getElementById('star-' + id);
+        if (btn) btn.className = 'star-btn' + (newState ? ' starred' : '');
+        document.getElementById('dash-favs').textContent =
+            vaultEntries.filter(e => e.is_favorite).length;
+        if (document.getElementById('page-favorites').classList.contains('active')) {
+            renderFavorites();
+        }
+    } catch(_) { showToast('Failed to update favorite', 'error'); }
 }
 
 function confirmDelete(type, id, name) {
@@ -1890,8 +1922,18 @@ function clientGenPassword(length,upper,lower,numbers,symbols){
   const max=Math.floor(0x100000000/chars.length)*chars.length;
   let out='',i=0;
   while(out.length<length&&i<arr.length){if(arr[i]<max)out+=chars[arr[i]%chars.length];i++;}
-  while(out.length<length){const b=new Uint32Array(1);crypto.getRandomValues(b);if(b[0]<max)out+=chars[b[0]%chars.length];}
-  return out;
+  let maxAttempts = length * 1000;
+  while (out.length < length && maxAttempts-- > 0) {
+      const b = new Uint32Array(1);
+      crypto.getRandomValues(b);
+      if (b[0] < max) out += chars[b[0] % chars.length];
+  }
+  while (out.length < length) {
+      const b = new Uint32Array(1);
+      crypto.getRandomValues(b);
+      out += chars[b[0] % chars.length];
+  }
+    return out;
 }
 
 function updateGenStrength(pwd,entropy,strength){
@@ -2129,9 +2171,12 @@ function wireEvents(){
   document.getElementById('tb-settings').addEventListener('click', ()=>navigate('settings'));
   document.getElementById('tb-lock').addEventListener('click', lockVaultUI);
   // BUG FIX 3: Window control buttons now use correct Tauri v2 command names
-  document.getElementById('win-close').addEventListener('click', ()=>winAction('close'));
-  document.getElementById('win-min').addEventListener('click', ()=>winAction('minimize'));
-  document.getElementById('win-max').addEventListener('click', ()=>winAction('toggle_maximize'));
+  document.getElementById('win-close').addEventListener('click', () =>
+    rawInvoke('plugin:window|close', { label: 'main' }).catch(()=>{}));
+  document.getElementById('win-min').addEventListener('click', () =>
+      rawInvoke('plugin:window|minimize', { label: 'main' }).catch(()=>{}));
+  document.getElementById('win-max').addEventListener('click', () =>
+      rawInvoke('plugin:window|internal_toggle_maximize', { label: 'main' }).catch(()=>{}));
 
   // Sidebar nav
   document.querySelectorAll('#sidebar .nav-item[data-page]').forEach(n=>{

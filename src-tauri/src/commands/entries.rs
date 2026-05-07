@@ -9,6 +9,13 @@ use crate::{
     vault::entry,
 };
 
+fn validate_uuid(id: &str) -> Result<(), CypheriaError> {
+    uuid::Uuid::parse_str(id)
+        .map_err(|_| CypheriaError::InvalidInput("Invalid ID format".into()))?;
+    Ok(())
+}
+
+
 #[tauri::command]
 pub async fn get_all_entries(
     session: State<'_, Arc<SessionManager>>,
@@ -34,7 +41,7 @@ pub async fn get_entry_password(
 ) -> Result<String, CypheriaError> {
     autolock.bump_activity();
     if entry_id.len() != 36 {
-        return Err(CypheriaError::InvalidInput("Invalid entry ID format".into()));
+        validate_uuid(&entry_id)?;
     }
     session
         .with_session(|key_store, vault_store| {
@@ -59,6 +66,7 @@ pub async fn add_entry(
 
 #[tauri::command]
 pub async fn update_entry(
+    validate_uuid(&entry_id)?;
     entry_id: String,
     input: EntryInput,
     session: State<'_, Arc<SessionManager>>,
@@ -74,6 +82,7 @@ pub async fn update_entry(
 
 #[tauri::command]
 pub async fn delete_entry(
+    validate_uuid(&entry_id)?;
     entry_id: String,
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
@@ -93,6 +102,7 @@ pub async fn delete_entry(
 
 #[tauri::command]
 pub async fn toggle_favorite(
+    validate_uuid(&entry_id)?;
     entry_id: String,
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,

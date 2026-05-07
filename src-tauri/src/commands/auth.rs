@@ -91,6 +91,7 @@ pub async fn change_master_password(
         vault_store.header.kyber_ciphertext     = kyber_ciphertext;
         vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
 
+        key_store.master_key = crate::crypto::keys::MasterKey(new_mk);
         Ok(())
     }).await;
 
@@ -167,8 +168,10 @@ pub async fn create_vault(
         format_version:      FORMAT_VERSION,
     };
 
+    {
     let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
     persist_vault(&key_store, &vault_data, &header, &path).await?;
+    }
 
     Ok(())
 }

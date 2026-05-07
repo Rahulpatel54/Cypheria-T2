@@ -96,10 +96,10 @@ impl SessionManager {
     /// No async inside the closure; all crypto operations are synchronous anyway.
     pub async fn with_session<T, F>(&self, f: F) -> Result<T, CypheriaError>
     where
-        F: FnOnce(&ActiveKeyStore, &mut VaultStore) -> Result<T, CypheriaError>,
+        F: FnOnce(&ActiveKeyStore, &VaultStore) -> Result<T, CypheriaError>,
     {
-        let mut state = self.state.write().await;
-        match &mut *state {
+        let state = self.state.read().await;
+        match &*state {
             SessionState::Unlocked { key_store, vault_store, .. } => f(key_store, vault_store),
             SessionState::RateLimited { locked_until, .. } => {
                 if Instant::now() < *locked_until {

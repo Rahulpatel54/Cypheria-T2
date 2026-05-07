@@ -76,8 +76,15 @@ pub async fn load_and_unlock(
     // Step 4: Verify HMAC over the header section (tamper detection before decryption)
     let mut hmac_key = [0u8; 32];
     kdf::derive_subkey(&mk_bytes, b"HMAC_VAULT_INTEGRITY", &mut hmac_key);
-    verify_vault_hmac(
+    // Build the full covered region: everything before the HMAC
+    let data_section_start = hmac_end + 4; // skip the DATA_LEN u32
+    let covered_region = [
         &file_bytes[..header_end],
+        &file_bytes[hmac_end..hmac_end + 4],       // DATA_LEN
+        &file_bytes[data_section_start..],          // DATA
+    ].concat();
+    verify_vault_hmac(
+        &covered_region,
         &file_bytes[header_end..hmac_end],
         &hmac_key,
     )?;
@@ -161,6 +168,8 @@ pub async fn persist_vault(
     covered.extend_from_slice(&FORMAT_VERSION.to_le_bytes());
     covered.extend_from_slice(&header_len);
     covered.extend_from_slice(&header_bytes);
+    covered.extend_from_slice(&data_len);
+    covered.extend_from_slice(&encrypted_data);
 
     use hmac::{Hmac, Mac};
     use sha2::Sha256;

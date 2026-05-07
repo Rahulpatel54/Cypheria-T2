@@ -15,12 +15,6 @@ pub mod session;
 pub mod commands;
 pub mod models;
 
-/// Application state shared across all Tauri commands via State<'_, Arc<T>>.
-pub struct AppState {
-    pub session:  Arc<session::manager::SessionManager>,
-    pub autolock: Arc<session::autolock::AutoLockTimer>,
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let session  = Arc::new(session::manager::SessionManager::new());
