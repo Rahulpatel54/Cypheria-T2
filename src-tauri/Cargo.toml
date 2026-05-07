@@ -29,7 +29,7 @@ pqcrypto-kyber    = "0.8"
 pqcrypto-traits   = "0.3"
 
 # Memory security
-zeroize     = { version = "1.7", features = ["derive", "alloc"] }
+zeroize     = { version = "1.7", features = ["zeroize_derive", "alloc"] }
 secrecy     = "0.8"
 subtle      = "2.5"
 

@@ -66,13 +66,15 @@ pub async fn add_entry(
 
 #[tauri::command]
 pub async fn update_entry(
-    validate_uuid(&entry_id)?;
     entry_id: String,
     input: EntryInput,
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
+    validate_uuid(&entry_id)?;
+
+
     session
         .with_session_mut(|key_store, vault_store| {
             entry::update_entry(key_store.vault_key_bytes(), &mut vault_store.data, &entry_id, input)
@@ -82,12 +84,12 @@ pub async fn update_entry(
 
 #[tauri::command]
 pub async fn delete_entry(
-    validate_uuid(&entry_id)?;
     entry_id: String,
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<(), CypheriaError> {
     autolock.bump_activity();
+    validate_uuid(&entry_id)?;
     session
         .with_session_mut(|_key_store, vault_store| {
             let pre_len = vault_store.data.entries.len();
@@ -102,12 +104,12 @@ pub async fn delete_entry(
 
 #[tauri::command]
 pub async fn toggle_favorite(
-    validate_uuid(&entry_id)?;
     entry_id: String,
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<bool, CypheriaError> {
     autolock.bump_activity();
+    validate_uuid(&entry_id)?;
     session
         .with_session_mut(|_key_store, vault_store| {
             let e = vault_store

@@ -1,20 +1,20 @@
-//! Key hierarchy types — the nerve center of Cypheria's security model.
-//!
-//! Every type that holds key material implements Zeroize and ZeroizeOnDrop.
-//! When any of these structs are dropped, their memory is overwritten with zeros
-//! before being released. This prevents key material from lingering in freed heap pages.
-//!
-//! Key hierarchy:
-//!   MasterKey  — derived from master password via Argon2id; never stored on disk
-//!   VaultKey   — random 32-byte key; stored wrapped with MK in vault header
-//!   EntryKey   — random 32-byte key per entry; stored wrapped with VK in vault
-
 use zeroize::{Zeroize, ZeroizeOnDrop};
+/// Key hierarchy types — the nerve center of Cypheria's security model.
+///
+/// Every type that holds key material implements Zeroize and ZeroizeOnDrop.
+/// When any of these structs are dropped, their memory is overwritten with zeros
+/// before being released. This prevents key material from lingering in freed heap pages.
+///
+/// Key hierarchy:
+///   MasterKey  — derived from master password via Argon2id; never stored on disk
+///   VaultKey   — random 32-byte key; stored wrapped with MK in vault header
+///   EntryKey   — random 32-byte key per entry; stored wrapped with VK in vault
+
 
 /// Master Key — derived from the user's master password via Argon2id.
 /// Lives ONLY in memory while the vault is unlocked.
 /// Never serialized. Zeroized on lock (via ActiveKeyStore drop).
-#[derive(ZeroizeOnDrop)]
+#[derive(Zeroize, ZeroizeOnDrop)]
 pub struct MasterKey(pub(crate) [u8; 32]);
 
 /// Vault Key — encrypts all entry keys.

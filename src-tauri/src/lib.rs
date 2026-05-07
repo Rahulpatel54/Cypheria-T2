@@ -6,7 +6,6 @@
 //!   - AutoLockTimer: inactivity timer background task
 
 use std::sync::Arc;
-use tauri::Manager;
 
 pub mod error;
 pub mod crypto;

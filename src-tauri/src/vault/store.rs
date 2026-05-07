@@ -7,7 +7,7 @@
 use std::path::Path;
 use zeroize::Zeroize;
 use crate::{
-    crypto::{kdf, aes, keys::ActiveKeyStore, rng},
+    crypto::{kdf, aes, keys::ActiveKeyStore},
     error::CypheriaError,
     vault::format::*,
 };
@@ -71,7 +71,7 @@ pub async fn load_and_unlock(
         .map_err(|_| CypheriaError::VaultCorrupted)?;
 
     // Step 3: Derive Master Key
-    let mut mk_bytes = kdf::derive_master_key(password, &header.argon2_salt)?;
+    let mk_bytes = kdf::derive_master_key(password, &header.argon2_salt)?;
 
     // Step 4: Verify HMAC over the header section (tamper detection before decryption)
     let mut hmac_key = [0u8; 32];

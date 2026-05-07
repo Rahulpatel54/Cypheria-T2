@@ -1,7 +1,6 @@
 //! Key derivation using Argon2id (OWASP-compliant parameters).
 
 use argon2::{Argon2, Algorithm, Version, Params};
-use zeroize::Zeroize;
 use crate::error::CypheriaError;
 
 /// Argon2id parameters — OWASP recommended minimum for high-security use.

@@ -115,11 +115,11 @@ impl SessionManager {
 
     pub async fn with_session_mut<T, F>(&self, f: F) -> Result<T, CypheriaError>
     where
-        F: FnOnce(&ActiveKeyStore, &mut VaultStore) -> Result<T, CypheriaError>,
+        F: FnOnce(&mut ActiveKeyStore, &mut VaultStore) -> Result<T, CypheriaError>,
     {
         let mut state = self.state.write().await;
         match &mut *state {
-            SessionState::Unlocked { key_store, vault_store, vault_path, .. } => {
+            SessionState::Unlocked { ref mut key_store, vault_store, vault_path, .. } => {
                 let result = f(key_store, vault_store)?;
                 // Persist to disk after every mutation
                 crate::vault::store::persist_vault(
