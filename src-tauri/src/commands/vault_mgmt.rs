@@ -1,4 +1,4 @@
-//! Vault management commands — open, export, import.
+//! Vault management commands — open, export.
 
 use std::sync::Arc;
 use tauri::State;
@@ -7,21 +7,8 @@ use crate::{
     session::{manager::SessionManager, autolock::AutoLockTimer},
 };
 
-// BUG-006 fix: panic boundary macro — see auth.rs for rationale.
-macro_rules! safe_command {
-    ($body:block) => {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
-            Ok(result) => result,
-            Err(_) => Err(CypheriaError::InternalError(
-                "Unexpected internal error".into(),
-            )),
-        }
-    };
-}
-
-/// Open an existing vault by setting the vault path.
+/// Open an existing vault by validating the file and returning its canonical path.
 /// The actual unlock (key derivation) is done via unlock_vault().
-/// This command just validates the file exists and looks like a .qvault file.
 #[tauri::command]
 pub async fn open_vault(vault_path: String) -> Result<String, CypheriaError> {
     use crate::vault::format::MAGIC;
@@ -36,14 +23,16 @@ pub async fn open_vault(vault_path: String) -> Result<String, CypheriaError> {
     let mut file = tokio::fs::File::open(&path).await?;
     use tokio::io::AsyncReadExt;
     let mut magic_buf = [0u8; 9];
-    file.read_exact(&mut magic_buf).await
+    file.read_exact(&mut magic_buf)
+        .await
         .map_err(|_| CypheriaError::VaultCorrupted)?;
 
     if &magic_buf != MAGIC {
         return Err(CypheriaError::VaultCorrupted);
     }
 
-    let canonical = path.canonicalize()
+    let canonical = path
+        .canonicalize()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or(vault_path);
 
@@ -51,7 +40,7 @@ pub async fn open_vault(vault_path: String) -> Result<String, CypheriaError> {
 }
 
 /// Export (copy) the current vault file to a destination path.
-/// Useful for USB backup. The file is already encrypted — no re-encryption needed.
+/// The file is already encrypted — no re-encryption needed.
 #[tauri::command]
 pub async fn export_vault(
     destination_path: String,
@@ -67,21 +56,14 @@ pub async fn export_vault(
 
     let dest = std::path::PathBuf::from(&destination_path);
 
-    // BUG-011 fix: the previous check blocked overwriting a *different* existing
-    // file but silently allowed exporting to the vault's OWN path, which would
-    // cause tokio::fs::copy to truncate the source file mid-write, corrupting it.
-    //
-    // New logic:
-    //   - If dest == vault_path (same file): always reject — this is self-corruption.
-    //   - If dest is a different existing file: allow (copy will atomically replace it).
+    // BUG-011 fix: reject export to the vault's own path to prevent
+    // tokio::fs::copy from truncating the source file mid-write.
     if dest.canonicalize().ok() == vault_path.canonicalize().ok() {
         return Err(CypheriaError::InvalidInput(
             "Cannot export vault to its own location. Choose a different path.".into(),
         ));
     }
 
-    safe_command!({
-        tokio::fs::copy(&vault_path, &dest).await?;
-        Ok(())
-    })
+    tokio::fs::copy(&vault_path, &dest).await?;
+    Ok(())
 }
