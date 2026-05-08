@@ -8,6 +8,19 @@ use crate::{
     session::{manager::SessionManager, autolock::AutoLockTimer},
 };
 
+// BUG-006 fix: macro that wraps any command body in catch_unwind so a panic
+// cannot bypass ZeroizeOnDrop and leave key material live in freed memory.
+macro_rules! safe_command {
+    ($body:block) => {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
+            Ok(result) => result,
+            Err(_) => Err(CypheriaError::InternalError(
+                "Unexpected internal error".into(),
+            )),
+        }
+    };
+}
+
 #[tauri::command]
 pub async fn unlock_vault(
     password: String,
@@ -55,44 +68,58 @@ pub async fn change_master_password(
         return Err(CypheriaError::InvalidInput("New password must be at least 8 characters".into()));
     }
 
-     let result = session.with_session_mut(|key_store, vault_store| {
-        use crate::crypto::{kdf, aes, kyber, rng};
-        use subtle::ConstantTimeEq;
+    // BUG-006 fix: wrap the entire async body in safe_command! via a sync
+    // closure passed to with_session_mut (which is already sync inside).
+    let result = session.with_session_mut(|key_store, vault_store| {
+        safe_command!({
+            use crate::crypto::{kdf, aes, kyber, rng};
+            use subtle::ConstantTimeEq;
 
-        // 1. Verify old password matches current MK
-        let derived_mk = kdf::derive_master_key(&old_bytes, &vault_store.header.argon2_salt)?;
-        let matches: bool = derived_mk.ct_eq(key_store.master_key_bytes()).into();
-        if !matches {
-            return Err(CypheriaError::AuthFailed);
-        }
+            // 1. Verify old password matches current MK
+            let derived_mk = kdf::derive_master_key(&old_bytes, &vault_store.header.argon2_salt)?;
+            let matches: bool = derived_mk.ct_eq(key_store.master_key_bytes()).into();
+            if !matches {
+                return Err(CypheriaError::AuthFailed);
+            }
 
-        // 2. Generate new salt and new Master Key
-        let new_salt = rng::argon2_salt();
-        let new_mk   = kdf::derive_master_key(&new_bytes, &new_salt)?;
+            // 2. Generate new salt and new Master Key
+            let new_salt = rng::argon2_salt();
+            let new_mk   = kdf::derive_master_key(&new_bytes, &new_salt)?;
 
-        // 3. Re-wrap VK with new MK
-        let new_vk_wrapped = aes::wrap_key(&new_mk, key_store.vault_key_bytes())?;
+            // 3. Re-wrap VK with new MK
+            let new_vk_wrapped = aes::wrap_key(&new_mk, key_store.vault_key_bytes())?;
 
-        // 4. Re-generate Kyber keypair and re-wrap VK post-quantum
-        let kp = kyber::generate_keypair();
-        let pub_key = kp.public_key.clone();
-        let sec_key = kp.secret_key.clone();
-        drop(kp);
+            // 4. Re-generate Kyber keypair and re-wrap VK post-quantum
+            let kp = kyber::generate_keypair();
+            let pub_key = kp.public_key.clone();
+            let sec_key = kp.secret_key.clone();
+            drop(kp);
 
-        let (kyber_ciphertext, vk_wrapped_pq) =
-            kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
-        let kyber_sk_encrypted = aes::encrypt(&new_mk, &sec_key)?;
+            let (kyber_ciphertext, vk_wrapped_pq) =
+                kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
+            let kyber_sk_encrypted = aes::encrypt(&new_mk, &sec_key)?;
 
-        // 5. Update header
-        vault_store.header.argon2_salt          = new_salt;
-        vault_store.header.vk_wrapped_classical = new_vk_wrapped;
-        vault_store.header.kyber_public_key     = pub_key;
-        vault_store.header.kyber_sk_encrypted   = kyber_sk_encrypted;
-        vault_store.header.kyber_ciphertext     = kyber_ciphertext;
-        vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
+            // 5. Update header
+            vault_store.header.argon2_salt          = new_salt;
+            vault_store.header.vk_wrapped_classical = new_vk_wrapped;
+            vault_store.header.kyber_public_key     = pub_key;
+            vault_store.header.kyber_sk_encrypted   = kyber_sk_encrypted;
+            vault_store.header.kyber_ciphertext     = kyber_ciphertext;
+            vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
 
-        key_store.master_key = crate::crypto::keys::MasterKey(new_mk);
-        Ok(())
+            key_store.master_key = crate::crypto::keys::MasterKey(new_mk);
+
+            // BUG-005 fix: sync KDF params in the header to current constants.
+            // Without this, if ARGON2_* constants change between releases, a
+            // vault whose password was changed under the old constants will
+            // store stale params, causing unlock to derive a different key and
+            // fail authentication.
+            vault_store.header.kdf_memory_kb   = kdf::ARGON2_MEMORY_KB;
+            vault_store.header.kdf_iterations  = kdf::ARGON2_ITERATIONS;
+            vault_store.header.kdf_parallelism = kdf::ARGON2_PARALLELISM;
+
+            Ok(())
+        })
     }).await;
 
     old_bytes.zeroize();
@@ -169,8 +196,8 @@ pub async fn create_vault(
     };
 
     {
-    let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
-    persist_vault(&key_store, &vault_data, &header, &path).await?;
+        let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
+        persist_vault(&key_store, &vault_data, &header, &path).await?;
     }
 
     Ok(())

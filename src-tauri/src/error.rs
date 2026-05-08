@@ -43,6 +43,11 @@ pub enum CypheriaError {
 
     #[error("Session expired")]
     SessionExpired,
+
+    // BUG-006 fix: returned when a panic is caught at a command entry point,
+    // preventing the panic from bypassing ZeroizeOnDrop on ActiveKeyStore.
+    #[error("Internal error: {0}")]
+    InternalError(String),
 }
 
 // CRITICAL: Never expose internal crypto details to the frontend.

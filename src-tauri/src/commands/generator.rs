@@ -1,16 +1,22 @@
 //! Server-side CSPRNG password generator.
-//!
-//! IMPROVEMENTS over a naive implementation:
-//!   1. Rejection sampling — prevents modulo bias for non-power-of-2 charsets
-//!   2. Real entropy calculation — returns log2(charset^length) for accurate strength meter
-//!   3. All randomness from OsRng (OS entropy source, same as the rest of the crypto stack)
 
 use rand::RngCore;
 use rand::rngs::OsRng;
 use serde::Serialize;
 use crate::{error::CypheriaError, models::entry::GenOptions};
 
-/// Result returned to the frontend.
+// BUG-006 fix: panic boundary macro — see auth.rs for rationale.
+macro_rules! safe_command {
+    ($body:block) => {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
+            Ok(result) => result,
+            Err(_) => Err(CypheriaError::InternalError(
+                "Unexpected internal error".into(),
+            )),
+        }
+    };
+}
+
 #[derive(Serialize)]
 pub struct PasswordGenResult {
     pub password:     String,
@@ -19,70 +25,58 @@ pub struct PasswordGenResult {
     pub charset_size: u32,
 }
 
-/// Generate a cryptographically secure password.
-///
-/// Uses rejection sampling to eliminate modulo bias — for any charset that is
-/// not a power of 2, naive `byte % charset_len` over-represents low-index chars.
-/// We reject bytes above `floor(256 / charset_len) * charset_len` so the
-/// distribution across the charset is perfectly uniform.
 #[tauri::command]
 pub fn generate_password(options: GenOptions) -> Result<PasswordGenResult, CypheriaError> {
-    // Validate length bounds
-    if options.length < 4 || options.length > 256 {
-        return Err(CypheriaError::InvalidInput("Password length must be between 4 and 256".into()));
-    }
-
-    // Build character set from enabled classes
-    let mut charset = String::new();
-    if options.upper   { charset.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ"); }
-    if options.lower   { charset.push_str("abcdefghijklmnopqrstuvwxyz"); }
-    if options.numbers { charset.push_str("0123456789"); }
-    if options.symbols { charset.push_str("!@#$%^&*()_+-=[]{}|;:,.<>?"); }
-
-    if charset.is_empty() {
-        return Err(CypheriaError::InvalidInput(
-            "At least one character class must be selected".into(),
-        ));
-    }
-
-    let charset_bytes: Vec<u8> = charset.bytes().collect();
-    let charset_len = charset_bytes.len();
-
-    // Rejection sampling threshold:
-    // Accept bytes in [0, max_valid) — this range divides evenly into `charset_len` groups
-    let max_valid = (256 / charset_len) * charset_len;
-
-    let mut password = Vec::with_capacity(options.length);
-    let mut buf = [0u8; 1];
-    let mut accepted = 0usize;
-
-    while accepted < options.length {
-        OsRng.fill_bytes(&mut buf);
-        let byte = buf[0] as usize;
-        if byte < max_valid {
-            password.push(charset_bytes[byte % charset_len]);
-            accepted += 1;
+    safe_command!({
+        if options.length < 4 || options.length > 256 {
+            return Err(CypheriaError::InvalidInput("Password length must be between 4 and 256".into()));
         }
-        // Rejected bytes are discarded — no modulo bias in accepted bytes
-    }
 
-    let pwd_str = String::from_utf8(password).map_err(|_| CypheriaError::CryptoError)?;
+        let mut charset = String::new();
+        if options.upper   { charset.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZ"); }
+        if options.lower   { charset.push_str("abcdefghijklmnopqrstuvwxyz"); }
+        if options.numbers { charset.push_str("0123456789"); }
+        if options.symbols { charset.push_str("!@#$%^&*()_+-=[]{}|;:,.<>?"); }
 
-    // True entropy: log2(charset_size ^ length) = length * log2(charset_size)
-    let entropy_bits = (options.length as f64) * (charset_len as f64).log2();
+        if charset.is_empty() {
+            return Err(CypheriaError::InvalidInput(
+                "At least one character class must be selected".into(),
+            ));
+        }
 
-    let strength = match entropy_bits as u32 {
-        0..=35  => "Weak",
-        36..=59 => "Moderate",
-        60..=79 => "Strong",
-        _       => "Very Strong",
-    };
+        let charset_bytes: Vec<u8> = charset.bytes().collect();
+        let charset_len = charset_bytes.len();
+        let max_valid = (256 / charset_len) * charset_len;
 
-    Ok(PasswordGenResult {
-        password:     pwd_str,
-        entropy_bits: entropy_bits as u32,
-        strength:     strength.to_string(),
-        charset_size: charset_len as u32,
+        let mut password = Vec::with_capacity(options.length);
+        let mut buf = [0u8; 1];
+        let mut accepted = 0usize;
+
+        while accepted < options.length {
+            OsRng.fill_bytes(&mut buf);
+            let byte = buf[0] as usize;
+            if byte < max_valid {
+                password.push(charset_bytes[byte % charset_len]);
+                accepted += 1;
+            }
+        }
+
+        let pwd_str = String::from_utf8(password).map_err(|_| CypheriaError::CryptoError)?;
+        let entropy_bits = (options.length as f64) * (charset_len as f64).log2();
+
+        let strength = match entropy_bits as u32 {
+            0..=35  => "Weak",
+            36..=59 => "Moderate",
+            60..=79 => "Strong",
+            _       => "Very Strong",
+        };
+
+        Ok(PasswordGenResult {
+            password:     pwd_str,
+            entropy_bits: entropy_bits as u32,
+            strength:     strength.to_string(),
+            charset_size: charset_len as u32,
+        })
     })
 }
 
@@ -103,7 +97,6 @@ mod tests {
 
     #[test]
     fn test_entropy_calculation() {
-        // 16 chars from 26 lowercase = 16 * log2(26) ≈ 75 bits
         let result = generate_password(opts(16, false, true, false, false)).unwrap();
         assert!(result.entropy_bits >= 70, "Expected ~75 bits, got {}", result.entropy_bits);
         assert_eq!(result.strength, "Strong");

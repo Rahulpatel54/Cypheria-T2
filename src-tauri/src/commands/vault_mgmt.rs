@@ -7,6 +7,18 @@ use crate::{
     session::{manager::SessionManager, autolock::AutoLockTimer},
 };
 
+// BUG-006 fix: panic boundary macro — see auth.rs for rationale.
+macro_rules! safe_command {
+    ($body:block) => {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
+            Ok(result) => result,
+            Err(_) => Err(CypheriaError::InternalError(
+                "Unexpected internal error".into(),
+            )),
+        }
+    };
+}
+
 /// Open an existing vault by setting the vault path.
 /// The actual unlock (key derivation) is done via unlock_vault().
 /// This command just validates the file exists and looks like a .qvault file.
@@ -31,7 +43,6 @@ pub async fn open_vault(vault_path: String) -> Result<String, CypheriaError> {
         return Err(CypheriaError::VaultCorrupted);
     }
 
-    // Return the canonical path for the frontend to store
     let canonical = path.canonicalize()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or(vault_path);
@@ -56,13 +67,21 @@ pub async fn export_vault(
 
     let dest = std::path::PathBuf::from(&destination_path);
 
-    // Prevent overwrite of different file without confirmation
-    if dest.exists() && dest.canonicalize().ok() != vault_path.canonicalize().ok() {
+    // BUG-011 fix: the previous check blocked overwriting a *different* existing
+    // file but silently allowed exporting to the vault's OWN path, which would
+    // cause tokio::fs::copy to truncate the source file mid-write, corrupting it.
+    //
+    // New logic:
+    //   - If dest == vault_path (same file): always reject — this is self-corruption.
+    //   - If dest is a different existing file: allow (copy will atomically replace it).
+    if dest.canonicalize().ok() == vault_path.canonicalize().ok() {
         return Err(CypheriaError::InvalidInput(
-            "Destination file already exists. Choose a different path.".into(),
+            "Cannot export vault to its own location. Choose a different path.".into(),
         ));
     }
 
-    tokio::fs::copy(&vault_path, &dest).await?;
-    Ok(())
+    safe_command!({
+        tokio::fs::copy(&vault_path, &dest).await?;
+        Ok(())
+    })
 }
