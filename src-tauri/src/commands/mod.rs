@@ -18,6 +18,20 @@
 ///     3. Validate all untrusted inputs before any processing.
 ///     4. Never log passwords, key bytes, or plaintext credential data.
 
+#[macro_export]
+macro_rules! safe_command {
+    ($body:block) => {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
+            Ok(result) => result,
+            Err(_) => Err(crate::error::CypheriaError::InternalError(
+                "Unexpected internal error".into(),
+            )),
+        }
+    };
+}
+
+
+
 pub mod auth;
 pub mod entries;
 pub mod notes;

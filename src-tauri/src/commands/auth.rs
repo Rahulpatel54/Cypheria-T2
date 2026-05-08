@@ -8,18 +8,6 @@ use crate::{
     session::{manager::SessionManager, autolock::AutoLockTimer},
 };
 
-// BUG-006 fix: macro that wraps any command body in catch_unwind so a panic
-// cannot bypass ZeroizeOnDrop and leave key material live in freed memory.
-macro_rules! safe_command {
-    ($body:block) => {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
-            Ok(result) => result,
-            Err(_) => Err(CypheriaError::InternalError(
-                "Unexpected internal error".into(),
-            )),
-        }
-    };
-}
 
 #[tauri::command]
 pub async fn unlock_vault(

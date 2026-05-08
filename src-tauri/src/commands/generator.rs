@@ -5,17 +5,6 @@ use rand::rngs::OsRng;
 use serde::Serialize;
 use crate::{error::CypheriaError, models::entry::GenOptions};
 
-// BUG-006 fix: panic boundary macro — see auth.rs for rationale.
-macro_rules! safe_command {
-    ($body:block) => {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
-            Ok(result) => result,
-            Err(_) => Err(CypheriaError::InternalError(
-                "Unexpected internal error".into(),
-            )),
-        }
-    };
-}
 
 #[derive(Serialize)]
 pub struct PasswordGenResult {
