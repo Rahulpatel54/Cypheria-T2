@@ -63,6 +63,8 @@ pub async fn delete_note(
             if vault_store.data.notes.len() == pre_len {
                 return Err(CypheriaError::NoteNotFound(note_id.clone()));
             }
+            // ERR-007 fix: stamp the vault-level updated_at on deletion.
+            vault_store.data.updated_at = chrono::Utc::now();
             Ok(())
         })
         .await

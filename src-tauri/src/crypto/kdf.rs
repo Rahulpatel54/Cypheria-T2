@@ -41,6 +41,34 @@ pub fn derive_master_key(
     Ok(output_key)
 }
 
+/// Derive a 32-byte Master Key using caller-supplied Argon2id parameters.
+/// Used by `load_and_unlock` to honour the params stored in the vault header,
+/// ensuring old vaults remain readable after KDF constants are updated.
+pub fn derive_master_key_with_params(
+    password: &[u8],
+    salt: &[u8; 32],
+    memory_kb: u32,
+    iterations: u32,
+    parallelism: u32,
+) -> Result<[u8; ARGON2_OUTPUT_LEN], CypheriaError> {
+    let params = Params::new(
+        memory_kb,
+        iterations,
+        parallelism,
+        Some(ARGON2_OUTPUT_LEN),
+    )
+    .map_err(|_| CypheriaError::KdfError)?;
+
+    let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+    let mut output_key = [0u8; ARGON2_OUTPUT_LEN];
+
+    argon2
+        .hash_password_into(password, salt, &mut output_key)
+        .map_err(|_| CypheriaError::KdfError)?;
+
+    Ok(output_key)
+}
+
 /// Domain-separated subkey derivation.
 ///
 /// Derives different 32-byte subkeys from the same Master Key for different
@@ -80,6 +108,34 @@ mod tests {
         let key1 = derive_master_key(password, &salt1).unwrap();
         let key2 = derive_master_key(password, &salt2).unwrap();
         assert_ne!(key1, key2, "Different salts must produce different keys");
+    }
+
+    #[test]
+    fn test_derive_master_key_with_params_matches_default() {
+        // Verify that derive_master_key_with_params produces the same result
+        // as derive_master_key when called with the same compile-time constants.
+        let password = b"test_password_42";
+        let salt = [0xAB_u8; 32];
+        let key1 = derive_master_key(password, &salt).unwrap();
+        let key2 = derive_master_key_with_params(
+            password,
+            &salt,
+            ARGON2_MEMORY_KB,
+            ARGON2_ITERATIONS,
+            ARGON2_PARALLELISM,
+        )
+        .unwrap();
+        assert_eq!(key1, key2, "With-params must match default when constants are equal");
+    }
+
+    #[test]
+    fn test_derive_master_key_with_params_different_memory() {
+        // Different memory param must produce a different key.
+        let password = b"test_password";
+        let salt = [0x01_u8; 32];
+        let key1 = derive_master_key_with_params(password, &salt, 65536, 3, 4).unwrap();
+        let key2 = derive_master_key_with_params(password, &salt, 32768, 3, 4).unwrap();
+        assert_ne!(key1, key2, "Different memory param must produce different key");
     }
 
     #[test]

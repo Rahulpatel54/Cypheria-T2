@@ -23,7 +23,7 @@ pub struct VaultStore {
 /// Security steps (in order):
 ///   1. Verify magic bytes
 ///   2. Parse and deserialize the header
-///   3. Derive Master Key from password + salt
+///   3. Derive Master Key from password + salt using header-stored KDF params
 ///   4. Derive HMAC subkey; verify HMAC over MAGIC+VERSION+HEADER_LEN+HEADER (tamper detection)
 ///   5. Unwrap Vault Key (classical path — AES-GCM with MK)
 ///   6. Decrypt VaultData with VK
@@ -38,7 +38,12 @@ pub async fn load_and_unlock(
     password: &[u8],
     path: &Path,
 ) -> Result<(ActiveKeyStore, VaultStore), CypheriaError> {
-    if !path.exists() {
+    // ERR-005 fix: use the async variant so the Tokio thread is not blocked
+    // during the filesystem round-trip.
+    if !tokio::fs::try_exists(&path)
+        .await
+        .map_err(|_| CypheriaError::VaultNotFound)?
+    {
         return Err(CypheriaError::VaultNotFound);
     }
 
@@ -77,7 +82,15 @@ pub async fn load_and_unlock(
         .map_err(|_| CypheriaError::VaultCorrupted)?;
 
     // Step 3: Derive Master Key
-    let mk_bytes = kdf::derive_master_key(password, &header.argon2_salt)?;
+    // ERR-003 fix: use the KDF params stored in the header, not the compile-time
+    // constants, so vaults created under old params remain unlockable.
+    let mk_bytes = kdf::derive_master_key_with_params(
+        password,
+        &header.argon2_salt,
+        header.kdf_memory_kb,
+        header.kdf_iterations,
+        header.kdf_parallelism,
+    )?;
 
     // Step 4: Verify HMAC over exactly MAGIC + VERSION + HEADER_LEN + HEADER
     // This must match what persist_vault() signed.

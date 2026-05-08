@@ -64,6 +64,9 @@ pub fn add_entry(
         payload_encrypted,
     });
 
+    // ERR-007 fix: stamp the vault-level updated_at on every mutation.
+    vault_data.updated_at = Utc::now();
+
     Ok(id)
 }
 
@@ -183,6 +186,9 @@ pub fn update_entry(
     encrypted_entry.category          = input.category.unwrap_or(encrypted_entry.category.clone());
     encrypted_entry.color             = input.color.unwrap_or(encrypted_entry.color.clone());
     encrypted_entry.emoji             = input.emoji.unwrap_or(encrypted_entry.emoji.clone());
+
+    // ERR-007 fix: stamp the vault-level updated_at on every mutation.
+    vault_data.updated_at = Utc::now();
 
     Ok(())
 }

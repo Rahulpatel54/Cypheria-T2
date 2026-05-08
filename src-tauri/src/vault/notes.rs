@@ -42,6 +42,9 @@ pub fn add_note(
         payload_encrypted,
     });
 
+    // ERR-007 fix: stamp the vault-level updated_at on every mutation.
+    vault_data.updated_at = Utc::now();
+
     Ok(id)
 }
 
@@ -102,6 +105,9 @@ pub fn update_note(
     encrypted_note.payload_encrypted = payload_encrypted;
     encrypted_note.ek_wrapped        = ek_wrapped;
     encrypted_note.updated_at        = Utc::now();
+
+    // ERR-007 fix: stamp the vault-level updated_at on every mutation.
+    vault_data.updated_at = Utc::now();
 
     Ok(())
 }

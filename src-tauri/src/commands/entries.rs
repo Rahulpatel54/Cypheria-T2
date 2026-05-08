@@ -101,6 +101,8 @@ pub async fn delete_entry(
             if vault_store.data.entries.len() == pre_len {
                 return Err(CypheriaError::EntryNotFound(entry_id.clone()));
             }
+            // ERR-007 fix: stamp the vault-level updated_at on deletion.
+            vault_store.data.updated_at = chrono::Utc::now();
             Ok(())
         })
         .await
