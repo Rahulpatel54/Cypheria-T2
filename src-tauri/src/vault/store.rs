@@ -23,11 +23,12 @@ pub struct VaultStore {
 /// Security steps (in order):
 ///   1. Verify magic bytes
 ///   2. Parse and deserialize the header
-///   3. Derive Master Key from password + salt using header-stored KDF params
-///   4. Derive HMAC subkey; verify HMAC over MAGIC+VERSION+HEADER_LEN+HEADER (tamper detection)
-///   5. Unwrap Vault Key (classical path — AES-GCM with MK)
-///   6. Decrypt VaultData with VK
-///   7. Return (ActiveKeyStore, VaultStore)
+///   3. Verify format version — reject files from incompatible future versions
+///   4. Derive Master Key from password + salt using header-stored KDF params
+///   5. Derive HMAC subkey; verify HMAC over MAGIC+VERSION+HEADER_LEN+HEADER
+///   6. Unwrap Vault Key (classical path — AES-GCM with MK)
+///   7. Decrypt VaultData with VK
+///   8. Return (ActiveKeyStore, VaultStore)
 ///
 /// File layout on disk:
 ///   MAGIC(9) | VERSION(2) | HEADER_LEN(4) | HEADER(n) | HMAC(32) | DATA_LEN(4) | DATA(m)
@@ -81,6 +82,19 @@ pub async fn load_and_unlock(
     let header: VaultHeader = bincode::deserialize(&file_bytes[header_start..header_end])
         .map_err(|_| CypheriaError::VaultCorrupted)?;
 
+    // FIX: IMPROVE-007 — reject vault files written by an incompatible format version.
+    // A vault with format_version > FORMAT_VERSION was written by a newer build and
+    // may use layout changes we do not understand. Reject it with a clear message.
+    // A vault with format_version < FORMAT_VERSION could be migrated; for now we
+    // require an exact match and surface a descriptive error.
+    if header.format_version != FORMAT_VERSION {
+        return Err(CypheriaError::InvalidInput(format!(
+            "Unsupported vault format version {} (this build supports version {}). \
+             Please use a compatible version of Cypheria.",
+            header.format_version, FORMAT_VERSION
+        )));
+    }
+
     // Step 3: Derive Master Key
     // ERR-003 fix: use the KDF params stored in the header, not the compile-time
     // constants, so vaults created under old params remain unlockable.
@@ -111,7 +125,7 @@ pub async fn load_and_unlock(
     let vk_bytes = aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)
         .map_err(|_| CypheriaError::AuthFailed)?;
 
-    // Step 6: Build ActiveKeyStore (owns both keys; ZeroizeOnDrop)
+    // Step 6: Build ActiveKeyStore (owns both keys; zeroized on drop)
     let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
 
     // Step 7: Decrypt VaultData
@@ -129,6 +143,8 @@ pub async fn load_and_unlock(
 
 /// Constant-time HMAC verification.
 /// Prevents timing attacks that would reveal partial HMAC matches.
+// FIX: IMPROVE-005 — #[must_use] ensures callers cannot silently ignore the Result.
+#[must_use = "HMAC verification result must be checked — ignoring it bypasses tamper detection"]
 fn verify_vault_hmac(
     covered_data: &[u8],
     expected_hmac: &[u8],

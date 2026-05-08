@@ -9,6 +9,8 @@ use crate::{
     vault::entry,
 };
 
+// FIX: IMPROVE-005 — #[must_use] ensures callers cannot discard the validation result.
+#[must_use = "UUID validation result must be checked with ?"]
 fn validate_uuid(id: &str) -> Result<(), CypheriaError> {
     uuid::Uuid::parse_str(id)
         .map_err(|_| CypheriaError::InvalidInput("Invalid ID format".into()))?;
@@ -24,12 +26,14 @@ pub async fn get_all_entries(
         autolock.bump_activity();
         session
             .with_session(|key_store, vault_store| {
-                vault_store
-                    .data
-                    .entries
-                    .iter()
-                    .map(|e| entry::decrypt_entry(key_store.vault_key_bytes(), e))
-                    .collect::<Result<Vec<_>, _>>()
+                catch_sync_panic!({
+                    vault_store
+                        .data
+                        .entries
+                        .iter()
+                        .map(|e| entry::decrypt_entry(key_store.vault_key_bytes(), e))
+                        .collect::<Result<Vec<_>, _>>()
+                })
             })
             .await
     })
@@ -47,7 +51,9 @@ pub async fn get_entry_password(
         validate_uuid(&entry_id)?;
         session
             .with_session(|key_store, vault_store| {
-                entry::get_entry_password(key_store.vault_key_bytes(), &vault_store.data, &entry_id)
+                catch_sync_panic!({
+                    entry::get_entry_password(key_store.vault_key_bytes(), &vault_store.data, &entry_id)
+                })
             })
             .await
     })
@@ -63,12 +69,13 @@ pub async fn add_entry(
         autolock.bump_activity();
         session
             .with_session_mut(|key_store, vault_store| {
-                entry::add_entry(key_store.vault_key_bytes(), &mut vault_store.data, input)
+                catch_sync_panic!({
+                    entry::add_entry(key_store.vault_key_bytes(), &mut vault_store.data, input)
+                })
             })
             .await
     })
 }
-
 
 #[tauri::command]
 pub async fn update_entry(
@@ -83,12 +90,14 @@ pub async fn update_entry(
         validate_uuid(&entry_id)?;
         session
             .with_session_mut(|key_store, vault_store| {
-                entry::update_entry(
-                    key_store.vault_key_bytes(),
-                    &mut vault_store.data,
-                    &entry_id,
-                    input,
-                )
+                catch_sync_panic!({
+                    entry::update_entry(
+                        key_store.vault_key_bytes(),
+                        &mut vault_store.data,
+                        &entry_id,
+                        input,
+                    )
+                })
             })
             .await
     })
@@ -106,19 +115,20 @@ pub async fn delete_entry(
         validate_uuid(&entry_id)?;
         session
             .with_session_mut(|_key_store, vault_store| {
-                let pre_len = vault_store.data.entries.len();
-                vault_store.data.entries.retain(|e| e.id != entry_id);
-                if vault_store.data.entries.len() == pre_len {
-                    return Err(CypheriaError::EntryNotFound(entry_id.clone()));
-                }
-                // ERR-007 fix: stamp the vault-level updated_at on deletion.
-                vault_store.data.updated_at = chrono::Utc::now();
-                Ok(())
+                catch_sync_panic!({
+                    let pre_len = vault_store.data.entries.len();
+                    vault_store.data.entries.retain(|e| e.id != entry_id);
+                    if vault_store.data.entries.len() == pre_len {
+                        return Err(CypheriaError::EntryNotFound(entry_id.clone()));
+                    }
+                    // ERR-007 fix: stamp the vault-level updated_at on deletion.
+                    vault_store.data.updated_at = chrono::Utc::now();
+                    Ok(())
+                })
             })
             .await
     })
 }
-
 
 #[tauri::command]
 pub async fn toggle_favorite(
@@ -132,14 +142,16 @@ pub async fn toggle_favorite(
         validate_uuid(&entry_id)?;
         session
             .with_session_mut(|_key_store, vault_store| {
-                let e = vault_store
-                    .data
-                    .entries
-                    .iter_mut()
-                    .find(|e| e.id == entry_id)
-                    .ok_or_else(|| CypheriaError::EntryNotFound(entry_id.clone()))?;
-                e.is_favorite = !e.is_favorite;
-                Ok(e.is_favorite)
+                catch_sync_panic!({
+                    let e = vault_store
+                        .data
+                        .entries
+                        .iter_mut()
+                        .find(|e| e.id == entry_id)
+                        .ok_or_else(|| CypheriaError::EntryNotFound(entry_id.clone()))?;
+                    e.is_favorite = !e.is_favorite;
+                    Ok(e.is_favorite)
+                })
             })
             .await
     })

@@ -56,10 +56,11 @@ pub async fn change_master_password(
         return Err(CypheriaError::InvalidInput("New password must be at least 8 characters".into()));
     }
 
-    // BUG-006 fix: wrap the entire async body in safe_command! via a sync
-    // closure passed to with_session_mut (which is already sync inside).
+    // BUG-006 fix: wrap the entire sync closure body in catch_sync_panic!
+    // to prevent a panic inside the password-change logic from bypassing
+    // ZeroizeOnDrop on ActiveKeyStore.
     let result = session.with_session_mut(|key_store, vault_store| {
-        safe_command!({
+        catch_sync_panic!({
             use crate::crypto::{kdf, aes, kyber, rng};
             use subtle::ConstantTimeEq;
 
@@ -95,13 +96,10 @@ pub async fn change_master_password(
             vault_store.header.kyber_ciphertext     = kyber_ciphertext;
             vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
 
-            key_store.master_key = crate::crypto::keys::MasterKey(new_mk);
+            // FIX: IMPROVE-001 — MasterKey::new() replaces direct tuple construction.
+            key_store.master_key = crate::crypto::keys::MasterKey::new(new_mk);
 
             // BUG-005 fix: sync KDF params in the header to current constants.
-            // Without this, if ARGON2_* constants change between releases, a
-            // vault whose password was changed under the old constants will
-            // store stale params, causing unlock to derive a different key and
-            // fail authentication.
             vault_store.header.kdf_memory_kb   = kdf::ARGON2_MEMORY_KB;
             vault_store.header.kdf_iterations  = kdf::ARGON2_ITERATIONS;
             vault_store.header.kdf_parallelism = kdf::ARGON2_PARALLELISM;

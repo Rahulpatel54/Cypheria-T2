@@ -17,7 +17,6 @@
 ///     2. Route all vault access through `session.with_session()`.
 ///     3. Validate all untrusted inputs before any processing.
 ///     4. Never log passwords, key bytes, or plaintext credential data.
-
 #[macro_export]
 macro_rules! safe_command {
     ($body:block) => {
@@ -25,7 +24,27 @@ macro_rules! safe_command {
     };
 }
 
+#[macro_export]
+macro_rules! catch_sync_panic {
+    ($body:block) => {{
+        use std::panic::{self, AssertUnwindSafe};
+        use $crate::error::CypheriaError;
 
+        panic::catch_unwind(AssertUnwindSafe(|| $body)).unwrap_or_else(|payload| {
+            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic payload".to_string()
+            };
+            eprintln!("[Cypheria] caught sync panic in vault closure: {msg}");
+            Err(CypheriaError::InternalError(
+                "An unexpected internal error occurred".to_string(),
+            ))
+        })
+    }};
+}
 
 pub mod auth;
 pub mod entries;
