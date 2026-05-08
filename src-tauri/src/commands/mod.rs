@@ -21,12 +21,7 @@
 #[macro_export]
 macro_rules! safe_command {
     ($body:block) => {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $body)) {
-            Ok(result) => result,
-            Err(_) => Err(crate::error::CypheriaError::InternalError(
-                "Unexpected internal error".into(),
-            )),
-        }
+        $body
     };
 }
 
