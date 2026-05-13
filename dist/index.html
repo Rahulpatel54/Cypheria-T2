@@ -1088,7 +1088,6 @@ let currentVaultPath = null;
 let selectedEntryId  = null;
 let lockAttempts     = 0;
 let lockCooldown     = false;
-let autoLockSecs     = 300;
 let clipSecs         = 30;
 let clipTimer        = null;
 let clipInterval     = null;
@@ -1118,7 +1117,6 @@ async function initTauri() {
 // Session-guarded vault calls (bumps inactivity timer)
 async function vaultCall(cmd, args = {}) {
   if (!_invoke) throw new Error('Backend unavailable');
-  bumpInactivity();
   try {
     return await _invoke(cmd, args);
   } catch (err) {
@@ -1165,31 +1163,6 @@ async function clearPersistedVaultPath() {
     await rawInvoke('clear_last_vault_path');
   } catch (_) {}
 }
-
-// ─── INACTIVITY TIMER ────────────────────────────
-function bumpInactivity() {
-  if (!appUnlocked) return;
-  if (inactivityTimer) clearTimeout(inactivityTimer);
-  if (autoLockSecs > 0) {
-    inactivityTimer = setTimeout(() => {
-      if (appUnlocked) lockVaultUI();
-    }, autoLockSecs * 1000);
-  }
-}
-
-['mousedown','keydown','touchstart'].forEach(e =>
-  document.addEventListener(e, bumpInactivity, { passive: true })
-);
-
-let blurTimer = null;
-window.addEventListener('blur', () => {
-  if (!appUnlocked || autoLockSecs === 0) return;
-  blurTimer = setTimeout(() => { if (appUnlocked) lockVaultUI(); }, autoLockSecs * 1000);
-});
-window.addEventListener('focus', () => {
-  if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
-  bumpInactivity();
-});
 
 // ─── LOADING ─────────────────────────────────────
 function showLoading(msg = 'Loading…') {
@@ -1250,7 +1223,7 @@ async function suggestPath() {
   const pathEl  = document.getElementById('setup-path');
   const hint    = document.getElementById('path-hint');
 
-  if (pathEl.value) return;
+  if (pathEl.value) return; // First check — before async gap
 
   try {
     let base = null;
@@ -1260,6 +1233,10 @@ async function suggestPath() {
         if (base && typeof base === 'string') break;
       } catch (_) {}
     }
+
+    // BUG-010 fix: re-check AFTER the await — user may have typed during async gap
+    if (pathEl.value) return;
+
     if (base && typeof base === 'string') {
       const sep      = base.includes('/') ? '/' : '\\';
       const proposed = `${base}${sep}Cypheria${sep}${name}.qvault`;
@@ -1270,6 +1247,8 @@ async function suggestPath() {
       throw new Error('no base dir resolved');
     }
   } catch (_) {
+    // BUG-010 fix: also check on error path before clearing user input
+    if (pathEl.value) return;
     pathEl.value         = '';
     hint.textContent     = 'Could not detect your Documents folder. Please click Browse to choose a save location.';
     hint.style.color     = 'var(--color-amber)';
@@ -1343,7 +1322,6 @@ async function createVault() {
 
     document.getElementById('setup-screen').classList.add('hidden');
     appUnlocked = true;
-    bumpInactivity();
     await afterUnlock();
     showToast('Vault created successfully!', 'success');
 
@@ -1363,7 +1341,6 @@ async function createVault() {
 // ─── LOCK SCREEN ─────────────────────────────────
 function showLockScreen() {
   appUnlocked = false;
-  if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; }
   vaultEntries = []; vaultNotes = []; selectedEntryId = null;
 
   document.getElementById('setup-screen').classList.add('hidden');
@@ -1408,7 +1385,6 @@ async function tryUnlock() {
     pwd = null; // BUG-003: dereference immediately after use
     lockAttempts = 0;
     appUnlocked = true;
-    bumpInactivity();
     hideLockScreen();
     await afterUnlock();
     showToast('Vault unlocked', 'success');
@@ -1461,7 +1437,6 @@ async function lockVaultUI() {
   if (settingsDebounce) { clearTimeout(settingsDebounce); settingsDebounce = null; }
   passwordRevealTimers.forEach(tid => clearTimeout(tid));
   passwordRevealTimers.clear();
-  if (inactivityTimer) { clearTimeout(inactivityTimer); inactivityTimer = null; }
   showLockScreen();
 }
 
@@ -1578,10 +1553,8 @@ async function loadSettings() {
   try {
     const s = await vaultCall('get_settings');
     if (!s) return;
-    autoLockSecs = s.auto_lock_secs ?? 300;
     clipSecs     = s.clear_clipboard_secs ?? 30;
     const el = id => document.getElementById(id);
-    if (el('set-autolock')) el('set-autolock').value = String(autoLockSecs);
     if (el('set-clipboard')) el('set-clipboard').value = String(clipSecs);
     if (el('set-startup') && s.launch_at_startup !== undefined) el('set-startup').checked = s.launch_at_startup;
     if (el('set-tray')    && s.minimize_to_tray  !== undefined) el('set-tray').checked    = s.minimize_to_tray;
@@ -1601,7 +1574,6 @@ async function saveSettings() {
         show_password_default: document.getElementById('set-showpwd')?.checked ?? false,
         clear_clipboard_secs:  parseInt(document.getElementById('set-clipboard')?.value ?? '30'),
       };
-      autoLockSecs = settings.auto_lock_secs;
       clipSecs     = settings.clear_clipboard_secs;
       await vaultCall('save_settings', { settings });
     } catch (_) { showToast('Failed to save settings', 'error'); }
@@ -1784,7 +1756,15 @@ async function selectEntry(id) {
       const cpyB=document.createElement('div');cpyB.className='icon-btn';cpyB.title='Copy password';
       cpyB.innerHTML='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
       cpyB.onclick=async()=>{
-        try{const p=await vaultCall('get_entry_password',{entryId:f.entryId});copyToClipboard(p,'Password');}
+        try{
+          // BUG-012 fix: password never crosses IPC — Rust writes directly to clipboard
+          await vaultCall('copy_entry_password_to_clipboard',{
+            entryId:f.entryId,
+            timeoutSecs:clipSecs||30,
+          });
+          showToast(`Password copied — clears in ${clipSecs||30}s`,'success');
+          startClipCountdown();
+        }
         catch(e){showToast('Failed to copy password','error');}
       };
       fa.appendChild(eyeB);fa.appendChild(cpyB);
@@ -1859,36 +1839,61 @@ async function saveEditEntry() {
   const website  = document.getElementById('edit-website').value.trim();
   const notes    = document.getElementById('edit-notes').value.trim();
   document.getElementById('edit-error').textContent='';
-  if(!title){document.getElementById('edit-error').textContent='Title is required';return;}
-  const btn=document.getElementById('btn-edit-save');btn.disabled=true;
+
+  if (!title) {
+    document.getElementById('edit-error').textContent='Title is required';
+    return;
+  }
+
+  const btn=document.getElementById('btn-edit-save');
+  btn.disabled=true;
+
   try {
     const existing=vaultEntries.find(e=>e.id===id);
     let finalPwd=password;
+
     if (!finalPwd) {
+      // BUG-007 fix: explicitly surface password fetch errors instead of silently failing
       try {
         finalPwd = await vaultCall('get_entry_password', { entryId: id });
-      } catch(e) {
-        document.getElementById('edit-error').textContent = 'Could not retrieve existing password. Please enter the password manually to save.';
+      } catch (e) {
+        document.getElementById('edit-error').textContent =
+          'Could not retrieve existing password. Please enter the password manually to save.';
         btn.disabled = false;
         return;
       }
     }
+
     if (!finalPwd) {
-      document.getElementById('edit-error').textContent = 'Password cannot be empty. Enter a new password or the existing one.';
+      document.getElementById('edit-error').textContent =
+        'Password cannot be empty. Enter a new password or the existing one.';
       btn.disabled = false;
       return;
     }
-    const input={name:title,username,password:finalPwd,website,notes,is_favorite:existing?.is_favorite??false,category:existing?.category||'general',color:existing?.color||'#8b5cf6',emoji:existing?.emoji||title.charAt(0).toUpperCase()};
+
+    const input={
+      name:title,
+      username,
+      password:finalPwd,
+      website,
+      notes,
+      is_favorite:existing?.is_favorite??false,
+      category:existing?.category||'general',
+      color:existing?.color||'#8b5cf6',
+      emoji:existing?.emoji||title.charAt(0).toUpperCase(),
+    };
     await vaultCall('update_entry',{entryId:id,input});
     closeModal('modal-edit-entry');
     await loadEntries();
     setTimeout(()=>selectEntry(id),80);
     showToast('Entry updated','success');
-  } catch(e){
-    document.getElementById('edit-error').textContent=String(e).replace(/^Error: /,'').slice(0,120);
-  } finally{btn.disabled=false;}
+  } catch(e) {
+    document.getElementById('edit-error').textContent=
+      String(e).replace(/^Error: /,'').slice(0,120);
+  } finally {
+    btn.disabled=false;
+  }
 }
-
 async function toggleFavorite(id) {
     try {
         const newState = await vaultCall('toggle_favorite', {entryId: id});
@@ -1923,7 +1928,11 @@ function renderNotes() {
   vaultNotes.forEach(n=>{
     const card=document.createElement('div');card.className='note-card';
     const t=document.createElement('div');t.className='note-title';t.textContent=n.title;
-    const p=document.createElement('div');p.className='note-preview';p.textContent=n.content?n.content.substring(0,120):'(empty)';
+    const p=document.createElement('div');p.className='note-preview';
+    // BUG-013 fix: never show note content in plain text preview
+    p.textContent=n.content?'• • • • • • • • • • • • • • •':'(empty)';
+    p.style.color='var(--text-muted)';
+    p.style.letterSpacing='0.15em';
     const d=document.createElement('div');d.className='note-date';d.textContent=fmtDate(n.updated_at);
     const del=document.createElement('div');del.className='icon-btn note-delete';del.title='Delete note';
     del.innerHTML='<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
@@ -2122,15 +2131,29 @@ async function copyToClipboard(value,label){
   }catch(e){showToast('Copy failed','error');}
 }
 
-function startClipCountdown(){
-  if(clipTimer) clearTimeout(clipTimer);
-  if(clipInterval) clearInterval(clipInterval);
-  const ind=document.getElementById('clip-indicator');
-  const cnt=document.getElementById('clip-countdown');
-  const s=clipSecs||30;
-  let rem=s; cnt.textContent=rem; ind.style.display='block';
-  clipInterval=setInterval(()=>{rem--;cnt.textContent=rem;if(rem<=0){clearInterval(clipInterval);ind.style.display='none';}},1000);
-  clipTimer=setTimeout(()=>{navigator.clipboard.writeText('').catch(()=>{});ind.style.display='none';clearInterval(clipInterval);},s*1000);
+function startClipCountdown() {
+    if (clipTimer) clearTimeout(clipTimer);
+    if (clipInterval) clearInterval(clipInterval);
+    const ind = document.getElementById('clip-indicator');
+    const cnt = document.getElementById('clip-countdown');
+    const s   = clipSecs || 30;
+    let rem   = s;
+    cnt.textContent = rem;
+    ind.style.display = 'block';
+    clipInterval = setInterval(() => {
+        rem--;
+        cnt.textContent = rem;
+        if (rem <= 0) {
+            clearInterval(clipInterval);
+            ind.style.display = 'none';
+        }
+    }, 1000);
+    clipTimer = setTimeout(() => {
+        // MISS-001 fix: clear clipboard via Rust backend, not navigator.clipboard
+        if (_invoke) rawInvoke('clear_clipboard').catch(() => {});
+        ind.style.display = 'none';
+        clearInterval(clipInterval);
+    }, s * 1000);
 }
 
 // ─── MODALS ──────────────────────────────────────
@@ -2255,11 +2278,11 @@ function wireEvents(){
   document.getElementById('tb-settings').addEventListener('click', ()=>navigate('settings'));
   document.getElementById('tb-lock').addEventListener('click', lockVaultUI);
   document.getElementById('win-close').addEventListener('click', () =>
-    rawInvoke('plugin:window|close', { label: 'main' }).catch(()=>{}));
+  rawInvoke('plugin:window|close', {}).catch(()=>{}));
   document.getElementById('win-min').addEventListener('click', () =>
-      rawInvoke('plugin:window|minimize', { label: 'main' }).catch(()=>{}));
+  rawInvoke('plugin:window|minimize', {}).catch(()=>{}));
   document.getElementById('win-max').addEventListener('click', () =>
-      rawInvoke('plugin:window|internal_toggle_maximize', { label: 'main' }).catch(()=>{}));
+  rawInvoke('plugin:window|internal_toggle_maximize', {}).catch(()=>{}));
 
   // Sidebar nav
   document.querySelectorAll('#sidebar .nav-item[data-page]').forEach(n=>{
