@@ -1091,7 +1091,6 @@ let lockCooldown     = false;
 let clipSecs         = 30;
 let clipTimer        = null;
 let clipInterval     = null;
-let inactivityTimer  = null;
 let settingsDebounce = null;
 let confirmCallback  = null;
 const passwordRevealTimers = new Map();
@@ -1459,8 +1458,12 @@ async function openDifferentVault() {
         currentVaultPath = canonical;
         // BUG-002 FIX: Use Rust backend instead of localStorage
         await persistVaultPath(canonical);
-        document.getElementById('lock-vault-name').textContent =
-          canonical.split(/[\\/]/).pop().replace('.qvault', '');
+         try {
+            const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
+            document.getElementById('lock-vault-name').textContent = meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
+        } catch (_) {
+            document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault', '');
+        }
         document.getElementById('lock-error').textContent = '';
         showToast('Vault loaded — enter your password', 'success');
       }
@@ -1504,9 +1507,13 @@ async function checkInitialState() {
     currentVaultPath = canonical;
     // Keep stored path up to date (canonical may differ from stored)
     await persistVaultPath(canonical);
-    document.getElementById('lock-vault-name').textContent =
-      canonical.split(/[\\/]/).pop().replace('.qvault', '');
-    showLockScreen();
+    try {
+            const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
+            document.getElementById('lock-vault-name').textContent = meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
+        } catch (_) {
+            document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault', '');
+        }
+        showLockScreen();
   } catch (_) {
     // Vault file moved or deleted — clear the stored path
     await clearPersistedVaultPath();
@@ -2148,14 +2155,13 @@ function startClipCountdown() {
             ind.style.display = 'none';
         }
     }, 1000);
-    clipTimer = setTimeout(() => {
+     clipTimer = setTimeout(() => {
         // MISS-001 fix: clear clipboard via Rust backend, not navigator.clipboard
         if (_invoke) rawInvoke('clear_clipboard').catch(() => {});
         ind.style.display = 'none';
         clearInterval(clipInterval);
     }, s * 1000);
-}
-
+  }
 // ─── MODALS ──────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -2247,7 +2253,13 @@ function wireEvents(){
         // BUG-002 FIX: Persist via Rust backend, not localStorage
         await persistVaultPath(canonical);
         document.getElementById('setup-screen').classList.add('hidden');
-        document.getElementById('lock-vault-name').textContent=canonical.split(/[\\/]/).pop().replace('.qvault','');
+         try {
+            const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
+            document.getElementById('lock-vault-name').textContent = meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
+        } catch (_) {
+            document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault', '');
+        }
+        document.getElementById('lock-error').textContent = '';
         showLockScreen();
       })
       .catch(e=>showToast('Could not open vault: '+String(e).slice(0,80),'error'));
@@ -2385,12 +2397,17 @@ function wireEvents(){
     }
   });
 
-  // Close search on outside click
+// Close search on outside click
   document.addEventListener('click', e=>{
     if(!e.target.closest('#title-search-wrap')&&!e.target.closest('#search-results')){
       document.getElementById('search-results').classList.remove('open');
     }
   });
+
+  // MISS-004 fix: disable right-click context menu in production builds
+  if (!window.__TAURI_INTERNALS__?.isTauriDevTools) {
+      document.addEventListener('contextmenu', e => e.preventDefault());
+  }
 }
 
 function toggleEye(inputId){
