@@ -53,3 +53,4 @@ pub mod generator;
 pub mod settings;
 pub mod vault_mgmt;
 pub mod vault_path;
+pub mod clipboard;

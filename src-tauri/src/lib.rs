@@ -56,6 +56,8 @@ pub fn run() {
             commands::vault_path::get_last_vault_path,
             commands::vault_path::set_last_vault_path,
             commands::vault_path::clear_last_vault_path,
+            commands::clipboard::copy_entry_password_to_clipboard,
+            commands::clipboard::clear_clipboard,
         ])
         .setup(move |app| {
             // Start auto-lock background task (needs AppHandle for event emission)
