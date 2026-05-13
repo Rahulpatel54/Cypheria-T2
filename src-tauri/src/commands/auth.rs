@@ -62,14 +62,12 @@ pub async fn change_master_password(
     let result = session.with_session_mut(|key_store, vault_store| {
         catch_sync_panic!({
             use crate::crypto::{kdf, aes, kyber, rng};
-            use subtle::ConstantTimeEq;
-
             // 1. Verify old password matches current MK
-            let derived_mk = kdf::derive_master_key(&old_bytes, &vault_store.header.argon2_salt)?;
-            let matches: bool = derived_mk.ct_eq(key_store.master_key_bytes()).into();
-            if !matches {
-                return Err(CypheriaError::AuthFailed);
-            }
+            // 1. Verify old password by attempting to unwrap the VK — cryptographic proof
+            let mut derived_mk = kdf::derive_master_key(&old_bytes, &vault_store.header.argon2_salt)?;
+            let unwrap_result = aes::unwrap_key(&derived_mk, &vault_store.header.vk_wrapped_classical);
+            derived_mk.zeroize();
+            unwrap_result.map_err(|_| CypheriaError::AuthFailed)?;
 
             // 2. Generate new salt and new Master Key
             let new_salt = rng::argon2_salt();
@@ -125,6 +123,7 @@ pub async fn create_vault(
     use crate::vault::store::persist_vault;
     use crate::models::settings::Settings;
     use chrono::Utc;
+    use zeroize::Zeroizing;
 
     if password.len() < 8 {
         return Err(CypheriaError::InvalidInput("Password must be at least 8 characters".into()));
@@ -143,8 +142,11 @@ pub async fn create_vault(
     let mk_bytes = kdf::derive_master_key(&pwd_bytes, &salt)?;
     pwd_bytes.zeroize();
 
-    let vk_bytes: [u8; 32] = rng::entry_key();
-    let vk_wrapped_classical = aes::wrap_key(&mk_bytes, &vk_bytes)?;
+    let mk_bytes = Zeroizing::new(kdf::derive_master_key(&pwd_bytes, &salt)?);
+    pwd_bytes.zeroize();
+
+    let vk_bytes = Zeroizing::new(rng::entry_key());
+    let vk_wrapped_classical = aes::wrap_key(&*mk_bytes, &*vk_bytes)?;
 
     let kp = kyber::generate_keypair();
     let pub_key = kp.public_key.clone();
@@ -153,11 +155,11 @@ pub async fn create_vault(
 
     let (kyber_ciphertext, vk_wrapped_pq) =
         kyber::encapsulate_vault_key(&pub_key, &vk_bytes)?;
-    let kyber_sk_encrypted = aes::encrypt(&mk_bytes, &sec_key)?;
+    let kyber_sk_encrypted = aes::encrypt(&*mk_bytes, &sec_key)?;
 
     let default_settings = Settings::default();
     let settings_json = serde_json::to_vec(&default_settings).map_err(|_| CypheriaError::SerdeError)?;
-    let settings_encrypted = aes::encrypt(&mk_bytes, &settings_json)?;
+    let settings_encrypted = aes::encrypt(&*mk_bytes, &settings_json)?;
 
     let vault_data = VaultData {
         entries:    vec![],
@@ -182,7 +184,7 @@ pub async fn create_vault(
     };
 
     {
-        let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
+        let key_store = ActiveKeyStore::new(*mk_bytes, *vk_bytes);
         persist_vault(&key_store, &vault_data, &header, &path).await?;
     }
 
