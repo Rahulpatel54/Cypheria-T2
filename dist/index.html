@@ -1604,7 +1604,8 @@ function fmtDate(iso) {
     try {
         const d = new Date(iso);
         if (isNaN(d.getTime())) return '—';
-        return d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+        // ERR-008 fix: use the user's system locale instead of hardcoded 'en-GB'
+        return d.toLocaleDateString(navigator.language || undefined, {day:'2-digit', month:'short', year:'numeric'});
     } catch { return '—'; }
 }
 
@@ -2015,17 +2016,20 @@ function clientGenPassword(length,upper,lower,numbers,symbols){
   const max=Math.floor(0x100000000/chars.length)*chars.length;
   let out='',i=0;
   while(out.length<length&&i<arr.length){if(arr[i]<max)out+=chars[arr[i]%chars.length];i++;}
-  let maxAttempts = length * 1000;
-  while (out.length < length && maxAttempts-- > 0) {
-      const b = new Uint32Array(1);
-      crypto.getRandomValues(b);
-      if (b[0] < max) out += chars[b[0] % chars.length];
-  }
-  while (out.length < length) {
-      const b = new Uint32Array(1);
-      crypto.getRandomValues(b);
-      out += chars[b[0] % chars.length];
-  }
+// IMPROVE-008 fix: hard cap prevents infinite loop on tiny charsets
+const MAX_REJECTION_ATTEMPTS = length * 10000;
+let attempts = 0;
+while (out.length < length) {
+    if (attempts++ > MAX_REJECTION_ATTEMPTS) {
+        const b = new Uint32Array(1);
+        crypto.getRandomValues(b);
+        out += chars[b[0] % chars.length];
+    } else {
+        const b = new Uint32Array(1);
+        crypto.getRandomValues(b);
+        if (b[0] < max) out += chars[b[0] % chars.length];
+    }
+}
   return out;
 }
 
