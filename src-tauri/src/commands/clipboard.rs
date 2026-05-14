@@ -25,8 +25,7 @@ pub async fn copy_entry_password_to_clipboard(
     safe_command!({
         autolock.bump_activity();
 
-        uuid::Uuid::parse_str(&entry_id)
-            .map_err(|_| CypheriaError::InvalidInput("Invalid ID format".into()))?;
+        crate::commands::validate_uuid(&entry_id)?;
 
         let password = session
             .with_session(|key_store, vault_store| {

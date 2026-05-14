@@ -229,7 +229,15 @@ pub async fn persist_vault(
     if let Some(parent) = path.parent() {
         tokio::fs::create_dir_all(parent).await?;
     }
-    let tmp_path = path.with_extension("qvault.tmp");
+    let tmp_path = {
+        let mut name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        name.push_str(".tmp");
+        path.with_file_name(name)
+    };
     tokio::fs::write(&tmp_path, &file).await?;
     tokio::fs::rename(&tmp_path, path).await?;
 

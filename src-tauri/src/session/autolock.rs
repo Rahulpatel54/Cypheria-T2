@@ -6,7 +6,7 @@
 //! and a "vault-auto-locked" Tauri event is emitted to the frontend.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep, Duration};
 use crate::session::manager::SessionManager;
@@ -14,6 +14,7 @@ use crate::session::manager::SessionManager;
 pub struct AutoLockTimer {
     last_activity_unix_secs: Arc<AtomicU64>,
     timeout_secs:            Arc<AtomicU64>,
+    running:                 Arc<AtomicBool>,
 }
 
 impl AutoLockTimer {
@@ -22,6 +23,7 @@ impl AutoLockTimer {
         Self {
             last_activity_unix_secs: Arc::new(AtomicU64::new(now)),
             timeout_secs:            Arc::new(AtomicU64::new(timeout_secs)),
+            running:                 Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -39,13 +41,29 @@ impl AutoLockTimer {
         self.timeout_secs.load(Ordering::Relaxed)
     }
 
+    /// Stop the background polling loop. Safe to call multiple times.
+    pub fn stop(&self) {
+        self.running.store(false, Ordering::Relaxed);
+    }
+
     /// Spawn the background auto-lock polling task.
     /// Takes an AppHandle so it can emit the "vault-auto-locked" event.
     pub fn start(self: Arc<Self>, session: Arc<SessionManager>, app: tauri::AppHandle) {
+        // Prevent double-start
+        if self.running.swap(true, Ordering::Relaxed) {
+            eprintln!("[Cypheria] AutoLockTimer::start() called while already running — ignoring");
+            return;
+        }
+
         let timer_ref = self.clone();
         tauri::async_runtime::spawn(async move {
             loop {
                 sleep(Duration::from_secs(10)).await; // Poll every 10 seconds
+
+                // Exit if stopped
+                if !timer_ref.running.load(Ordering::Relaxed) {
+                    break;
+                }
 
                 let now     = now_secs();
                 let last    = timer_ref.last_activity_unix_secs.load(Ordering::Relaxed);
@@ -65,6 +83,7 @@ impl AutoLockTimer {
             }
         });
     }
+
 }
 
 fn now_secs() -> u64 {

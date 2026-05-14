@@ -17,10 +17,17 @@
 ///     2. Route all vault access through `session.with_session()`.
 ///     3. Validate all untrusted inputs before any processing.
 ///     4. Never log passwords, key bytes, or plaintext credential data.
+/// Wraps a Tauri command body with synchronous panic catching.
+/// Any panic inside the block is caught, logged, and converted to
+/// `CypheriaError::InternalError` rather than crashing the process.
+///
+/// All #[tauri::command] functions MUST use this macro as their outer wrapper.
+/// Do NOT use .await inside the direct body of this macro — use it to wrap
+/// the outer command logic, with async calls made before entering sub-closures.
 #[macro_export]
 macro_rules! safe_command {
     ($body:block) => {
-        $body
+        $crate::catch_sync_panic!($body)
     };
 }
 
@@ -30,7 +37,12 @@ macro_rules! catch_sync_panic {
         use std::panic::{self, AssertUnwindSafe};
         use $crate::error::CypheriaError;
 
-        panic::catch_unwind(AssertUnwindSafe(|| $body)).unwrap_or_else(|payload| {
+        // SAFETY: This macro only catches SYNCHRONOUS panics.
+        // Do NOT use .await inside $body — catch_unwind cannot protect against
+        // panics in async code. AssertUnwindSafe is required because &mut VaultStore
+        // does not implement UnwindSafe.
+        let sync_result = panic::catch_unwind(AssertUnwindSafe(|| $body));
+        sync_result.unwrap_or_else(|payload| {
             let msg = if let Some(s) = payload.downcast_ref::<&str>() {
                 s.to_string()
             } else if let Some(s) = payload.downcast_ref::<String>() {
@@ -54,3 +66,12 @@ pub mod settings;
 pub mod vault_mgmt;
 pub mod vault_path;
 pub mod clipboard;
+
+/// Validate that `id` is a well-formed UUID string.
+/// Returns `Err(InvalidInput)` if parsing fails.
+#[must_use = "UUID validation result must be checked with ?"]
+pub(crate) fn validate_uuid(id: &str) -> Result<(), crate::error::CypheriaError> {
+    uuid::Uuid::parse_str(id)
+        .map(|_| ())
+        .map_err(|_| crate::error::CypheriaError::InvalidInput("Invalid ID format".into()))
+}

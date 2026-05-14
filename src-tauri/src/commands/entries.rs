@@ -8,14 +8,7 @@ use crate::{
     session::{manager::SessionManager, autolock::AutoLockTimer},
     vault::entry,
 };
-
-// FIX: IMPROVE-005 — #[must_use] ensures callers cannot discard the validation result.
-#[must_use = "UUID validation result must be checked with ?"]
-fn validate_uuid(id: &str) -> Result<(), CypheriaError> {
-    uuid::Uuid::parse_str(id)
-        .map_err(|_| CypheriaError::InvalidInput("Invalid ID format".into()))?;
-    Ok(())
-}
+use crate::commands::validate_uuid;
 
 #[tauri::command]
 pub async fn get_all_entries(
