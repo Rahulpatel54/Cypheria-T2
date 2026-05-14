@@ -1348,6 +1348,7 @@ function showLockScreen() {
   document.getElementById('master-pwd').value = '';
   document.getElementById('lock-error').textContent = '';
   document.getElementById('lock-attempts').textContent = '';
+  document.getElementById('lock-attempts').textContent = '';
   setTimeout(() => document.getElementById('master-pwd').focus(), 100);
 }
 
@@ -1843,65 +1844,45 @@ async function saveEditEntry() {
   const id       = document.getElementById('edit-id').value;
   const title    = document.getElementById('edit-title').value.trim();
   const username = document.getElementById('edit-username').value.trim();
-  const password = document.getElementById('edit-password').value;
+  const newPwd   = document.getElementById('edit-password').value;
   const website  = document.getElementById('edit-website').value.trim();
   const notes    = document.getElementById('edit-notes').value.trim();
-  document.getElementById('edit-error').textContent='';
+  document.getElementById('edit-error').textContent = '';
 
   if (!title) {
-    document.getElementById('edit-error').textContent='Title is required';
+    document.getElementById('edit-error').textContent = 'Title is required';
     return;
   }
 
-  const btn=document.getElementById('btn-edit-save');
-  btn.disabled=true;
+  const existing = vaultEntries.find(e => e.id === id);
+  const btn = document.getElementById('btn-edit-save');
+  btn.disabled = true;
 
   try {
-    const existing=vaultEntries.find(e=>e.id===id);
-    let finalPwd=password;
-
-    if (!finalPwd) {
-      // BUG-007 fix: explicitly surface password fetch errors instead of silently failing
-      try {
-        finalPwd = await vaultCall('get_entry_password', { entryId: id });
-      } catch (e) {
-        document.getElementById('edit-error').textContent =
-          'Could not retrieve existing password. Please enter the password manually to save.';
-        btn.disabled = false;
-        return;
-      }
-    }
-
-    if (!finalPwd) {
-      document.getElementById('edit-error').textContent =
-        'Password cannot be empty. Enter a new password or the existing one.';
-      btn.disabled = false;
-      return;
-    }
-
-    const input={
-      name:title,
+    await vaultCall('update_entry_keep_password', {
+      entryId:     id,
+      name:        title,
       username,
-      password:finalPwd,
+      newPassword: newPwd || null,
       website,
       notes,
-      is_favorite:existing?.is_favorite??false,
-      category:existing?.category||'general',
-      color:existing?.color||'#8b5cf6',
-      emoji:existing?.emoji||title.charAt(0).toUpperCase(),
-    };
-    await vaultCall('update_entry',{entryId:id,input});
+      isFavorite:  existing?.is_favorite ?? false,
+      category:    existing?.category || 'general',
+      color:       existing?.color || '#8b5cf6',
+      emoji:       existing?.emoji || title.charAt(0).toUpperCase(),
+    });
     closeModal('modal-edit-entry');
     await loadEntries();
-    setTimeout(()=>selectEntry(id),80);
-    showToast('Entry updated','success');
-  } catch(e) {
-    document.getElementById('edit-error').textContent=
-      String(e).replace(/^Error: /,'').slice(0,120);
+    setTimeout(() => selectEntry(id), 80);
+    showToast('Entry updated', 'success');
+  } catch (e) {
+    document.getElementById('edit-error').textContent =
+      String(e).replace(/^Error: /, '').slice(0, 120);
   } finally {
-    btn.disabled=false;
+    btn.disabled = false;
   }
 }
+
 async function toggleFavorite(id) {
     try {
         const newState = await vaultCall('toggle_favorite', {entryId: id});

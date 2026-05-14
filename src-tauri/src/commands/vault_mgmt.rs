@@ -32,6 +32,11 @@ pub async fn open_vault(vault_path: String) -> Result<String, CypheriaError> {
             return Err(CypheriaError::VaultCorrupted);
         }
 
+        let metadata = tokio::fs::metadata(&path).await?;
+        if metadata.len() < 200 {
+            return Err(CypheriaError::VaultCorrupted);
+        }
+
         let canonical = path
             .canonicalize()
             .map(|p| p.to_string_lossy().to_string())

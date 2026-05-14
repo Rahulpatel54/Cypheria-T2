@@ -156,3 +156,51 @@ pub async fn toggle_favorite(
             .await
     })
 }
+
+#[tauri::command]
+pub async fn update_entry_keep_password(
+    entry_id: String,
+    name: String,
+    username: String,
+    new_password: Option<String>,
+    website: String,
+    notes: String,
+    is_favorite: Option<bool>,
+    category: Option<String>,
+    color: Option<String>,
+    emoji: Option<String>,
+    session: State<'_, Arc<SessionManager>>,
+    autolock: State<'_, Arc<AutoLockTimer>>,
+) -> Result<(), CypheriaError> {
+    safe_command!({
+        autolock.bump_activity();
+        validate_uuid(&entry_id)?;
+
+        session
+            .with_session_mut(|key_store, vault_store| {
+                catch_sync_panic!({
+                    let vk = key_store.vault_key_bytes();
+
+                    let password = match new_password.as_deref() {
+                        Some(p) if !p.is_empty() => p.to_string(),
+                        _ => entry::get_entry_password(vk, &vault_store.data, &entry_id)?,
+                    };
+
+                    let input = crate::models::entry::EntryInput {
+                        name,
+                        username,
+                        password,
+                        website,
+                        notes,
+                        is_favorite,
+                        category,
+                        color,
+                        emoji,
+                    };
+
+                    entry::update_entry(vk, &mut vault_store.data, &entry_id, input)
+                })
+            })
+            .await
+    })
+}

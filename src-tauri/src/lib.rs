@@ -44,6 +44,7 @@ pub fn run() {
             commands::entries::update_entry,
             commands::entries::delete_entry,
             commands::entries::toggle_favorite,
+            commands::entries::update_entry_keep_password,
             // Notes CRUD
             commands::notes::get_all_notes,
             commands::notes::save_note,
