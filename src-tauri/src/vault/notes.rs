@@ -113,10 +113,11 @@ pub fn update_note(
 }
 
 fn validate_note_input(input: &NoteInput) -> Result<(), CypheriaError> {
-    if input.title.trim().is_empty() {
+    let trimmed_title = input.title.trim();
+    if trimmed_title.is_empty() {
         return Err(CypheriaError::InvalidInput("Note title cannot be empty".into()));
     }
-    if input.title.len() > 256 {
+    if trimmed_title.len() > 256 {
         return Err(CypheriaError::InvalidInput("Note title too long (max 256 chars)".into()));
     }
     if input.content.len() > 1_048_576 {

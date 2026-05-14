@@ -18,8 +18,8 @@ pub async fn get_settings(
             .with_session(|key_store, vault_store| {
                 let mut settings_key = [0u8; 32];
                 crate::crypto::kdf::derive_subkey(
-                    key_store.master_key_bytes(),
-                    b"SETTINGS_ENCRYPTION",
+                    key_store.vault_key_bytes(),
+                    b"SETTINGS_ENCRYPTION_VK",
                     &mut settings_key,
                 );
                 let result = crate::crypto::aes::decrypt(
@@ -50,8 +50,8 @@ pub async fn save_settings(
                     serde_json::to_vec(&settings).map_err(|_| CypheriaError::SerdeError)?;
                 let mut settings_key = [0u8; 32];
                 crate::crypto::kdf::derive_subkey(
-                    key_store.master_key_bytes(),
-                    b"SETTINGS_ENCRYPTION",
+                    key_store.vault_key_bytes(),
+                    b"SETTINGS_ENCRYPTION_VK",
                     &mut settings_key,
                 );
                 let result = crate::crypto::aes::encrypt(&settings_key, &json);

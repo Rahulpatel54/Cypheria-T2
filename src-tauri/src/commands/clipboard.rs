@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tauri::State;
+use zeroize::Zeroize;
 use crate::{
     error::CypheriaError,
     session::{manager::SessionManager, autolock::AutoLockTimer},
@@ -17,7 +18,7 @@ pub struct ClipboardTimer(pub Arc<Mutex<Option<JoinHandle<()>>>>);
 #[tauri::command]
 pub async fn copy_entry_password_to_clipboard(
     entry_id: String,
-    timeout_secs: u64,
+    // timeout_secs removed — read from vault settings server-side
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
     clip_timer: State<'_, Arc<ClipboardTimer>>,
@@ -27,14 +28,37 @@ pub async fn copy_entry_password_to_clipboard(
 
         crate::commands::validate_uuid(&entry_id)?;
 
-        let password = session
+        let (password, timeout_secs) = session
             .with_session(|key_store, vault_store| {
                 catch_sync_panic!({
-                    entry::get_entry_password(
+                    let pwd = entry::get_entry_password(
                         key_store.vault_key_bytes(),
                         &vault_store.data,
                         &entry_id,
-                    )
+                    )?;
+
+                    // Read clipboard timeout from decrypted settings server-side
+                    let secs: u64 = {
+                        let mut settings_key = [0u8; 32];
+                        crate::crypto::kdf::derive_subkey(
+                            key_store.vault_key_bytes(),
+                            b"SETTINGS_ENCRYPTION_VK",
+                            &mut settings_key,
+                        );
+                        let result = crate::crypto::aes::decrypt(
+                            &settings_key,
+                            &vault_store.data.settings.payload_encrypted,
+                        );
+                        settings_key.zeroize();
+                        match result {
+                            Ok(json) => serde_json::from_slice::<crate::models::settings::Settings>(&json)
+                                .map(|s| s.clear_clipboard_secs)
+                                .unwrap_or(30),
+                            Err(_) => 30, // fallback to 30s if settings unreadable
+                        }
+                    };
+
+                    Ok((pwd, secs))
                 })
             })
             .await?;

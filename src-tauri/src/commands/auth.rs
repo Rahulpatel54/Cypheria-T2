@@ -195,8 +195,12 @@ pub async fn create_vault(
     let default_settings = Settings::default();
     let settings_json = serde_json::to_vec(&default_settings).map_err(|_| CypheriaError::SerdeError)?;
     // CRIT-002 fix: use mk_bytes through Zeroizing wrapper (already in scope), no extra key needed
-    let settings_encrypted = aes::encrypt(&*mk_bytes, &settings_json)?;
-    // settings_json is plain Vec<u8> — zeroize it before it goes out of scope
+    // Encrypt settings with a VK-derived subkey (not MK) so settings survive
+    // master password changes without re-encryption.
+    let mut settings_subkey = [0u8; 32];
+    kdf::derive_subkey(&*vk_bytes, b"SETTINGS_ENCRYPTION_VK", &mut settings_subkey);
+    let settings_encrypted = aes::encrypt(&settings_subkey, &settings_json)?;
+    settings_subkey.zeroize();
     let mut settings_json = settings_json;
     settings_json.zeroize();
 

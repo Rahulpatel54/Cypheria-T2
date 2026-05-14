@@ -1432,6 +1432,12 @@ function startLockCooldown(seconds) {
 }
 
 async function lockVaultUI() {
+  // Cancel clipboard timers and clear clipboard immediately on lock
+  if (clipTimer)    { clearTimeout(clipTimer);    clipTimer = null; }
+  if (clipInterval) { clearInterval(clipInterval); clipInterval = null; }
+  document.getElementById('clip-indicator').style.display = 'none';
+  if (_invoke) rawInvoke('clear_clipboard').catch(() => {});
+
   try { await rawInvoke('lock_vault'); } catch (_) {}
   appUnlocked = false;
   if (settingsDebounce) { clearTimeout(settingsDebounce); settingsDebounce = null; }
@@ -1525,6 +1531,10 @@ async function checkInitialState() {
 
 // ─── NAVIGATION ──────────────────────────────────
 function navigate(page) {
+// Close search dropdown on any navigation
+  document.getElementById('search-results').classList.remove('open');
+  document.getElementById('search-input').value = '';
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('#sidebar .nav-item[data-page]').forEach(n => n.classList.remove('active'));
   const pg = document.getElementById('page-' + page);
@@ -1605,9 +1615,11 @@ function fmtDate(iso) {
     try {
         const d = new Date(iso);
         if (isNaN(d.getTime())) return '—';
-        // ERR-008 fix: use the user's system locale instead of hardcoded 'en-GB'
         return d.toLocaleDateString(navigator.language || undefined, {day:'2-digit', month:'short', year:'numeric'});
-    } catch { return '—'; }
+    } catch (e) {
+        console.warn('[Cypheria] fmtDate failed for value:', iso, e);
+        return '—';
+    }
 }
 
 // ─── DASHBOARD ───────────────────────────────────
@@ -1765,17 +1777,15 @@ async function selectEntry(id) {
       const cpyB=document.createElement('div');cpyB.className='icon-btn';cpyB.title='Copy password';
       cpyB.innerHTML='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
       cpyB.onclick=async()=>{
-        try{
-          // BUG-012 fix: password never crosses IPC — Rust writes directly to clipboard
-          await vaultCall('copy_entry_password_to_clipboard',{
-            entryId:f.entryId,
-            timeoutSecs:clipSecs||30,
-          });
-          showToast(`Password copied — clears in ${clipSecs||30}s`,'success');
-          startClipCountdown();
-        }
-        catch(e){showToast('Failed to copy password','error');}
-      };
+            try{
+              await vaultCall('copy_entry_password_to_clipboard',{
+                entryId:f.entryId,
+              });
+              showToast(`Password copied — clears in ${clipSecs||30}s`,'success');
+              startClipCountdown();
+            }
+            catch(e){showToast('Failed to copy password','error');}
+          };     
       fa.appendChild(eyeB);fa.appendChild(cpyB);
       row.appendChild(val);row.appendChild(fa);
     } else {
@@ -2275,11 +2285,11 @@ function wireEvents(){
   document.getElementById('tb-settings').addEventListener('click', ()=>navigate('settings'));
   document.getElementById('tb-lock').addEventListener('click', lockVaultUI);
   document.getElementById('win-close').addEventListener('click', () =>
-  rawInvoke('plugin:window|close', {}).catch(()=>{}));
+    rawInvoke('plugin:window|close', { label: 'main' }).catch(() => {}));
   document.getElementById('win-min').addEventListener('click', () =>
-  rawInvoke('plugin:window|minimize', {}).catch(()=>{}));
+    rawInvoke('plugin:window|minimize', { label: 'main' }).catch(() => {}));
   document.getElementById('win-max').addEventListener('click', () =>
-  rawInvoke('plugin:window|internal_toggle_maximize', {}).catch(()=>{}));
+    rawInvoke('plugin:window|internal_toggle_maximize', { label: 'main' }).catch(() => {}));
 
   // Sidebar nav
   document.querySelectorAll('#sidebar .nav-item[data-page]').forEach(n=>{
