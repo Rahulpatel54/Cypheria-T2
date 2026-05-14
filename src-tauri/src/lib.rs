@@ -52,6 +52,7 @@ pub fn run() {
             // Vault management
             commands::vault_mgmt::open_vault,
             commands::vault_mgmt::export_vault,
+            commands::vault_mgmt::get_vault_meta,
             // Vault path persistence (BUG-002 fix — replaces localStorage)
             commands::vault_path::get_last_vault_path,
             commands::vault_path::set_last_vault_path,

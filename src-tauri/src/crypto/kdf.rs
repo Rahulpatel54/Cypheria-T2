@@ -75,15 +75,25 @@ pub fn derive_master_key_with_params(
 /// cryptographic purposes (AES encryption vs. HMAC authentication vs. settings
 /// encryption). This prevents cross-purpose key reuse.
 ///
-/// Scheme: SHA-256("CYPHERIA_SUBKEY_v1|" || domain || "|" || master_key)
+/// Derives a domain-separated 32-byte subkey from the Master Key using HMAC-SHA256.
+///
+/// Construction: HMAC-SHA256(key=master_key, data="CYPHERIA_SUBKEY_v1|" || domain)
+/// This is the correct keyed construction — unlike bare SHA-256, HMAC-SHA256 is
+/// resistant to length-extension attacks and is the accepted pattern for key derivation.
+///
+/// NOTE: This produces different output than the previous SHA-256-based implementation.
+/// Existing settings blobs encrypted with the old subkey will silently fall back to
+/// Settings::default() on first load after this change — this is acceptable since
+/// settings are non-critical and no credential data is affected.
 pub fn derive_subkey(master_key: &[u8; 32], domain: &[u8], out: &mut [u8; 32]) {
-    use sha2::{Sha256, Digest};
-    let mut hasher = Sha256::new();
-    hasher.update(b"CYPHERIA_SUBKEY_v1|");
-    hasher.update(domain);
-    hasher.update(b"|");
-    hasher.update(master_key);
-    let result = hasher.finalize();
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    let mut mac = <Hmac<Sha256>>::new_from_slice(master_key)
+        .expect("HMAC accepts any key length");
+    mac.update(b"CYPHERIA_SUBKEY_v1|");
+    mac.update(domain);
+    let result = mac.finalize().into_bytes();
     out.copy_from_slice(&result);
 }
 

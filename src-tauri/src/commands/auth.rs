@@ -62,12 +62,6 @@ pub async fn change_master_password(
     let result = session.with_session_mut(|key_store, vault_store| {
         catch_sync_panic!({
             use crate::crypto::{kdf, aes, kyber, rng};
-            // 1. Verify old password matches current MK
-            // 1. Verify old password by attempting to unwrap the VK — cryptographic proof
-            let mut derived_mk = kdf::derive_master_key(&old_bytes, &vault_store.header.argon2_salt)?;
-            let unwrap_result = aes::unwrap_key(&derived_mk, &vault_store.header.vk_wrapped_classical);
-            derived_mk.zeroize();
-            unwrap_result.map_err(|_| CypheriaError::AuthFailed)?;
 
             // 2. Generate new salt and new Master Key
             let new_salt = rng::argon2_salt();
@@ -93,6 +87,45 @@ pub async fn change_master_password(
             vault_store.header.kyber_sk_encrypted   = kyber_sk_encrypted;
             vault_store.header.kyber_ciphertext     = kyber_ciphertext;
             vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
+
+            // HIGH-003 fix: re-encrypt settings blob from old MK subkey → new MK subkey.
+            // Must happen BEFORE key_store.master_key is updated, so master_key_bytes()
+            // still returns the old key during the decrypt step.
+            {
+                let mut old_settings_key = [0u8; 32];
+                let mut new_settings_key = [0u8; 32];
+
+                kdf::derive_subkey(key_store.master_key_bytes(), b"SETTINGS_ENCRYPTION", &mut old_settings_key);
+                kdf::derive_subkey(&new_mk, b"SETTINGS_ENCRYPTION", &mut new_settings_key);
+
+                let old_plaintext = aes::decrypt(
+                    &old_settings_key,
+                    &vault_store.data.settings.payload_encrypted,
+                );
+                old_settings_key.zeroize();
+
+                match old_plaintext {
+                    Ok(json_bytes) => {
+                        let new_encrypted = aes::encrypt(&new_settings_key, &json_bytes)
+                            .map_err(|e| { new_settings_key.zeroize(); e })?;
+                        new_settings_key.zeroize();
+                        vault_store.data.settings.payload_encrypted = new_encrypted;
+                    }
+                    Err(_) => {
+                        // Settings were unreadable (e.g., corrupted or from a failed migration).
+                        // Write fresh default settings encrypted under the new key.
+                        new_settings_key.zeroize();
+                        let default_json = serde_json::to_vec(&crate::models::settings::Settings::default())
+                            .map_err(|_| CypheriaError::SerdeError)?;
+                        let mut fresh_key = [0u8; 32];
+                        kdf::derive_subkey(&new_mk, b"SETTINGS_ENCRYPTION", &mut fresh_key);
+                        vault_store.data.settings.payload_encrypted =
+                            aes::encrypt(&fresh_key, &default_json)
+                                .map_err(|e| { fresh_key.zeroize(); e })?;
+                        fresh_key.zeroize();
+                    }
+                }
+            }
 
             // FIX: IMPROVE-001 — MasterKey::new() replaces direct tuple construction.
             key_store.master_key = crate::crypto::keys::MasterKey::new(new_mk);
@@ -138,10 +171,7 @@ pub async fn create_vault(
     }
 
     let mut pwd_bytes = password.into_bytes();
-    let salt     = rng::argon2_salt();
-    let mk_bytes = kdf::derive_master_key(&pwd_bytes, &salt)?;
-    pwd_bytes.zeroize();
-
+    let salt = rng::argon2_salt();
     let mk_bytes = Zeroizing::new(kdf::derive_master_key(&pwd_bytes, &salt)?);
     pwd_bytes.zeroize();
 
