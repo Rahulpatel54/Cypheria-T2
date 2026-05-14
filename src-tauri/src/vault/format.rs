@@ -125,7 +125,7 @@ pub struct EncryptedSettings {
 
 /// Plaintext credential payload — NEVER written to disk.
 /// Zeroized automatically when dropped (ZeroizeOnDrop).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 #[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct EntryPayload {
     pub name:     String,
@@ -136,7 +136,7 @@ pub struct EntryPayload {
 }
 
 /// Plaintext note payload — NEVER written to disk.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize)]
 #[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct NotePayload {
     pub title:   String,

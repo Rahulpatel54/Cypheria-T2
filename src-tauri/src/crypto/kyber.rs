@@ -26,6 +26,7 @@ pub struct KyberKeypair {
 impl Drop for KyberKeypair {
     fn drop(&mut self) {
         self.secret_key.zeroize();
+        self.public_key.zeroize();
     }
 }
 

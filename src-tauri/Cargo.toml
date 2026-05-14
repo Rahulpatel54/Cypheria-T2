@@ -22,7 +22,7 @@ aes-gcm     = { version = "0.10", features = ["aes"] }
 argon2      = { version = "0.5", features = ["std"] }
 rand        = { version = "0.8", features = ["getrandom"] }
 rand_core   = "0.6"
-getrandom   = { version = "0.2", features = ["js"] }
+getrandom   = { version = "0.2" }
 
 # Cryptography — post-quantum
 pqcrypto-kyber    = "0.8"
