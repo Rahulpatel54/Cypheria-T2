@@ -19,6 +19,12 @@ pub fn run() {
     let session  = Arc::new(session::manager::SessionManager::new());
     let autolock = Arc::new(session::autolock::AutoLockTimer::new(300)); // 5-minute default
 
+    let session  = Arc::new(session::manager::SessionManager::new());
+    let autolock = Arc::new(session::autolock::AutoLockTimer::new(300));
+    let clipboard_timer = Arc::new(crate::commands::clipboard::ClipboardTimer(
+        Arc::new(tokio::sync::Mutex::new(None)),
+));
+
     tauri::Builder::default()
         // ── Plugins ────────────────────────────────────────────────────────
         // The dialog plugin MUST be registered here before any frontend call
@@ -27,6 +33,7 @@ pub fn run() {
         // ── Managed state ─────────────────────────────────────────────────
         .manage(session.clone())
         .manage(autolock.clone())
+        .manage(clipboard_timer.clone())
         .invoke_handler(tauri::generate_handler![
             // Auth & vault lifecycle
             commands::auth::unlock_vault,

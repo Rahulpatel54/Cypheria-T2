@@ -120,17 +120,23 @@ impl SessionManager {
         let mut state = self.state.write().await;
         match &mut *state {
             SessionState::Unlocked { ref mut key_store, vault_store, vault_path, .. } => {
-                let result = f(key_store, vault_store)?;
-                // Persist to disk after every mutation
-                crate::vault::store::persist_vault(
-                    key_store,
-                    &vault_store.data,
-                    &vault_store.header,
-                    vault_path,
-                )
-                .await?;
-                Ok(result)
+            let result = f(key_store, vault_store)?;
+            // Persist AFTER successful mutation. If persist fails, surface a clear error.
+            if let Err(persist_err) = crate::vault::store::persist_vault(
+                key_store,
+                &vault_store.data,
+                &vault_store.header,
+                vault_path,
+            ).await {
+                eprintln!("[Cypheria] CRITICAL: persist_vault failed: {:?}", persist_err);
+                return Err(CypheriaError::PersistFailed(
+                    format!("Changes were applied in memory but could not be saved to disk. \
+                            Your data is NOT lost yet — lock and unlock the vault to retry. \
+                            Error: {}", persist_err)
+                ));
             }
+            Ok(result)
+        }
             SessionState::RateLimited { locked_until, .. } => {
                 if Instant::now() < *locked_until {
                     let remaining = locked_until.duration_since(Instant::now()).as_secs();

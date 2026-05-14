@@ -44,6 +44,12 @@ pub enum CypheriaError {
     #[error("Session expired")]
     SessionExpired,
 
+    #[error("Session expired")]
+    SessionExpired,
+
+    #[error("Vault could not be saved to disk: {0}")]
+    PersistFailed(String),
+
     // BUG-006 fix: returned when a panic is caught at a command entry point,
     // preventing the panic from bypassing ZeroizeOnDrop on ActiveKeyStore.
     #[error("Internal error: {0}")]
