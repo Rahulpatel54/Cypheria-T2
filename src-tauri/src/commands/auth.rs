@@ -62,6 +62,11 @@ pub async fn change_master_password(
     let result = session.with_session_mut(|key_store, vault_store| {
         catch_sync_panic!({
             use crate::crypto::{kdf, aes, kyber, rng};
+            // 1. Verify old password cryptographically via AES-GCM unwrap
+            let mut derived_mk = kdf::derive_master_key(&old_bytes, &vault_store.header.argon2_salt)?;
+            let unwrap_result = aes::unwrap_key(&derived_mk, &vault_store.header.vk_wrapped_classical);
+            derived_mk.zeroize();
+            unwrap_result.map_err(|_| CypheriaError::AuthFailed)?;
 
             // 2. Generate new salt and new Master Key
             let new_salt = rng::argon2_salt();
@@ -74,7 +79,7 @@ pub async fn change_master_password(
             let kp = kyber::generate_keypair();
             let pub_key = kp.public_key.clone();
             let sec_key = kp.secret_key.clone();
-            drop(kp);
+            drop(kp);f
 
             let (kyber_ciphertext, vk_wrapped_pq) =
                 kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
@@ -180,7 +185,7 @@ pub async fn create_vault(
 
     let kp = kyber::generate_keypair();
     let pub_key = kp.public_key.clone();
-    let sec_key = kp.secret_key.clone();
+    let sec_key = zeroize::Zeroizing::new(kp.secret_key.clone());
     drop(kp);
 
     let (kyber_ciphertext, vk_wrapped_pq) =
