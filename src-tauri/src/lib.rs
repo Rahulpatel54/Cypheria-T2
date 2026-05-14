@@ -18,9 +18,6 @@ pub mod models;
 pub fn run() {
     let session  = Arc::new(session::manager::SessionManager::new());
     let autolock = Arc::new(session::autolock::AutoLockTimer::new(300)); // 5-minute default
-
-    let session  = Arc::new(session::manager::SessionManager::new());
-    let autolock = Arc::new(session::autolock::AutoLockTimer::new(300));
     let clipboard_timer = Arc::new(crate::commands::clipboard::ClipboardTimer(
         Arc::new(tokio::sync::Mutex::new(None)),
 ));

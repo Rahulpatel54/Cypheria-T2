@@ -44,9 +44,6 @@ pub enum CypheriaError {
     #[error("Session expired")]
     SessionExpired,
 
-    #[error("Session expired")]
-    SessionExpired,
-
     #[error("Vault could not be saved to disk: {0}")]
     PersistFailed(String),
 

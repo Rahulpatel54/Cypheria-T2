@@ -79,7 +79,7 @@ pub async fn change_master_password(
             let kp = kyber::generate_keypair();
             let pub_key = kp.public_key.clone();
             let sec_key = kp.secret_key.clone();
-            drop(kp);f
+            drop(kp);
 
             let (kyber_ciphertext, vk_wrapped_pq) =
                 kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
@@ -194,7 +194,11 @@ pub async fn create_vault(
 
     let default_settings = Settings::default();
     let settings_json = serde_json::to_vec(&default_settings).map_err(|_| CypheriaError::SerdeError)?;
+    // CRIT-002 fix: use mk_bytes through Zeroizing wrapper (already in scope), no extra key needed
     let settings_encrypted = aes::encrypt(&*mk_bytes, &settings_json)?;
+    // settings_json is plain Vec<u8> — zeroize it before it goes out of scope
+    let mut settings_json = settings_json;
+    settings_json.zeroize();
 
     let vault_data = VaultData {
         entries:    vec![],
