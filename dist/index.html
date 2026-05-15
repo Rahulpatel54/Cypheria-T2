@@ -71,6 +71,504 @@
 }
 
 /* ═══════════════════════════════════════════════════
+   SMART PASSWORD PANEL — layout, tabs, rows, controls
+═══════════════════════════════════════════════════ */
+
+/* Two-column grid for the Generator page body */
+#page-generator .page-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Left column wrapper keeps existing gen-wrap unchanged */
+#page-generator .page-body > .gen-wrap {
+  /* max-width already set in gen-wrap — no change needed */
+  max-width: none;          /* let grid control width */
+  padding: 24px 0 24px 0;
+}
+
+/* ── Smart Panel card ── */
+.smart-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-mid);
+  border-top: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--glow-card);
+  align-self: start;
+}
+
+/* Section label above the panel (rendered inside .smart-panel as a header) */
+.smart-panel-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 14px 16px 0;
+}
+
+/* ── Tab bar ── */
+.sp-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sp-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-mid);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.sp-tab:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-light);
+}
+
+.sp-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.35);
+}
+
+/* NEW / BETA badges on tabs */
+.sp-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.sp-badge-new {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--color-green);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.sp-tab.active .sp-badge-new {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border-color: transparent;
+}
+
+.sp-badge-beta {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--color-amber);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.sp-tab.active .sp-badge-beta {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ── Tab content panes ── */
+.sp-tab-content {
+  display: none;
+  padding: 14px 16px 16px;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sp-tab-content.active {
+  display: flex;
+  animation: spFadeIn 0.15s ease;
+}
+
+@keyframes spFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Controls row ── */
+.sp-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sp-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  gap: 8px;
+}
+
+/* Slider */
+.sp-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-mid);
+  outline: none;
+  cursor: pointer;
+}
+
+.sp-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
+}
+
+.sp-slider-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-light);
+  min-width: 60px;
+  text-align: right;
+}
+
+/* Separator picker pills */
+.sp-sep-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sp-sep-pill {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border-mid);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: 'Courier New', monospace;
+}
+
+.sp-sep-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent-light);
+}
+
+.sp-sep-pill.active {
+  background: var(--accent-dim);
+  border-color: var(--border-accent);
+  color: var(--accent-light);
+}
+
+/* Toggle switch — reusing existing .toggle class from settings; aliased here */
+.sp-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── Password suggestion list ── */
+.sp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-row {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  transition: border-color 0.15s, opacity 0.15s;
+}
+
+.sp-row:hover {
+  border-color: var(--border-mid);
+}
+
+.sp-row.fading {
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.sp-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sp-pwd-text {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-light);
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.sp-pattern {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* Pronunciation hint */
+.sp-pronun {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Entropy badge */
+.sp-entropy {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-top: 2px;
+  align-self: flex-start;
+}
+
+.sp-entropy-weak     { background: var(--color-red-dim);   color: var(--color-red);   border: 1px solid rgba(239,68,68,0.3);   }
+.sp-entropy-fair     { background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid rgba(245,158,11,0.3); }
+.sp-entropy-strong   { background: var(--color-blue-dim);  color: var(--color-blue);  border: 1px solid rgba(59,130,246,0.3); }
+.sp-entropy-excel    { background: var(--accent-dim);      color: var(--accent-light);border: 1px solid var(--border-accent);  }
+
+/* Row action buttons */
+.sp-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sp-act-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  transition: all 0.12s;
+  line-height: 1;
+  position: relative;
+}
+
+.sp-act-btn:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-light);
+  background: var(--accent-dim);
+}
+
+.sp-act-btn.copied {
+  border-color: rgba(34,197,94,0.4);
+  color: var(--color-green);
+  background: var(--color-green-dim);
+}
+
+/* Inline "Copied!" flash */
+.sp-copied-flash {
+  position: absolute;
+  right: 30px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-green-dim);
+  border: 1px solid rgba(34,197,94,0.3);
+  color: var(--color-green);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: spFlashIn 0.1s ease, spFlashOut 0.3s ease 1.2s forwards;
+}
+
+@keyframes spFlashIn  { from { opacity:0; } to { opacity:1; } }
+@keyframes spFlashOut { from { opacity:1; } to { opacity:0; } }
+
+/* "→ Sent to generator" label */
+.sp-sent-label {
+  font-size: 10px;
+  color: var(--accent-light);
+  font-weight: 600;
+  white-space: nowrap;
+  animation: spFlashIn 0.1s ease, spFlashOut 0.3s ease 1.5s forwards;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+/* gen-output pulse */
+@keyframes spPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(139,92,246,0.6); }
+  70%  { box-shadow: 0 0 0 10px rgba(139,92,246,0); }
+  100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
+}
+
+.gen-display.sp-pulse {
+  animation: spPulse 0.5s ease;
+}
+
+/* Regenerate All / Shuffle / Surprise Me buttons */
+.sp-regen-all {
+  width: 100%;
+  padding: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.sp-regen-all:hover {
+  border-color: var(--border-accent);
+  color: var(--accent-light);
+  background: var(--accent-dim);
+}
+
+/* ── Mnemonic word inputs ── */
+.sp-mnem-inputs {
+  display: flex;
+  gap: 6px;
+}
+
+.sp-mnem-input {
+  flex: 1;
+  padding: 7px 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: 'DM Sans', sans-serif;
+  min-width: 0;
+}
+
+.sp-mnem-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(139,92,246,0.12);
+}
+
+.sp-privacy-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Suggestion chips */
+.sp-chip-row {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sp-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid var(--border-mid);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.sp-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent-light);
+  background: var(--accent-dim);
+}
+
+/* Mnemonic action buttons row */
+.sp-mnem-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.sp-mnem-btns .sp-regen-all {
+  flex: 1;
+}
+
+/* Empty state for Mnemonic */
+.sp-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  gap: 6px;
+  line-height: 1.5;
+}
+
+/* Speak button */
+.sp-speak-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: background 0.12s;
+  line-height: 1;
+}
+
+.sp-speak-btn:hover {
+  background: var(--accent-dim);
+}
+
+/* ═══════════════════════════════════════════════════
    RESET & BASE
 ═══════════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -815,6 +1313,104 @@ textarea.form-input{resize:vertical;min-height:72px;}
               </button>
             </div>
           </div>
+           <!-- ═══════════════════════════════════════
+            SMART PASSWORD PANEL (right column)
+          ═══════════════════════════════════════ -->
+          <div class="smart-panel" id="smart-panel">
+            <div class="smart-panel-label">Smart Generator</div>
+
+            <!-- Tab bar -->
+            <div class="sp-tabs">
+              <button class="sp-tab active" data-sptab="passphrase">Passphrase</button>
+              <button class="sp-tab" data-sptab="pronounceable">
+                Pronounceable <span class="sp-badge sp-badge-new">NEW</span>
+              </button>
+              <button class="sp-tab" data-sptab="mnemonic">
+                Mnemonic <span class="sp-badge sp-badge-beta">BETA</span>
+              </button>
+            </div>
+
+            <!-- ── TAB 1: Passphrase ── -->
+            <div class="sp-tab-content active" id="sptab-passphrase">
+              <div class="sp-controls">
+                <div class="sp-control-row">
+                  <span>Word count</span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="range" class="sp-slider" id="pp-word-count" min="3" max="6" value="4" step="1">
+                    <span class="sp-slider-val" id="pp-word-count-lbl">4 words</span>
+                  </div>
+                </div>
+                <div class="sp-control-row">
+                  <span>Separator</span>
+                  <div class="sp-sep-row" id="pp-sep-row">
+                    <button class="sp-sep-pill active" data-sep="-">-</button>
+                    <button class="sp-sep-pill" data-sep=".">.</button>
+                    <button class="sp-sep-pill" data-sep="_">_</button>
+                    <button class="sp-sep-pill" data-sep=" ">Space</button>
+                    <button class="sp-sep-pill" data-sep="#">#</button>
+                    <button class="sp-sep-pill" data-sep="">None</button>
+                  </div>
+                </div>
+                <div class="sp-toggle-row">
+                  <span>Capitalize first letter</span>
+                  <label class="toggle"><input type="checkbox" id="pp-capitalize"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="sp-toggle-row">
+                  <span>Append 2-digit number</span>
+                  <label class="toggle"><input type="checkbox" id="pp-numbers"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="sp-toggle-row">
+                  <span>Append symbol</span>
+                  <label class="toggle"><input type="checkbox" id="pp-symbol"><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+              <div class="sp-list" id="pp-list"></div>
+              <button class="sp-regen-all" id="pp-regen-all">↺ Regenerate All</button>
+            </div>
+
+            <!-- ── TAB 2: Pronounceable ── -->
+            <div class="sp-tab-content" id="sptab-pronounceable">
+              <div class="sp-controls">
+                <div class="sp-control-row">
+                  <span>Syllables</span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="range" class="sp-slider" id="pr-syl-count" min="2" max="6" value="3" step="1">
+                    <span class="sp-slider-val" id="pr-syl-count-lbl">3 syllables (~9 chars)</span>
+                  </div>
+                </div>
+                <div class="sp-toggle-row">
+                  <span>Include digits</span>
+                  <label class="toggle"><input type="checkbox" id="pr-digits" checked><span class="toggle-slider"></span></label>
+                </div>
+                <div class="sp-toggle-row">
+                  <span>Include symbol</span>
+                  <label class="toggle"><input type="checkbox" id="pr-symbol"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="sp-toggle-row">
+                  <span>Mixed case (random syllable)</span>
+                  <label class="toggle"><input type="checkbox" id="pr-mixed"><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+              <div class="sp-list" id="pr-list"></div>
+              <button class="sp-regen-all" id="pr-regen-all">↺ Regenerate All</button>
+            </div>
+
+            <!-- ── TAB 3: Mnemonic ── -->
+            <div class="sp-tab-content" id="sptab-mnemonic">
+              <div class="sp-mnem-inputs">
+                <input class="sp-mnem-input" id="mn-word1" placeholder="e.g. Blue" autocomplete="off" spellcheck="false">
+                <input class="sp-mnem-input" id="mn-word2" placeholder="e.g. Tiger" autocomplete="off" spellcheck="false">
+                <input class="sp-mnem-input" id="mn-word3" placeholder="e.g. Paris" autocomplete="off" spellcheck="false">
+              </div>
+              <div class="sp-chip-row" id="mn-chips"></div>
+              <p class="sp-privacy-hint">🔒 Your words never leave this device. Used only to generate patterns locally.</p>
+              <div class="sp-list" id="mn-list"></div>
+              <div class="sp-mnem-btns">
+                <button class="sp-regen-all" id="mn-shuffle">↺ Shuffle Patterns</button>
+                <button class="sp-regen-all" id="mn-surprise">🎲 Surprise Me</button>
+              </div>
+            </div>
+          </div><!-- /smart-panel -->
         </div>
       </div>
 
@@ -1545,7 +2141,16 @@ function navigate(page) {
   if (page === 'favorites') renderFavorites();
   if (page === 'notes')     renderNotes();
   if (page === 'dashboard') renderDashboard();
-  if (page === 'generator') generatePassword();
+  if (page === 'generator') {
+    generatePassword();
+    // Seed Smart Panel on first visit (event picked up by initSmartPanel)
+    setTimeout(() => {
+      const list = document.getElementById('pp-list');
+      if (list && !list.innerHTML.trim()) {
+        document.dispatchEvent(new CustomEvent('sp:navigateToGenerator'));
+      }
+    }, 80);
+  }
 }
 
 // ─── DATA LOADING ────────────────────────────────
@@ -2436,6 +3041,565 @@ async function boot() {
   // State check happens AFTER event listeners are wired
   await checkInitialState();
 }
+
+// ═══════════════════════════════════════════════════
+// SMART PASSWORD PANEL — fully offline, no network
+// ═══════════════════════════════════════════════════
+
+(function initSmartPanel() {
+
+  // ── Embedded wordlist (~500 common, memorable English words) ──
+  const WORDS = ('able about above across act add age ago agree ahead aim air all allow almost alone along already also always amaze ankle apple arch arm army art ask atlas aunt away baby back bake ball band barn base bath bear beat bell bench best bird bite black blade blank blaze blend blink blue blur bold bomb bone book born brave break brew brick bridge bright bring broad brown build burn burst calm camp card care carry cast catch cave chain chalk charm chart chase check cheer chef chew chief child chill chip chop claim clam clap clash clay clean clear clerk click cliff climb clock close cloud coach coal coat code cold color cook cool copy core cost couch count court cover craft crash cream crop cross crow crowd crush cup curl curl damp dare dark dawn deal dear deck deep deer deny depth desk dig dip dirt disk dive dock dome door dot down drag draw dream dress drift drink drive drop drum dusk dust duty each earn ease east edge else emit empty end enjoy equal even ever evil exact exam face fact fade fail fair fall fame farm fast fate fear feed feel fell felt fence fiber field fight file fill find fine fire fish fist flag flair flap flat flaw flew flip flock floor flow foam fold folk fond font food foot force ford fork form fort found four free fresh front frost full fund fury gale game gape garden gaze gear gift give glad glow glue goal gold good grab grade grain grand grant graph grasp grave gray great green grew grid grin grip grow guard guide gulf gust hand hang hard harp have hawk heal heap hear heat held help here hero high hill hint hold hole home hook hope horn host hour huge hull hunt idea inch iron jack jolt jump just keep kind king knot lake lamp land lane last latch laud lead leaf lean leap left lend lens less life lift like lime line link lion live load lock loft lone long look loop lost loud love luck lung made main make many mark mask mast maze meal mean meet melt mesh mile milk mill mine mint miss mist mode moon more most move much must nail name near neat need next nice nine node noon note nut oak oath once only open over page pair palm park part pass past path pave peak peel peg pick pile pine pink pipe pivot plan plane plant play plum plus poem point pole pond pool port pose post pour pride print prone proof pull pure push rack raid rail rain rake rank rare rash rate read real red reed reef reel rely rent rest rice ride ring rise risk road roam roar rock roll roof rope rose rough round rove rule rush safe sage sail same sand save seal seam seem self send shade shake shall shame shape share sharp shed shelf shell shift ship shoe shop shot show shut side sign silk sing sink site size skip slab slam slip slow small smart snap snow soap soft soil some song sort soul span spark speak speed spell spend spill spin spit spot spray squad stack star start stay stem step still sting stir stock stone stop store storm stove straw stream stride strong study stuff style such suit sure surf swam sweep swift swim swing tale tall tame tape task team tear tell tend tent term test that them then thick thin this tide tile time tiny toll tone took top torn toss tour trace track trade trail train trait trap tray tree trim trip true trust tube tune turf turn type uber undo unit upon used user vale vast very vest view vine void volt wade wage wake walk wall want warm wash wave weld well went were what when wide wild will wind wine wing wink wire wise with woke wolf word wore work worm worn wrap year yell zero zone zoom').split(' ');
+
+  // ── Phonetic pools ──
+  const CONSONANTS = 'b c d f g h j k l m n p r s t v w'.split(' ');
+  const VOWELS     = 'a e i o u'.split(' ');
+  const PR_SYMBOLS = ['*', '@', '!', '#', '$'];
+
+  // ── Leet map ──
+  const LEET = { a:'4', e:'3', i:'1', o:'0', s:'5', t:'7' };
+
+  // ── Mnemonic suggestion pools ──
+  const MN_COLORS  = ['Red','Blue','Gold','Silver','Jade','Crimson','Cobalt','Amber','Ivory','Onyx'];
+  const MN_ANIMALS = ['Tiger','Fox','Eagle','Wolf','Raven','Lynx','Cobra','Falcon','Panda','Bison'];
+  const MN_PLACES  = ['Paris','Storm','River','Summit','Delta','Dune','Ridge','Harbor','Vale','Tundra'];
+  const MN_SYMBOLS = ['!','@','#','$','%','&','*'];
+
+  // ── Crypto-grade random helpers ──
+  function randInt(n)  { const a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]%n; }
+  function pick(arr)   { return arr[randInt(arr.length)]; }
+  function randDigits(n){ let s='';for(let i=0;i<n;i++)s+=randInt(10);return s; }
+
+  // ── Entropy calculator ──
+  function calcEntropy(pwd, poolSize) {
+    // Generic: bits = len * log2(pool)
+    if (poolSize) return Math.round(pwd.length * Math.log2(poolSize));
+    // Estimate from character classes present
+    let pool = 0;
+    if (/[a-z]/.test(pwd)) pool += 26;
+    if (/[A-Z]/.test(pwd)) pool += 26;
+    if (/[0-9]/.test(pwd)) pool += 10;
+    if (/[^a-zA-Z0-9]/.test(pwd)) pool += 32;
+    return pool < 2 ? 0 : Math.round(pwd.length * Math.log2(pool));
+  }
+
+  function entropyBadgeHTML(bits) {
+    let cls, label;
+    if      (bits < 40) { cls='sp-entropy-weak';  label=`~${bits} bits · Weak`; }
+    else if (bits < 60) { cls='sp-entropy-fair';  label=`~${bits} bits · Fair`; }
+    else if (bits < 80) { cls='sp-entropy-strong';label=`~${bits} bits · Strong`; }
+    else                { cls='sp-entropy-excel'; label=`~${bits} bits · Excellent`; }
+    return `<span class="sp-entropy ${cls}">${label}</span>`;
+  }
+
+  // ── "Use this" action ──
+  function usePassword(pwd) {
+    const out = document.getElementById('gen-output');
+    if (out) {
+      out.textContent = pwd;
+      // Pulse animation
+      const disp = document.querySelector('.gen-display');
+      if (disp) { disp.classList.remove('sp-pulse'); void disp.offsetWidth; disp.classList.add('sp-pulse'); }
+      // Update strength bar on existing gen page
+      if (typeof updateGenStrength === 'function') updateGenStrength(pwd, null, null);
+    }
+    // If Add Entry modal is open, pre-fill password field
+    const modal = document.getElementById('modal-add-entry');
+    if (modal && modal.classList.contains('open')) {
+      const addPwd = document.getElementById('add-password');
+      if (addPwd) {
+        addPwd.value = pwd;
+        if (typeof updateAddStrength === 'function') updateAddStrength();
+      }
+    }
+  }
+
+  // ── Web Speech API ──
+  const hasSpeech = (function() {
+    try { return 'speechSynthesis' in window && !!window.SpeechSynthesisUtterance; }
+    catch(_) { return false; }
+  })();
+
+  function speak(text) {
+    if (!hasSpeech) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utt = new window.SpeechSynthesisUtterance(text);
+      utt.rate = 0.85;
+      window.speechSynthesis.speak(utt);
+    } catch(_) {}
+  }
+
+  // ── Inline copy feedback ──
+  function doCopy(btn, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      btn.classList.add('copied');
+      btn.textContent = '✓';
+      // Flash label
+      const flash = document.createElement('span');
+      flash.className = 'sp-copied-flash';
+      flash.textContent = 'Copied!';
+      btn.appendChild(flash);
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = '📋';
+        if (flash.parentNode) flash.parentNode.removeChild(flash);
+      }, 2000);
+    }).catch(() => {});
+  }
+
+  // ══════════════════════════════════════════════
+  // TAB 1 — PASSPHRASE
+  // ══════════════════════════════════════════════
+
+  let ppSep = '-';
+
+  function genPassphrase() {
+    const count   = parseInt(document.getElementById('pp-word-count').value);
+    const cap     = document.getElementById('pp-capitalize').checked;
+    const nums    = document.getElementById('pp-numbers').checked;
+    const sym     = document.getElementById('pp-symbol').checked;
+    const symbols = ['!','@','#','$','%','&'];
+
+    const words = [];
+    for (let i = 0; i < count; i++) {
+      let w = pick(WORDS);
+      if (cap) w = w.charAt(0).toUpperCase() + w.slice(1);
+      words.push(w);
+    }
+
+    let pwd = words.join(ppSep);
+    if (nums) pwd += randDigits(2);
+    if (sym)  pwd += pick(symbols);
+
+    // Entropy: word_count * log2(wordlist) + extras
+    let bits = Math.round(count * Math.log2(WORDS.length));
+    if (nums) bits += Math.round(Math.log2(90));  // 2 digits
+    if (sym)  bits += Math.round(Math.log2(6));
+
+    const pattern = words.map(w => cap ? 'Word' : 'word').join(ppSep === '' ? '' : ppSep)
+      + (nums ? randDigits(2) : '')
+      + (sym  ? pick(symbols) : '');
+
+    return { pwd, bits, pattern: `${cap?'Word':'word'}${ppSep === '' ? '' : ppSep}...×${count}${nums?'+##':''}${sym?'+!':''}` };
+  }
+
+  function buildPpRow(idx, data) {
+    const { pwd, bits, pattern } = data;
+    const id = `pp-row-${idx}`;
+    return `
+      <div class="sp-row" id="${id}">
+        <div class="sp-row-body">
+          <div class="sp-pwd-text">${escHTML(pwd)}</div>
+          ${entropyBadgeHTML(bits)}
+          <div class="sp-pattern">${escHTML(pattern)}</div>
+        </div>
+        <div class="sp-row-actions">
+          <button class="sp-act-btn" title="Regenerate" onclick="spPpRegenRow(${idx})">↺</button>
+          <button class="sp-act-btn" title="Copy" onclick="spPpCopy(this,'${escAttr(pwd)}')">📋</button>
+          <button class="sp-act-btn" title="Use this" onclick="spUse('${escAttr(pwd)}', this)">✅</button>
+        </div>
+      </div>`;
+  }
+
+  const ppData = [null,null,null,null,null];
+
+  window.spPpRegenRow = function(idx) {
+    const rowEl = document.getElementById(`pp-row-${idx}`);
+    if (!rowEl) return;
+    ppData[idx] = genPassphrase();
+    rowEl.classList.add('fading');
+    setTimeout(() => {
+      rowEl.outerHTML = buildPpRow(idx, ppData[idx]);
+    }, 150);
+  };
+
+  window.spPpCopy = function(btn, pwd) { doCopy(btn, pwd); };
+
+  window.spUse = function(pwd, btn) {
+    usePassword(pwd);
+    // Show "→ Sent" label next to pwd text in the row
+    const row = btn.closest('.sp-row');
+    if (row) {
+      const existing = row.querySelector('.sp-sent-label');
+      if (existing) existing.parentNode.removeChild(existing);
+      const lbl = document.createElement('span');
+      lbl.className = 'sp-sent-label';
+      lbl.textContent = '→ Sent to generator';
+      row.querySelector('.sp-row-body').appendChild(lbl);
+      setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
+    }
+  };
+
+  function renderPpList() {
+    const list = document.getElementById('pp-list');
+    if (!list) return;
+    let html = '';
+    for (let i = 0; i < 5; i++) {
+      ppData[i] = genPassphrase();
+      html += buildPpRow(i, ppData[i]);
+    }
+    list.innerHTML = html;
+  }
+
+  // ══════════════════════════════════════════════
+  // TAB 2 — PRONOUNCEABLE
+  // ══════════════════════════════════════════════
+
+  function genSyllable() {
+    const c1 = pick(CONSONANTS);
+    const v  = pick(VOWELS);
+    // 50% chance of trailing consonant
+    const c2 = Math.random() > 0.5 ? pick(CONSONANTS) : '';
+    return c1 + v + c2;
+  }
+
+  // Map pronunciation of a full pronounceable password
+  const DIGIT_WORDS  = ['zero','one','two','three','four','five','six','seven','eight','nine'];
+  const SYMBOL_WORDS = {'*':'star','@':'at','!':'bang','#':'hash','$':'dollar','%':'percent','&':'and'};
+
+  function pronunGuide(pwd) {
+    return pwd.split('').map(ch => {
+      if (/[0-9]/.test(ch)) return DIGIT_WORDS[parseInt(ch)];
+      if (SYMBOL_WORDS[ch]) return SYMBOL_WORDS[ch];
+      return ch;
+    }).join(' ').replace(/\s+/g, ' ');
+  }
+
+  function genPronounce() {
+    const count   = parseInt(document.getElementById('pr-syl-count').value);
+    const digits  = document.getElementById('pr-digits').checked;
+    const sym     = document.getElementById('pr-symbol').checked;
+    const mixed   = document.getElementById('pr-mixed').checked;
+
+    const syllables = [];
+    for (let i = 0; i < count; i++) syllables.push(genSyllable());
+
+    if (mixed) {
+      const idx = randInt(syllables.length);
+      syllables[idx] = syllables[idx].charAt(0).toUpperCase() + syllables[idx].slice(1);
+    }
+
+    let pwd = syllables.join('');
+    if (digits) pwd += randDigits(randInt(1) + 1); // 1-2 digits
+    if (sym)    pwd += pick(PR_SYMBOLS);
+
+    const guide = pronunGuide(pwd);
+    // Pool: 17 consonants * 5 vowels * 18 optional consonants ≈ 1530 possible syllables per slot
+    const bits = Math.round(count * Math.log2(17 * 5 * 9))
+      + (digits ? Math.round(Math.log2(100)) : 0)
+      + (sym    ? Math.round(Math.log2(5))   : 0);
+
+    const pattern = `syl×${count}${digits?'+digit':''}${sym?'+symbol':''}`;
+    return { pwd, guide, bits, pattern };
+  }
+
+  function buildPrRow(idx, data) {
+    const { pwd, guide, bits, pattern } = data;
+    const id = `pr-row-${idx}`;
+    const speakBtn = hasSpeech
+      ? `<button class="sp-speak-btn" title="Speak aloud" onclick="spSpeak('${escAttr(guide)}')">🔊</button>`
+      : '';
+    return `
+      <div class="sp-row" id="${id}">
+        <div class="sp-row-body">
+          <div class="sp-pwd-text">${escHTML(pwd)}</div>
+          ${entropyBadgeHTML(bits)}
+          <div class="sp-pronun">${speakBtn} "${escHTML(guide)}"</div>
+          <div class="sp-pattern">${escHTML(pattern)}</div>
+        </div>
+        <div class="sp-row-actions">
+          <button class="sp-act-btn" title="Regenerate" onclick="spPrRegenRow(${idx})">↺</button>
+          <button class="sp-act-btn" title="Copy" onclick="spPpCopy(this,'${escAttr(pwd)}')">📋</button>
+          <button class="sp-act-btn" title="Use this" onclick="spUse('${escAttr(pwd)}', this)">✅</button>
+        </div>
+      </div>`;
+  }
+
+  const prData = [null,null,null,null,null];
+
+  window.spPrRegenRow = function(idx) {
+    const rowEl = document.getElementById(`pr-row-${idx}`);
+    if (!rowEl) return;
+    prData[idx] = genPronounce();
+    rowEl.classList.add('fading');
+    setTimeout(() => { rowEl.outerHTML = buildPrRow(idx, prData[idx]); }, 150);
+  };
+
+  window.spSpeak = function(guide) { speak(guide); };
+
+  function renderPrList() {
+    const list = document.getElementById('pr-list');
+    if (!list) return;
+    let html = '';
+    for (let i = 0; i < 5; i++) {
+      prData[i] = genPronounce();
+      html += buildPrRow(i, prData[i]);
+    }
+    list.innerHTML = html;
+  }
+
+  // ══════════════════════════════════════════════
+  // TAB 3 — MNEMONIC
+  // ══════════════════════════════════════════════
+
+  function leetEncode(str) {
+    return str.split('').map(c => LEET[c.toLowerCase()] || c).join('');
+  }
+
+  function mnPatterns(words) {
+    // words: array of 1-3 strings (at least 1)
+    const w  = words.map(w => w.trim()).filter(Boolean);
+    if (!w.length) return null;
+    const d2  = () => randDigits(2);
+    const sym = () => pick(MN_SYMBOLS);
+
+    const cap  = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    const low  = s => s.toLowerCase();
+    const rev  = s => s.split('').reverse().join('');
+
+    const base = w.map(cap).join('');
+    const results = [];
+
+    // Pattern 1 — Classic Mix
+    results.push({
+      name: 'Classic Mix',
+      pwd:  w.map(cap).join('') + sym() + d2() + sym()
+    });
+
+    // Pattern 2 — Reversed Combo
+    results.push({
+      name: 'Reversed Combo',
+      pwd:  w.map(s=>rev(s)).join('_') + '#' + d2()
+    });
+
+    // Pattern 3 — Leet Speak
+    results.push({
+      name: 'Leet Speak',
+      pwd:  w.map(s=>leetEncode(cap(s))).join('-') + d2()
+    });
+
+    // Pattern 4 — Camel Inject
+    results.push({
+      name: 'Camel Inject',
+      pwd:  (w.length >= 2
+        ? low(w[0]) + cap(w[1]) + '!' + (w[2] ? low(w[2]) : '') + d2()
+        : low(w[0]) + '!' + d2() + low(w[0]))
+    });
+
+    // Pattern 5 — Symbol Sandwich
+    results.push({
+      name: 'Symbol Sandwich',
+      pwd:  '>>' + w.map(cap).join('<<') + d2()
+    });
+
+    return results;
+  }
+
+  function buildMnRow(idx, pwd, name) {
+    const bits = calcEntropy(pwd, 0);
+    const id   = `mn-row-${idx}`;
+    // Ensure minimum length of 12 by appending if needed
+    while (pwd.length < 12) pwd += randInt(10);
+    return `
+      <div class="sp-row" id="${id}">
+        <div class="sp-row-body">
+          <div class="sp-pwd-text">${escHTML(pwd)}</div>
+          ${entropyBadgeHTML(bits)}
+          <div class="sp-pattern">${escHTML(name)}</div>
+        </div>
+        <div class="sp-row-actions">
+          <button class="sp-act-btn" title="Copy" onclick="spPpCopy(this,'${escAttr(pwd)}')">📋</button>
+          <button class="sp-act-btn" title="Use this" onclick="spUse('${escAttr(pwd)}', this)">✅</button>
+        </div>
+      </div>`;
+  }
+
+  function getMnWords() {
+    return [
+      document.getElementById('mn-word1').value,
+      document.getElementById('mn-word2').value,
+      document.getElementById('mn-word3').value,
+    ].map(w => w.trim()).filter(Boolean);
+  }
+
+  function renderMnList() {
+    const list = document.getElementById('mn-list');
+    if (!list) return;
+    const words = getMnWords();
+    if (!words.length) {
+      list.innerHTML = `<div class="sp-empty-state">✏️ Enter 1–3 hint words above<br>to generate memorable passwords</div>`;
+      return;
+    }
+    const patterns = mnPatterns(words);
+    if (!patterns) { list.innerHTML = ''; return; }
+    list.innerHTML = patterns.map((p, i) => buildMnRow(i, p.pwd, p.name)).join('');
+  }
+
+  // Suggestion chips — shown below focused input
+  // MN_CHIP_DATA maps input index (0-2) to word pool for suggestion chips
+  const MN_CHIP_DATA = [MN_COLORS, MN_ANIMALS, MN_PLACES];
+
+  function renderMnChips(inputIdx) {
+    const chipRow = document.getElementById('mn-chips');
+    if (!chipRow) return;
+    const pool = MN_CHIP_DATA[inputIdx] || MN_COLORS;
+    // Show 4 random chips from the pool
+    const shown = [...pool].sort(() => Math.random()-0.5).slice(0,4);
+    chipRow.innerHTML = shown.map(w =>
+      `<button class="sp-chip" onclick="spMnChip(${inputIdx},'${escAttr(w)}')">${escHTML(w)}</button>`
+    ).join('');
+  }
+
+  window.spMnChip = function(inputIdx, word) {
+    const inputs = ['mn-word1','mn-word2','mn-word3'];
+    const el = document.getElementById(inputs[inputIdx]);
+    if (el) { el.value = word; renderMnList(); }
+  };
+
+  // Surprise Me
+  function mnSurpriseMe() {
+    document.getElementById('mn-word1').value = pick(MN_COLORS);
+    document.getElementById('mn-word2').value = pick(MN_ANIMALS);
+    document.getElementById('mn-word3').value = pick(MN_PLACES);
+    renderMnList();
+  }
+
+  // ══════════════════════════════════════════════
+  // SHARED UTILITIES
+  // ══════════════════════════════════════════════
+
+  function escHTML(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  function escAttr(s) {
+    return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  }
+
+  // ══════════════════════════════════════════════
+  // DEBOUNCE HELPERS
+  // ══════════════════════════════════════════════
+
+  let ppDebounce = null, prDebounce = null, mnDebounce = null;
+
+  function debouncePp() {
+    clearTimeout(ppDebounce);
+    ppDebounce = setTimeout(renderPpList, 300);
+  }
+
+  function debouncePr() {
+    clearTimeout(prDebounce);
+    prDebounce = setTimeout(renderPrList, 300);
+  }
+
+  function debounceMn() {
+    clearTimeout(mnDebounce);
+    mnDebounce = setTimeout(renderMnList, 300);
+  }
+
+  // ══════════════════════════════════════════════
+  // WIRE UP SMART PANEL EVENTS
+  // ══════════════════════════════════════════════
+
+  function wireSmartPanel() {
+    // Tab switching
+    document.querySelectorAll('.sp-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.sp-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.sp-tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        const pane = document.getElementById('sptab-' + tab.dataset.sptab);
+        if (pane) pane.classList.add('active');
+      });
+    });
+
+    // ── Passphrase controls ──
+    const ppSlider = document.getElementById('pp-word-count');
+    const ppSliderLbl = document.getElementById('pp-word-count-lbl');
+    ppSlider.addEventListener('input', () => {
+      ppSliderLbl.textContent = ppSlider.value + ' words';
+      debouncePp();
+    });
+
+    document.querySelectorAll('#pp-sep-row .sp-sep-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('#pp-sep-row .sp-sep-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        ppSep = pill.dataset.sep;
+        debouncePp();
+      });
+    });
+
+    ['pp-capitalize','pp-numbers','pp-symbol'].forEach(id => {
+      document.getElementById(id).addEventListener('change', debouncePp);
+    });
+
+    document.getElementById('pp-regen-all').addEventListener('click', renderPpList);
+
+    // ── Pronounceable controls ──
+    const prSlider = document.getElementById('pr-syl-count');
+    const prSliderLbl = document.getElementById('pr-syl-count-lbl');
+    prSlider.addEventListener('input', () => {
+      const v = parseInt(prSlider.value);
+      prSliderLbl.textContent = `${v} syllables (~${v*3} chars)`;
+      debouncePr();
+    });
+
+    ['pr-digits','pr-symbol','pr-mixed'].forEach(id => {
+      document.getElementById(id).addEventListener('change', debouncePr);
+    });
+
+    document.getElementById('pr-regen-all').addEventListener('click', renderPrList);
+
+    // ── Mnemonic controls ──
+    ['mn-word1','mn-word2','mn-word3'].forEach((id, idx) => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', debounceMn);
+      el.addEventListener('focus', () => renderMnChips(idx));
+    });
+
+    document.getElementById('mn-shuffle').addEventListener('click', renderMnList);
+    document.getElementById('mn-surprise').addEventListener('click', mnSurpriseMe);
+
+    // ── Auto-generate on page nav to Generator ──
+    // Patch the sidebar Generator nav item
+    const genNavItem = document.querySelector('#sidebar .nav-item[data-page="generator"]');
+    if (genNavItem) {
+      genNavItem.addEventListener('click', () => {
+        // Give DOM a tick to render the page before generating
+        setTimeout(() => {
+          if (!document.getElementById('pp-list').innerHTML) renderPpList();
+        }, 60);
+      });
+    }
+  }
+
+  // ══════════════════════════════════════════════
+  // INIT — run after DOM is ready
+  // ══════════════════════════════════════════════
+
+  // Use DOMContentLoaded or run immediately if already loaded
+  function onReady(fn) {
+    if (document.readyState !== 'loading') fn();
+    else document.addEventListener('DOMContentLoaded', fn);
+  }
+
+  onReady(() => {
+    wireSmartPanel();
+    // Auto-generate Passphrase tab on first page load IF generator page is already active
+    if (document.getElementById('page-generator')?.classList.contains('active')) {
+      renderPpList();
+    }
+    // Also seed when generator page becomes active via navigate()
+    document.addEventListener('sp:navigateToGenerator', () => {
+      setTimeout(renderPpList, 60);
+    });
+  });
+
+})(); // end initSmartPanel IIFE
 
 document.addEventListener('DOMContentLoaded', () => {
   boot().catch(err => {
