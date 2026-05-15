@@ -26,7 +26,5 @@
     },
     "macOSPrivateApi": true
   },
-  "plugins": {
-  "dialog": {}
-}
+  "plugins": {}
 }

@@ -27,7 +27,7 @@
 #[macro_export]
 macro_rules! safe_command {
     ($body:block) => {
-        $crate::catch_sync_panic!($body)
+        $body
     };
 }
 

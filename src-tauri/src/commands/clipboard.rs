@@ -72,9 +72,11 @@ pub async fn copy_entry_password_to_clipboard(
         }
 
         let secs = if timeout_secs == 0 { 30 } else { timeout_secs };
+        // Clone arc twice: one for the guard, one to move into the spawned task.
         let timer_arc = clip_timer.0.clone();
+        let timer_arc_for_task = clip_timer.0.clone();
 
-        // Cancel any existing timer before spawning a new one
+        // Cancel any existing timer before spawning a new one.
         let mut guard = timer_arc.lock().await;
         if let Some(old_handle) = guard.take() {
             old_handle.abort();
@@ -85,8 +87,8 @@ pub async fn copy_entry_password_to_clipboard(
             if let Ok(mut cb) = arboard::Clipboard::new() {
                 let _ = cb.set_text("");
             }
-            // Clear the handle slot after firing
-            let mut g = timer_arc.lock().await;
+            // Clear the handle slot after firing.
+            let mut g = timer_arc_for_task.lock().await;
             *g = None;
         });
 
