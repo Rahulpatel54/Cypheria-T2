@@ -85,9 +85,17 @@ pub async fn copy_entry_password_to_clipboard(
         let new_handle = tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
             if let Ok(mut cb) = arboard::Clipboard::new() {
+                // Write noise first to push the password out of clipboard history
+                let noise: String = (0..32)
+                    .map(|_| {
+                        let b = crate::crypto::rng::secure_random_bytes::<1>()[0];
+                        (33u8 + (b % 94)) as char
+                    })
+                    .collect();
+                let _ = cb.set_text(&noise);
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                 let _ = cb.set_text("");
             }
-            // Clear the handle slot after firing.
             let mut g = timer_arc_for_task.lock().await;
             *g = None;
         });
@@ -113,9 +121,27 @@ pub async fn clear_clipboard(
 
         let mut clipboard = arboard::Clipboard::new()
             .map_err(|_| CypheriaError::InternalError("Clipboard unavailable".into()))?;
+
+        // Write random noise first — this pushes the sensitive content out of
+        // clipboard history's most-recent slot before we blank it.
+        // Windows Clipboard History stores every unique write; writing noise
+        // then empty means the password is no longer the latest entry.
+        let noise: String = (0..32)
+            .map(|_| {
+                let b = crate::crypto::rng::secure_random_bytes::<1>()[0];
+                // Map to printable ASCII 33–126
+                (33u8 + (b % 94)) as char
+            })
+            .collect();
+        let _ = clipboard.set_text(&noise);
+
+        // Small yield so the OS has time to register the noise write
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+
         clipboard
             .set_text("")
             .map_err(|_| CypheriaError::InternalError("Clipboard clear failed".into()))?;
+
         Ok(())
     })
 }
