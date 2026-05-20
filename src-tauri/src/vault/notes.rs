@@ -124,7 +124,7 @@ pub fn update_note(
         .find(|n| n.id == note_id)
         .ok_or_else(|| CypheriaError::NoteNotFound(note_id.to_string()))?;
 
-    let mut new_nk = rng::entry_key();
+    let mut new_nk = rng::entry_key();  
 
     let payload = NotePayload {
         title:   input.title,
@@ -133,6 +133,8 @@ pub fn update_note(
 
     let payload_json      = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
     let payload_encrypted = aes::encrypt(&new_nk, &payload_json)?;
+    let mut payload_json = payload_json;
+    payload_json.zeroize();
     let ek_wrapped        = aes::wrap_key(vault_key, &new_nk)?;
     new_nk.zeroize();
 

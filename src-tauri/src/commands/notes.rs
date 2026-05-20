@@ -55,10 +55,13 @@ pub async fn save_note(
 ) -> Result<String, CypheriaError> {
     safe_command!({
         autolock.bump_activity();
+
+        // UUID validation must happen BEFORE entering the session closure
+        if let Some(ref id) = note_id {
+            validate_uuid(id)?;
+        }
+
         session
-            if let Some(ref id) = note_id {
-                validate_uuid(id)?;
-            }
             .with_session_mut(|key_store, vault_store| match note_id {
                 Some(ref id) => {
                     notes::update_note(
