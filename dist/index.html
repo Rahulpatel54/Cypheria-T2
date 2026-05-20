@@ -71,9 +71,10 @@
 /* Two-column grid for the Generator page body */
 #page-generator .page-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: 480px 1fr;
+  gap: 24px;
   align-items: start;
+  max-width: 1100px;
 }
 
 /* Left column wrapper keeps existing gen-wrap unchanged */
@@ -87,31 +88,19 @@
 .smart-panel {
   background: var(--bg-card);
   border: 1px solid var(--border-mid);
-  border-top: 2px solid var(--accent);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: var(--glow-card);
   align-self: start;
 }
 
-/* Section label above the panel (rendered inside .smart-panel as a header) */
-.smart-panel-label {
-  font-family: 'Syne', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-muted);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 14px 16px 0;
-}
 
 /* ── Tab bar ── */
 .sp-tabs {
   display: flex;
-  gap: 6px;
-  padding: 10px 16px 12px;
+  gap: 2px;
+  padding: 10px 12px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -120,28 +109,31 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 13px;
-  border-radius: 999px;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--border-mid);
-  background: var(--bg-surface);
-  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--text-muted);
   transition: all 0.15s;
   user-select: none;
+  position: relative;
+  bottom: -1px;
 }
 
 .sp-tab:hover {
-  border-color: var(--border-accent);
-  color: var(--accent-light);
+  color: var(--text-secondary);
+  background: var(--bg-surface);
 }
 
 .sp-tab.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.35);
+  background: var(--bg-panel);
+  border-color: var(--border-mid);
+  border-bottom-color: var(--bg-panel);
+  color: var(--accent-light);
 }
 
 /* NEW / BETA badges on tabs */
@@ -184,6 +176,7 @@
   padding: 14px 16px 16px;
   flex-direction: column;
   gap: 12px;
+  background: var(--bg-panel);
 }
 
 .sp-tab-content.active {
@@ -369,8 +362,8 @@
 }
 
 .sp-act-btn {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-card);
@@ -378,11 +371,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
   transition: all 0.12s;
   line-height: 1;
   position: relative;
+  flex-shrink: 0;
 }
 
 .sp-act-btn:hover {
@@ -443,8 +437,8 @@
 /* Regenerate All / Shuffle / Surprise Me buttons */
 .sp-regen-all {
   width: 100%;
-  padding: 8px;
-  background: var(--bg-surface);
+  padding: 7px 12px;
+  background: var(--bg-card);
   border: 1px solid var(--border-mid);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
@@ -605,12 +599,11 @@ button,input,textarea,select{font-family:'DM Sans',sans-serif;}
 .title-icon-btn:hover{background:var(--bg-card);color:var(--text-secondary);}
 .title-icon-btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
 .title-divider{width:1px;height:18px;background:var(--border-subtle);}
-.win-controls{display:flex;align-items:center;gap:6px;margin-left:4px;-webkit-app-region:no-drag;}
-.win-btn{width:12px;height:12px;border-radius:50%;border:none;cursor:pointer;transition:opacity 0.15s;flex-shrink:0;}
-.win-btn:hover{opacity:0.8;}
-.win-close{background:#ff5f57;}
-.win-min{background:#febc2e;}
-.win-max{background:#28c840;}
+.win-controls{display:flex;align-items:center;gap:0;margin-left:8px;-webkit-app-region:no-drag;}
+.win-btn{width:46px;height:32px;border-radius:0;border:none;cursor:pointer;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);transition:background 0.1s,color 0.1s;flex-shrink:0;}
+.win-btn:hover{background:var(--bg-card);color:var(--text-primary);}
+.win-close:hover{background:#c42b1c!important;color:#fff!important;}
+.win-btn svg{pointer-events:none;}
 
 /* ═══════════════════════════════════════════════════
    MAIN LAYOUT
@@ -1050,11 +1043,16 @@ textarea.form-input{resize:vertical;min-height:72px;}
       <button class="title-icon-btn" id="tb-lock" title="Lock vault">
         <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       </button>
-      <div class="title-divider"></div>
       <div class="win-controls">
-        <button class="win-btn win-close" id="win-close" title="Close"></button>
-        <button class="win-btn win-min" id="win-min" title="Minimize"></button>
-        <button class="win-btn win-max" id="win-max" title="Maximize"></button>
+        <button class="win-btn win-min" id="win-min" title="Minimize">
+          <svg viewBox="0 0 10 1" width="10" height="1"><rect width="10" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="win-btn win-max" id="win-max" title="Maximize">
+          <svg viewBox="0 0 10 10" width="9" height="9"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        </button>
+        <button class="win-btn win-close" id="win-close" title="Close">
+          <svg viewBox="0 0 10 10" width="9" height="9"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.2"/></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -1311,8 +1309,10 @@ textarea.form-input{resize:vertical;min-height:72px;}
             SMART PASSWORD PANEL (right column)
           ═══════════════════════════════════════ -->
           <div class="smart-panel" id="smart-panel">
-            <div class="smart-panel-label">Smart Generator</div>
-
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
+              <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--text-primary);">Smart Generator</span>
+              <span style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);">AI-free · local only</span>
+            </div>
             <!-- Tab bar -->
             <div class="sp-tabs">
               <button class="sp-tab active" data-sptab="passphrase">Passphrase</button>
