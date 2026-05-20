@@ -46,18 +46,20 @@ pub async fn save_settings(
 
         session
             .with_session_mut(|key_store, vault_store| {
-                let json =
-                    serde_json::to_vec(&settings).map_err(|_| CypheriaError::SerdeError)?;
-                let mut settings_key = [0u8; 32];
-                crate::crypto::kdf::derive_subkey(
-                    key_store.vault_key_bytes(),
-                    b"SETTINGS_ENCRYPTION_VK",
-                    &mut settings_key,
-                );
-                let result = crate::crypto::aes::encrypt(&settings_key, &json);
-                settings_key.zeroize();
-                vault_store.data.settings.payload_encrypted = result?;
-                Ok(())
+                catch_sync_panic!({
+                    let json =
+                        serde_json::to_vec(&settings).map_err(|_| CypheriaError::SerdeError)?;
+                    let mut settings_key = [0u8; 32];
+                    crate::crypto::kdf::derive_subkey(
+                        key_store.vault_key_bytes(),
+                        b"SETTINGS_ENCRYPTION_VK",
+                        &mut settings_key,
+                    );
+                    let result = crate::crypto::aes::encrypt(&settings_key, &json);
+                    settings_key.zeroize();
+                    vault_store.data.settings.payload_encrypted = result?;
+                    Ok(())
+                })
             })
             .await?;
 

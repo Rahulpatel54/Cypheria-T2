@@ -168,7 +168,6 @@ mod tests {
     use crate::vault::format::{VaultData, EncryptedSettings};
     use chrono::Utc;
 
-    // Helper: empty in-memory vault
     fn empty_vault_data() -> VaultData {
         VaultData {
             entries: vec![],
@@ -178,113 +177,122 @@ mod tests {
         }
     }
 
-    // Fixed test vault key
     fn test_vk() -> [u8; 32] { [0xAB_u8; 32] }
 
-    // Helper: minimal valid EntryInput
-    fn sample_input(name: &str) -> EntryInput {
-        EntryInput {
-            name: name.to_string(),
-            username: "user@example.com".to_string(),
-            password: "s3cr3t!Password1".to_string(),
-            website: "https://example.com".to_string(),
-            notes: String::new(),
-            is_favorite: Some(false),
-            category: Some("general".into()),
-            color: Some("#8b5cf6".into()),
-            emoji: Some("T".into()),
+    fn sample_note_input(title: &str) -> NoteInput {
+        NoteInput {
+            title:   title.to_string(),
+            content: "This is the note body.".to_string(),
         }
     }
 
+    // ── 1 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_add_and_decrypt_entry_roundtrip() {
-        // Basic add + decrypt must recover correct name and mask password
+    fn test_add_and_decrypt_note_roundtrip() {
+        // add_note + decrypt_note must recover title and mask content
         let vk = test_vk();
         let mut data = empty_vault_data();
-        let id = add_entry(&vk, &mut data, sample_input("TestSite")).unwrap();
-        assert_eq!(data.entries.len(), 1);
-        let view = decrypt_entry(&vk, &data.entries[0]).unwrap();
+        let id = add_note(&vk, &mut data, sample_note_input("My Secret")).unwrap();
+        assert_eq!(data.notes.len(), 1);
+        let view = decrypt_note(&vk, &data.notes[0]).unwrap();
         assert_eq!(view.id, id);
-        assert_eq!(view.name, "TestSite");
-        assert_eq!(view.username, "user@example.com");
-        assert!(view.password_masked, "password must be masked in EntryView");
+        assert_eq!(view.title, "My Secret");
+        assert!(view.content_masked, "content must be masked in NoteView");
     }
 
+    // ── 2 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_get_entry_password_returns_correct_value() {
-        // get_entry_password must return the plaintext stored password
+    fn test_get_note_content_returns_correct_value() {
+        // get_note_content must return the plaintext content stored at add time
         let vk = test_vk();
         let mut data = empty_vault_data();
-        let id = add_entry(&vk, &mut data, sample_input("Login")).unwrap();
-        let pwd = get_entry_password(&vk, &data, &id).unwrap();
-        assert_eq!(pwd, "s3cr3t!Password1");
+        let id = add_note(&vk, &mut data, sample_note_input("Title")).unwrap();
+        let full = get_note_content(&vk, &data, &id).unwrap();
+        assert_eq!(full.title,   "Title");
+        assert_eq!(full.content, "This is the note body.");
     }
 
+    // ── 3 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_update_entry_rotates_key() {
-        // Every update must produce a new wrapped Entry Key (forward secrecy)
+    fn test_update_note_rotates_key() {
+        // Every update must produce a new wrapped Note Key (forward secrecy)
         let vk = test_vk();
         let mut data = empty_vault_data();
-        let id = add_entry(&vk, &mut data, sample_input("Old")).unwrap();
-        let old_ek = data.entries[0].ek_wrapped.clone();
-        update_entry(&vk, &mut data, &id, sample_input("New")).unwrap();
+        let id = add_note(&vk, &mut data, sample_note_input("Old Title")).unwrap();
+        let old_ek = data.notes[0].ek_wrapped.clone();
+        update_note(&vk, &mut data, &id, NoteInput {
+            title:   "New Title".to_string(),
+            content: "Updated body.".to_string(),
+        }).unwrap();
         assert_ne!(
-            data.entries[0].ek_wrapped, old_ek,
+            data.notes[0].ek_wrapped, old_ek,
             "ek_wrapped must differ after update (key rotation)"
         );
-        let view = decrypt_entry(&vk, &data.entries[0]).unwrap();
-        assert_eq!(view.name, "New");
+        let view = decrypt_note(&vk, &data.notes[0]).unwrap();
+        assert_eq!(view.title, "New Title");
     }
 
+    // ── 4 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_decrypt_entry_wrong_key_fails() {
+    fn test_decrypt_note_wrong_key_fails() {
         // Decryption with a wrong vault key must return an error
-        let vk = test_vk();
+        let vk       = test_vk();
         let wrong_vk = [0x00_u8; 32];
         let mut data = empty_vault_data();
-        add_entry(&vk, &mut data, sample_input("Secret")).unwrap();
+        add_note(&vk, &mut data, sample_note_input("Secret")).unwrap();
         assert!(
-            decrypt_entry(&wrong_vk, &data.entries[0]).is_err(),
-            "wrong vault key must not decrypt entry"
+            decrypt_note(&wrong_vk, &data.notes[0]).is_err(),
+            "wrong vault key must not decrypt note"
         );
     }
 
+    // ── 5 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_add_entry_empty_name_rejected() {
-        // Validation must reject an empty entry name
-        let mut input = sample_input("placeholder");
-        input.name = String::new();
-        let mut data = empty_vault_data();
-        assert!(add_entry(&test_vk(), &mut data, input).is_err());
+    fn test_add_note_empty_title_rejected() {
+        // Validation must reject an empty note title
+        let mut data  = empty_vault_data();
+        let bad_input = NoteInput { title: "".to_string(), content: "body".to_string() };
+        assert!(add_note(&test_vk(), &mut data, bad_input).is_err());
     }
 
+    // ── 6 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_add_entry_name_too_long_rejected() {
-        // Validation must reject names over 256 characters
-        let long_name = "a".repeat(257);
-        let input = sample_input(&long_name);
-        let mut data = empty_vault_data();
-        assert!(add_entry(&test_vk(), &mut data, input).is_err());
+    fn test_add_note_whitespace_only_title_rejected() {
+        // A title of only whitespace must be rejected (trim check)
+        let mut data  = empty_vault_data();
+        let bad_input = NoteInput { title: "   ".to_string(), content: "body".to_string() };
+        assert!(add_note(&test_vk(), &mut data, bad_input).is_err());
     }
 
+    // ── 7 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_get_entry_password_nonexistent_id_fails() {
-        // Requesting password for unknown ID must return EntryNotFound
-        let vk = test_vk();
+    fn test_add_note_title_too_long_rejected() {
+        // Validation must reject titles over 256 characters
+        let long_title = "a".repeat(257);
+        let mut data   = empty_vault_data();
+        let bad_input  = NoteInput { title: long_title, content: "body".to_string() };
+        assert!(add_note(&test_vk(), &mut data, bad_input).is_err());
+    }
+
+    // ── 8 ──────────────────────────────────────────────────────────────────
+    #[test]
+    fn test_get_note_content_nonexistent_id_fails() {
+        // Requesting content for unknown ID must return NoteNotFound
+        let vk   = test_vk();
         let data = empty_vault_data();
-        let result = get_entry_password(&vk, &data, "00000000-0000-0000-0000-000000000000");
+        let result = get_note_content(&vk, &data, "00000000-0000-0000-0000-000000000000");
         assert!(result.is_err());
     }
 
+    // ── 9 ──────────────────────────────────────────────────────────────────
     #[test]
-    fn test_vault_updated_at_stamped_on_add() {
-        // vault_data.updated_at must be refreshed after add
-        let vk = test_vk();
+    fn test_vault_updated_at_stamped_on_add_note() {
+        // vault_data.updated_at must be refreshed after add_note
+        let vk       = test_vk();
         let mut data = empty_vault_data();
-        let before = data.updated_at;
-        // Small sleep to ensure timestamp differs
+        let before   = data.updated_at;
         std::thread::sleep(std::time::Duration::from_millis(10));
-        add_entry(&vk, &mut data, sample_input("TS")).unwrap();
+        add_note(&vk, &mut data, sample_note_input("TS")).unwrap();
         assert!(data.updated_at >= before);
     }
 }
