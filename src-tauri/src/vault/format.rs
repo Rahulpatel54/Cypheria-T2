@@ -24,7 +24,7 @@ pub const FORMAT_VERSION: u16 = 1;
 
 /// Stored in plaintext in the header section.
 /// Contains everything needed to re-derive keys and verify integrity.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct VaultHeader {
     /// Random 32-byte salt used for Argon2id key derivation.
     pub argon2_salt: [u8; 32],
