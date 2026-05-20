@@ -17,7 +17,7 @@ pub enum SessionState {
     Locked,
     Unlocked {
         key_store:   ActiveKeyStore,
-        vault_store: VaultStore,
+        vault_store: Box<VaultStore>,
         vault_path:  std::path::PathBuf,
         unlocked_at: Instant,
     },
@@ -61,7 +61,7 @@ impl SessionManager {
                 let mut state = self.state.write().await;
                 *state = SessionState::Unlocked {
                     key_store,
-                    vault_store,
+                    vault_store: Box::new(vault_store),
                     vault_path: vault_path.to_path_buf(),
                     unlocked_at: Instant::now(),
                 };

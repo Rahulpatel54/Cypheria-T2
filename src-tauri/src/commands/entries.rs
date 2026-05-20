@@ -79,7 +79,6 @@ pub async fn update_entry(
 ) -> Result<(), CypheriaError> {
     safe_command!({
         autolock.bump_activity();
-        // BUG-008 fix: unconditional validation.
         validate_uuid(&entry_id)?;
         if input.password.is_empty() {
             return Err(CypheriaError::InvalidInput(
@@ -155,6 +154,7 @@ pub async fn toggle_favorite(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn update_entry_keep_password(
     entry_id: String,

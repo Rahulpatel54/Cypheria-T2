@@ -75,7 +75,7 @@ pub async fn change_master_password(
             let new_mk = zeroize::Zeroizing::new(new_mk_raw);
 
             // 3. Re-wrap VK with new MK
-            let new_vk_wrapped = aes::wrap_key(&*new_mk, key_store.vault_key_bytes())?;
+            let new_vk_wrapped = aes::wrap_key(&new_mk, key_store.vault_key_bytes())?;
 
             // 4. Re-generate Kyber keypair and re-wrap VK post-quantum
             let kp = kyber::generate_keypair();
@@ -85,7 +85,7 @@ pub async fn change_master_password(
 
             let (kyber_ciphertext, vk_wrapped_pq) =
                 kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
-            let kyber_sk_encrypted = aes::encrypt(&*new_mk, &sec_key)?;
+            let kyber_sk_encrypted = aes::encrypt(&new_mk, &sec_key)?;
 
             // 5. Update header
             vault_store.header.argon2_salt          = new_salt;
@@ -160,7 +160,7 @@ pub async fn create_vault(
     pwd_bytes.zeroize();
 
     let vk_bytes = Zeroizing::new(rng::entry_key());
-    let vk_wrapped_classical = aes::wrap_key(&*mk_bytes, &*vk_bytes)?;
+    let vk_wrapped_classical = aes::wrap_key(&mk_bytes, &vk_bytes)?;
 
     let kp = kyber::generate_keypair();
     let pub_key = kp.public_key.clone();
@@ -169,7 +169,7 @@ pub async fn create_vault(
 
     let (kyber_ciphertext, vk_wrapped_pq) =
         kyber::encapsulate_vault_key(&pub_key, &vk_bytes)?;
-    let kyber_sk_encrypted = aes::encrypt(&*mk_bytes, &sec_key)?;
+    let kyber_sk_encrypted = aes::encrypt(&mk_bytes, &sec_key)?;
 
     let default_settings = Settings::default();
     let settings_json = serde_json::to_vec(&default_settings).map_err(|_| CypheriaError::SerdeError)?;
@@ -177,7 +177,7 @@ pub async fn create_vault(
     // Encrypt settings with a VK-derived subkey (not MK) so settings survive
     // master password changes without re-encryption.
     let mut settings_subkey = [0u8; 32];
-    kdf::derive_subkey(&*vk_bytes, b"SETTINGS_ENCRYPTION_VK", &mut settings_subkey);
+    kdf::derive_subkey(&vk_bytes, b"SETTINGS_ENCRYPTION_VK", &mut settings_subkey);
     let settings_encrypted = aes::encrypt(&settings_subkey, &settings_json)?;
     settings_subkey.zeroize();
     let mut settings_json = settings_json;

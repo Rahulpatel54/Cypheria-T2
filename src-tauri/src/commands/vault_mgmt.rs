@@ -28,7 +28,7 @@ pub async fn open_vault(vault_path: String) -> Result<String, CypheriaError> {
             .await
             .map_err(|_| CypheriaError::VaultCorrupted)?;
 
-        if &magic_buf != MAGIC {
+        if magic_buf != MAGIC {
             return Err(CypheriaError::VaultCorrupted);
         }
 

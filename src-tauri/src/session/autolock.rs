@@ -73,14 +73,11 @@ impl AutoLockTimer {
                 // Skip if timeout is 0 (disabled)
                 if timeout == 0 { continue; }
 
-                if now.saturating_sub(last) >= timeout {
-                    if session.is_unlocked().await {
-                        session.lock().await;
-                        // Notify the frontend so it can show the lock screen
-                        use tauri::Emitter;
-                        let _ = app.emit("vault-auto-locked", ());
-                    }
-                }
+                if now.saturating_sub(last) >= timeout && session.is_unlocked().await {
+                    session.lock().await;
+                    use tauri::Emitter;
+                    let _ = app.emit("vault-auto-locked", ());
+                }   
             }
         });
     }
