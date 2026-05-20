@@ -239,7 +239,11 @@ pub async fn persist_vault(
         path.with_file_name(name)
     };
     tokio::fs::write(&tmp_path, &file).await?;
-    tokio::fs::rename(&tmp_path, path).await?;
+    let rename_result = tokio::fs::rename(&tmp_path, path).await;
+    if rename_result.is_err() {
+        let _ = tokio::fs::remove_file(&tmp_path).await; // best-effort cleanup
+        rename_result?;
+    }
 
     Ok(())
 }

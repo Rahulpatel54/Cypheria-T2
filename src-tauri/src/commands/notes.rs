@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use tauri::State;
+use crate::models::note::{NoteInput, NoteView, NoteContentView};
+use crate::commands::validate_uuid;
 use crate::{
     error::CypheriaError,
-    models::note::{NoteInput, NoteView},
     session::{manager::SessionManager, autolock::AutoLockTimer},
     vault::notes,
 };
@@ -28,6 +29,24 @@ pub async fn get_all_notes(
 }
 
 #[tauri::command]
+pub async fn get_note_content(
+    note_id: String,
+    session: State<'_, Arc<SessionManager>>,
+    autolock: State<'_, Arc<AutoLockTimer>>,
+) -> Result<NoteContentView, CypheriaError> {
+    safe_command!({
+        autolock.bump_activity();
+        // BUG-HIGH-002 FIX: validate UUID before use
+        validate_uuid(&note_id)?;
+        session
+            .with_session(|key_store, vault_store| {
+                notes::get_note_content(key_store.vault_key_bytes(), &vault_store.data, &note_id)
+            })
+            .await
+    })
+}
+
+#[tauri::command]
 pub async fn save_note(
     note_id: Option<String>,
     input: NoteInput,
@@ -37,6 +56,9 @@ pub async fn save_note(
     safe_command!({
         autolock.bump_activity();
         session
+            if let Some(ref id) = note_id {
+                validate_uuid(id)?;
+            }
             .with_session_mut(|key_store, vault_store| match note_id {
                 Some(ref id) => {
                     notes::update_note(
@@ -61,6 +83,7 @@ pub async fn delete_note(
 ) -> Result<(), CypheriaError> {
     safe_command!({
         autolock.bump_activity();
+        validate_uuid(&note_id)?;
         session
             .with_session_mut(|_key_store, vault_store| {
                 let pre_len = vault_store.data.notes.len();
@@ -68,7 +91,6 @@ pub async fn delete_note(
                 if vault_store.data.notes.len() == pre_len {
                     return Err(CypheriaError::NoteNotFound(note_id.clone()));
                 }
-                // ERR-007 fix: stamp the vault-level updated_at on deletion.
                 vault_store.data.updated_at = chrono::Utc::now();
                 Ok(())
             })

@@ -5,12 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cypheria — Quantum-Resistant Offline Password Manager</title>
 <style>
-/* MISS-005 FIX: Fonts loaded locally — no external CDN requests.
-   Font files must be present in dist/fonts/:
-     - Syne-VariableFont_wght.woff2
-     - DMSans-VariableFont_opsz,wght.woff2
-     - DMSans-Italic-VariableFont_opsz,wght.woff2
-*/
 @font-face {
     font-family: 'Syne';
     src: url('./fonts/Syne-VariableFont_wght.woff2') format('woff2');
@@ -1616,7 +1610,7 @@ textarea.form-input{resize:vertical;min-height:72px;}
     </div>
     <div class="form-group">
       <label class="form-label">Content</label>
-      <textarea class="form-input" id="note-content" rows="8" placeholder="Write your secure note here…"></textarea>
+      <textarea class="form-input" id="note-content" rows="8" placeholder="Write your secure note here…" maxlength="1048576"></textarea>
     </div>
     <div class="modal-error" id="note-error"></div>
     <div class="modal-btns">
@@ -2043,9 +2037,25 @@ async function lockVaultUI() {
 }
 
 async function openDifferentVault() {
-  const choice = confirm('Open an existing vault? (OK)\nor Create a new vault? (Cancel)');
+  if (!_invoke) { showToast('File dialog requires Tauri backend', 'warning'); return; }
+  let choice;
+  try {
+    // ask() returns true when user clicks the first/OK button (Open Existing)
+    choice = await rawInvoke('plugin:dialog|ask', {
+      options: {
+        title:        'Switch Vault',
+        message:      'What would you like to do?',
+        okLabel:      'Open Existing Vault',
+        cancelLabel:  'Create New Vault',
+      },
+    });
+  } catch (_) {
+    // Fallback: treat failure as "open existing" since that is the safer path
+    choice = true;
+  }
+
   if (choice) {
-    if (!_invoke) { showToast('File dialog requires Tauri backend', 'warning'); return; }
+    // Open existing vault
     try {
       const p = await rawInvoke('plugin:dialog|open', {
         options: {
@@ -2059,13 +2069,14 @@ async function openDifferentVault() {
         const path      = typeof p === 'string' ? p : p[0];
         const canonical = await rawInvoke('open_vault', { vaultPath: path });
         currentVaultPath = canonical;
-        // BUG-002 FIX: Use Rust backend instead of localStorage
         await persistVaultPath(canonical);
-         try {
-            const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
-            document.getElementById('lock-vault-name').textContent = meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
+        try {
+          const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
+          document.getElementById('lock-vault-name').textContent =
+            meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
         } catch (_) {
-            document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault', '');
+          document.getElementById('lock-vault-name').textContent =
+            canonical.split(/[\\/]/).pop().replace('.qvault', '');
         }
         document.getElementById('lock-error').textContent = '';
         showToast('Vault loaded — enter your password', 'success');
@@ -2075,7 +2086,7 @@ async function openDifferentVault() {
       showToast('Could not open vault: ' + String(e).slice(0, 80), 'error');
     }
   } else {
-    // BUG-002 FIX: Clear via Rust backend instead of localStorage.removeItem
+    // Create new vault
     await clearPersistedVaultPath();
     currentVaultPath = null;
     showSetupScreen();
@@ -2216,15 +2227,20 @@ function makeAvatar(entry, size = 28) {
 }
 
 function fmtDate(iso) {
-    if (!iso) return '—';
-    try {
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return '—';
-        return d.toLocaleDateString(navigator.language || undefined, {day:'2-digit', month:'short', year:'numeric'});
-    } catch (e) {
-        console.warn('[Cypheria] fmtDate failed for value:', iso, e);
-        return '—';
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) {
+      console.warn('[Cypheria] fmtDate: invalid timestamp value:', iso);
+      return '—';
     }
+    return d.toLocaleDateString(navigator.language || undefined, {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+  } catch (e) {
+    console.warn('[Cypheria] fmtDate failed for value:', iso, e);
+    return '—';
+  }
 }
 
 // ─── DASHBOARD ───────────────────────────────────
@@ -2320,6 +2336,8 @@ function renderFavorites() {
 
 // ─── ENTRY DETAIL PANEL ──────────────────────────
 async function selectEntry(id) {
+  passwordRevealTimers.forEach((tid) => clearTimeout(tid));
+  passwordRevealTimers.clear();
   selectedEntryId = id;
   document.querySelectorAll('#vault-tbody tr').forEach(tr => tr.classList.remove('selected'));
   const row = document.getElementById('row-'+id);
@@ -2365,20 +2383,41 @@ async function selectEntry(id) {
       const fa=document.createElement('div'); fa.className='field-actions';
       const eyeB=document.createElement('div');eyeB.className='icon-btn';eyeB.title='Show/hide';
       eyeB.innerHTML='<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
-      eyeB.onclick=async()=>{
-        if(visible){val.textContent='••••••••••••••••';visible=false;}
-        else{
-          eyeB.style.opacity='0.5';
-          if(!cachedPwd){try{cachedPwd=await vaultCall('get_entry_password',{entryId:f.entryId});}catch(e){eyeB.style.opacity='';showToast('Failed to reveal password','error');return;}}
-          val.textContent=cachedPwd;visible=true;eyeB.style.opacity='';
-          if (passwordRevealTimers.has(entry.id)) { clearTimeout(passwordRevealTimers.get(entry.id)); }
-          const tid = setTimeout(() => {
-              val.textContent='••••••••••••••••'; visible=false; cachedPwd=null;
-              passwordRevealTimers.delete(entry.id);
-          }, 10000);
-          passwordRevealTimers.set(entry.id, tid);
+      eyeB.onclick = async () => {
+      if (visible) {
+        val.textContent = '••••••••••••••••';
+        visible = false;
+        cachedPwd = null; // explicitly clear on manual re-hide
+        if (passwordRevealTimers.has(entry.id)) {
+          clearTimeout(passwordRevealTimers.get(entry.id));
+          passwordRevealTimers.delete(entry.id);
         }
-      };
+      } else {
+        eyeB.style.opacity = '0.5';
+        if (!cachedPwd) {
+          try {
+            cachedPwd = await vaultCall('get_entry_password', { entryId: f.entryId });
+          } catch (e) {
+            eyeB.style.opacity = '';
+            showToast('Failed to reveal password', 'error');
+            return;
+          }
+        }
+        val.textContent = cachedPwd;
+        visible = true;
+        eyeB.style.opacity = '';
+        if (passwordRevealTimers.has(entry.id)) {
+          clearTimeout(passwordRevealTimers.get(entry.id));
+        }
+        const tid = setTimeout(() => {
+          val.textContent = '••••••••••••••••';
+          visible = false;
+          cachedPwd = null; // clear on timer expiry
+          passwordRevealTimers.delete(entry.id);
+        }, 10000);
+        passwordRevealTimers.set(entry.id, tid);
+      }
+    };
       const cpyB=document.createElement('div');cpyB.className='icon-btn';cpyB.title='Copy password';
       cpyB.innerHTML='<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
       cpyB.onclick=async()=>{
@@ -2532,11 +2571,11 @@ function renderNotes() {
   vaultNotes.forEach(n=>{
     const card=document.createElement('div');card.className='note-card';
     const t=document.createElement('div');t.className='note-title';t.textContent=n.title;
-    const p=document.createElement('div');p.className='note-preview';
-    // BUG-013 fix: never show note content in plain text preview
-    p.textContent=n.content?'• • • • • • • • • • • • • • •':'(empty)';
-    p.style.color='var(--text-muted)';
-    p.style.letterSpacing='0.15em';
+    const p = document.createElement('div');
+    p.className = 'note-preview';
+    p.textContent = '• • • • • • • • • • • • • • •';
+    p.style.color = 'var(--text-muted)';
+    p.style.letterSpacing = '0.15em';
     const d=document.createElement('div');d.className='note-date';d.textContent=fmtDate(n.updated_at);
     const del=document.createElement('div');del.className='icon-btn note-delete';del.title='Delete note';
     del.innerHTML='<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
@@ -2547,12 +2586,23 @@ function renderNotes() {
   });
 }
 
-function openNoteModal(note=null){
-  document.getElementById('note-id').value         = note?.id||'';
-  document.getElementById('note-title').value      = note?.title||'';
-  document.getElementById('note-content').value    = note?.content||'';
-  document.getElementById('note-modal-title').textContent = note?'Edit Note':'New Note';
-  document.getElementById('note-error').textContent='';
+async function openNoteModal(note = null) {
+  document.getElementById('note-id').value            = note?.id || '';
+  document.getElementById('note-title').value         = note?.title || '';
+  document.getElementById('note-content').value       = '';
+  document.getElementById('note-modal-title').textContent = note ? 'Edit Note' : 'New Note';
+  document.getElementById('note-error').textContent   = '';
+
+  if (note?.id) {
+    // Fetch content only now, on explicit open
+    try {
+      const full = await vaultCall('get_note_content', { noteId: note.id });
+      document.getElementById('note-content').value = full.content || '';
+    } catch (e) {
+      document.getElementById('note-error').textContent =
+        'Could not load note content: ' + String(e).replace(/^Error: /, '').slice(0, 120);
+    }
+  }
   openModal('modal-note');
 }
 
@@ -2561,6 +2611,11 @@ async function saveNote(){
   const title   =document.getElementById('note-title').value.trim();
   const content =document.getElementById('note-content').value;
   document.getElementById('note-error').textContent='';
+  if (content.length > 1048576) {
+    document.getElementById('note-error').textContent =
+      'Note content is too long (max 1 MB). Please shorten it.';
+    return;
+  }
   if(!title){document.getElementById('note-error').textContent='Title is required';return;}
   const btn=document.getElementById('btn-note-save');btn.disabled=true;
   try{
@@ -2601,31 +2656,21 @@ function generatePassword() {
   }
 }
 
-function clientGenPassword(length,upper,lower,numbers,symbols){
-  let chars='';
-  if(upper)   chars+='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  if(lower)   chars+='abcdefghijklmnopqrstuvwxyz';
-  if(numbers) chars+='0123456789';
-  if(symbols) chars+='!@#$%^&*()_+-=[]{}|;:,.<>?';
-  const arr=new Uint32Array(length*2);
-  crypto.getRandomValues(arr);
-  const max=Math.floor(0x100000000/chars.length)*chars.length;
-  let out='',i=0;
-  while(out.length<length&&i<arr.length){if(arr[i]<max)out+=chars[arr[i]%chars.length];i++;}
-// IMPROVE-008 fix: hard cap prevents infinite loop on tiny charsets
-const MAX_REJECTION_ATTEMPTS = length * 10000;
-let attempts = 0;
-while (out.length < length) {
-    if (attempts++ > MAX_REJECTION_ATTEMPTS) {
-        const b = new Uint32Array(1);
-        crypto.getRandomValues(b);
-        out += chars[b[0] % chars.length];
-    } else {
-        const b = new Uint32Array(1);
-        crypto.getRandomValues(b);
-        if (b[0] < max) out += chars[b[0] % chars.length];
+function clientGenPassword(length, upper, lower, numbers, symbols) {
+  let chars = '';
+  if (upper)   chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (lower)   chars += 'abcdefghijklmnopqrstuvwxyz';
+  if (numbers) chars += '0123456789';
+  if (symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  const max = Math.floor(0x100000000 / chars.length) * chars.length;
+  let out = '';
+  while (out.length < length) {
+    const arr = new Uint32Array(Math.max((length - out.length) * 2, 16));
+    crypto.getRandomValues(arr);
+    for (let i = 0; i < arr.length && out.length < length; i++) {
+      if (arr[i] < max) out += chars[arr[i] % chars.length];
     }
-}
+  }
   return out;
 }
 
@@ -2739,29 +2784,37 @@ async function copyToClipboard(value,label){
 }
 
 function startClipCountdown() {
-    if (clipTimer) clearTimeout(clipTimer);
-    if (clipInterval) clearInterval(clipInterval);
-    const ind = document.getElementById('clip-indicator');
-    const cnt = document.getElementById('clip-countdown');
-    const s   = clipSecs || 30;
-    let rem   = s;
+  // Cancel any running timers before creating new ones
+  if (clipTimer)    { clearTimeout(clipTimer);    clipTimer = null; }
+  if (clipInterval) { clearInterval(clipInterval); clipInterval = null; }
+
+  const ind = document.getElementById('clip-indicator');
+  const cnt = document.getElementById('clip-countdown');
+  const s   = clipSecs || 30;
+  let rem   = s;
+  cnt.textContent = rem;
+  ind.style.display = 'block';
+
+  // Assign new handles immediately — no gap between clear and assign
+  clipInterval = setInterval(() => {
+    rem--;
     cnt.textContent = rem;
-    ind.style.display = 'block';
-    clipInterval = setInterval(() => {
-        rem--;
-        cnt.textContent = rem;
-        if (rem <= 0) {
-            clearInterval(clipInterval);
-            ind.style.display = 'none';
-        }
-    }, 1000);
-     clipTimer = setTimeout(() => {
-        // MISS-001 fix: clear clipboard via Rust backend, not navigator.clipboard
-        if (_invoke) rawInvoke('clear_clipboard').catch(() => {});
-        ind.style.display = 'none';
-        clearInterval(clipInterval);
-    }, s * 1000);
-  }
+    if (rem <= 0) {
+      clearInterval(clipInterval);
+      clipInterval = null;
+      ind.style.display = 'none';
+    }
+  }, 1000);
+
+  clipTimer = setTimeout(() => {
+    if (_invoke) rawInvoke('clear_clipboard').catch(() => {});
+    ind.style.display = 'none';
+    clearInterval(clipInterval);
+    clipInterval = null;
+    clipTimer = null;
+  }, s * 1000);
+}
+  
 // ─── MODALS ──────────────────────────────────────
 function openModal(id){document.getElementById(id).classList.add('open');}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
@@ -2968,8 +3021,21 @@ function wireEvents(){
   });
 
   // Close buttons on modals
-  document.querySelectorAll('[data-close]').forEach(el=>{
-    el.addEventListener('click',()=>closeModal(el.dataset.close));
+  document.querySelectorAll('[data-close]').forEach(el => {
+    el.addEventListener('click', () => {
+      closeModal(el.dataset.close);
+      // Clear sensitive fields only when the edit-entry modal is closed
+      if (el.dataset.close === 'modal-edit-entry') {
+        document.getElementById('edit-password').value = '';
+        document.getElementById('edit-id').value = '';
+      }
+      // Also clear setup password fields if setup modal-like screens close
+      if (el.dataset.close === 'modal-chpwd') {
+        document.getElementById('chpwd-current').value = '';
+        document.getElementById('chpwd-new').value = '';
+        document.getElementById('chpwd-confirm').value = '';
+      }
+    });
   });
 
   // Settings tabs
@@ -2989,11 +3055,21 @@ function wireEvents(){
   });
 
   // Ctrl+K
-  document.addEventListener('keydown', e=>{
-    if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();document.getElementById('search-input').focus();}
-    if(e.key==='Escape'){
-      document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
-      document.getElementById('search-results').classList.remove('open');
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      document.getElementById('search-input').focus();
+    }
+    if (e.key === 'Escape') {
+      const searchOpen = document.getElementById('search-results').classList.contains('open');
+      if (searchOpen) {
+        document.getElementById('search-results').classList.remove('open');
+        document.getElementById('search-input').value = '';
+        // Stop here — do NOT also close modals when only search is open
+        return;
+      }
+      // No search dropdown open — close topmost modal if any
+      document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
     }
   });
 

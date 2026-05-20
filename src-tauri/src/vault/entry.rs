@@ -44,7 +44,8 @@ pub fn add_entry(
 
     let payload_json = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
     let payload_encrypted = aes::encrypt(&ek_bytes, &payload_json)?;
-
+    let mut payload_json = payload_json;
+    payload_json.zeroize();
     // Wrap Entry Key with Vault Key
     let ek_wrapped = aes::wrap_key(vault_key, &ek_bytes)?;
     ek_bytes.zeroize();
@@ -87,10 +88,10 @@ pub fn decrypt_entry(
     // Decrypt, then immediately zeroize the key before touching the result.
     let decrypt_result = aes::decrypt(&ek_bytes, &encrypted_entry.payload_encrypted);
     ek_bytes.zeroize(); // always runs, even on error
-    let plaintext = decrypt_result?;
-
-    let payload: EntryPayload =
-        serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;
+    let mut plaintext = decrypt_result?;
+        let payload: EntryPayload =
+            serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;
+        plaintext.zeroize();
 
     Ok(EntryView {
         id:              encrypted_entry.id.clone(),
@@ -134,11 +135,10 @@ pub fn get_entry_password(
     // Decrypt, then immediately zeroize the key before touching the result.
     let decrypt_result = aes::decrypt(&ek_bytes, &encrypted_entry.payload_encrypted);
     ek_bytes.zeroize(); // always runs, even on error
-    let plaintext = decrypt_result?;
-
+    let mut plaintext = decrypt_result?;
     let payload: EntryPayload =
         serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;
-
+    plaintext.zeroize();
     let password = payload.password.clone();
     // payload.zeroize() fires on drop
     Ok(password)
@@ -176,8 +176,8 @@ pub fn update_entry(
 
     let payload_json      = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
     let payload_encrypted = aes::encrypt(&new_ek, &payload_json)?;
-    let ek_wrapped        = aes::wrap_key(vault_key, &new_ek)?;
-    new_ek.zeroize();
+    let mut payload_json = payload_json;
+    payload_json.zeroize();
 
     encrypted_entry.payload_encrypted = payload_encrypted;
     encrypted_entry.ek_wrapped        = ek_wrapped;

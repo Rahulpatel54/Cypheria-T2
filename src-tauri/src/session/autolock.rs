@@ -62,6 +62,7 @@ impl AutoLockTimer {
 
                 // Exit if stopped
                 if !timer_ref.running.load(Ordering::Relaxed) {
+                    timer_ref.running.store(false, Ordering::Relaxed);
                     break;
                 }
 

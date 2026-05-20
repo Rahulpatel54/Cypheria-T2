@@ -100,8 +100,16 @@ pub async fn change_master_password(
                 let mut old_settings_key = [0u8; 32];
                 let mut new_settings_key = [0u8; 32];
 
-                kdf::derive_subkey(key_store.master_key_bytes(), b"SETTINGS_ENCRYPTION", &mut old_settings_key);
-                kdf::derive_subkey(&new_mk, b"SETTINGS_ENCRYPTION", &mut new_settings_key);
+                crate::crypto::kdf::derive_subkey(
+                    key_store.vault_key_bytes(),
+                    b"SETTINGS_ENCRYPTION_VK",
+                    &mut old_settings_key,
+                );
+                crate::crypto::kdf::derive_subkey(
+                    key_store.vault_key_bytes(),
+                    b"SETTINGS_ENCRYPTION_VK",
+                    &mut new_settings_key,
+                );
 
                 let old_plaintext = aes::decrypt(
                     &old_settings_key,
@@ -117,13 +125,11 @@ pub async fn change_master_password(
                         vault_store.data.settings.payload_encrypted = new_encrypted;
                     }
                     Err(_) => {
-                        // Settings were unreadable (e.g., corrupted or from a failed migration).
-                        // Write fresh default settings encrypted under the new key.
                         new_settings_key.zeroize();
                         let default_json = serde_json::to_vec(&crate::models::settings::Settings::default())
                             .map_err(|_| CypheriaError::SerdeError)?;
                         let mut fresh_key = [0u8; 32];
-                        kdf::derive_subkey(&new_mk, b"SETTINGS_ENCRYPTION", &mut fresh_key);
+                        kdf::derive_subkey(key_store.vault_key_bytes(), b"SETTINGS_ENCRYPTION_VK", &mut fresh_key);
                         vault_store.data.settings.payload_encrypted =
                             aes::encrypt(&fresh_key, &default_json)
                                 .map_err(|e| { fresh_key.zeroize(); e })?;

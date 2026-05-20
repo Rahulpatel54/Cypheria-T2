@@ -49,6 +49,7 @@ pub fn run() {
             commands::notes::get_all_notes,
             commands::notes::save_note,
             commands::notes::delete_note,
+            commands::notes::get_note_content,
             // Password generator
             commands::generator::generate_password,
             // Settings

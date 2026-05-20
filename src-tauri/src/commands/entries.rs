@@ -81,6 +81,11 @@ pub async fn update_entry(
         autolock.bump_activity();
         // BUG-008 fix: unconditional validation.
         validate_uuid(&entry_id)?;
+        if input.password.is_empty() {
+            return Err(CypheriaError::InvalidInput(
+                "Password cannot be empty. Use update_entry_keep_password to keep the existing password.".into()
+            ));
+        }
         session
             .with_session_mut(|key_store, vault_store| {
                 catch_sync_panic!({
