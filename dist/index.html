@@ -1364,27 +1364,31 @@ textarea.form-input{resize:vertical;min-height:72px;}
 
             <!-- ── TAB 2: Pronounceable ── -->
             <div class="sp-tab-content" id="sptab-pronounceable">
-              <div class="sp-controls">
-                <div class="sp-control-row">
-                  <span>Syllables</span>
-                  <div style="display:flex;align-items:center;gap:8px;">
-                    <input type="range" class="sp-slider" id="pr-syl-count" min="2" max="6" value="3" step="1">
-                    <span class="sp-slider-val" id="pr-syl-count-lbl">3 syllables (~9 chars)</span>
-                  </div>
-                </div>
-                <div class="sp-toggle-row">
-                  <span>Include digits</span>
-                  <label class="toggle"><input type="checkbox" id="pr-digits" checked><span class="toggle-slider"></span></label>
-                </div>
-                <div class="sp-toggle-row">
-                  <span>Include symbol</span>
-                  <label class="toggle"><input type="checkbox" id="pr-symbol"><span class="toggle-slider"></span></label>
-                </div>
-                <div class="sp-toggle-row">
-                  <span>Mixed case (random syllable)</span>
-                  <label class="toggle"><input type="checkbox" id="pr-mixed"><span class="toggle-slider"></span></label>
+            <div class="sp-controls">
+              <div class="sp-control-row">
+                <span>Syllables</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <input type="range" class="sp-slider" id="pr-syl-count" min="2" max="6" value="3" step="1">
+                  <span class="sp-slider-val" id="pr-syl-count-lbl">3 syllables (~9 chars)</span>
                 </div>
               </div>
+              <div class="sp-toggle-row">
+                <span>Include digits</span>
+                <label class="toggle"><input type="checkbox" id="pr-digits" checked><span class="toggle-slider"></span></label>
+              </div>
+              <div class="sp-toggle-row">
+                <span>Include symbol</span>
+                <label class="toggle"><input type="checkbox" id="pr-symbol"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="sp-toggle-row">
+                <span>Mixed case (random syllable)</span>
+                <label class="toggle"><input type="checkbox" id="pr-mixed"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="sp-toggle-row">
+                <span>Inject digits/symbols randomly <span style="font-size:10px;color:var(--text-muted);">(not just at end)</span></span>
+                <label class="toggle"><input type="checkbox" id="pr-inject" checked><span class="toggle-slider"></span></label>
+              </div>
+            </div>
               <div class="sp-list" id="pr-list"></div>
               <button class="sp-regen-all" id="pr-regen-all">↺ Regenerate All</button>
             </div>
@@ -1392,12 +1396,61 @@ textarea.form-input{resize:vertical;min-height:72px;}
             <!-- ── TAB 3: Mnemonic ── -->
             <div class="sp-tab-content" id="sptab-mnemonic">
               <div class="sp-mnem-inputs">
-                <input class="sp-mnem-input" id="mn-word1" placeholder="e.g. Blue" autocomplete="off" spellcheck="false">
-                <input class="sp-mnem-input" id="mn-word2" placeholder="e.g. Tiger" autocomplete="off" spellcheck="false">
-                <input class="sp-mnem-input" id="mn-word3" placeholder="e.g. Paris" autocomplete="off" spellcheck="false">
+                <input class="sp-mnem-input" id="mn-word1" placeholder="Word 1 (e.g. Blue)" autocomplete="off" spellcheck="false">
+                <input class="sp-mnem-input" id="mn-word2" placeholder="Word 2 (e.g. Tiger)" autocomplete="off" spellcheck="false">
+                <input class="sp-mnem-input" id="mn-word3" placeholder="Word 3 (e.g. Paris)" autocomplete="off" spellcheck="false">
               </div>
               <div class="sp-chip-row" id="mn-chips"></div>
-              <p class="sp-privacy-hint">🔒 Your words never leave this device. Used only to generate patterns locally.</p>
+
+              <!-- Options row -->
+              <div style="display:flex;flex-wrap:wrap;gap:10px;padding:8px 0;border-top:1px solid var(--border-subtle);border-bottom:1px solid var(--border-subtle);margin:4px 0;">
+                <div class="sp-toggle-row" style="flex:1;min-width:120px;">
+                  <span style="font-size:11px;">Digits</span>
+                  <label class="toggle" style="transform:scale(0.85);transform-origin:right center;">
+                    <input type="checkbox" id="mn-opt-digits" checked><span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="sp-toggle-row" style="flex:1;min-width:120px;">
+                  <span style="font-size:11px;">Symbols</span>
+                  <label class="toggle" style="transform:scale(0.85);transform-origin:right center;">
+                    <input type="checkbox" id="mn-opt-symbols" checked><span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="sp-toggle-row" style="flex:1;min-width:120px;">
+                  <span style="font-size:11px;">Leet speak</span>
+                  <label class="toggle" style="transform:scale(0.85);transform-origin:right center;">
+                    <input type="checkbox" id="mn-opt-leet"><span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="sp-toggle-row" style="flex:1;min-width:120px;">
+                  <span style="font-size:11px;">Padding chars</span>
+                  <label class="toggle" style="transform:scale(0.85);transform-origin:right center;">
+                    <input type="checkbox" id="mn-opt-pad"><span class="toggle-slider"></span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Custom separator -->
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 0;">
+                <span style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">Separator</span>
+                <div class="sp-sep-row" id="mn-sep-row">
+                  <button class="sp-sep-pill active" data-sep=".">.</button>
+                  <button class="sp-sep-pill" data-sep="-">-</button>
+                  <button class="sp-sep-pill" data-sep="_">_</button>
+                  <button class="sp-sep-pill" data-sep="#">#</button>
+                  <button class="sp-sep-pill" data-sep="@">@</button>
+                  <button class="sp-sep-pill" data-sep="">None</button>
+                </div>
+              </div>
+
+              <!-- Min length enforcer -->
+              <div style="display:flex;align-items:center;gap:8px;padding:4px 0 8px;">
+                <span style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">Min length</span>
+                <input type="range" class="sp-slider" id="mn-min-len" min="8" max="24" value="12" step="1" style="flex:1;">
+                <span class="sp-slider-val" id="mn-min-len-lbl" style="min-width:28px;">12</span>
+              </div>
+
+              <p class="sp-privacy-hint">🔒 Your words never leave this device. Patterns generated locally.</p>
               <div class="sp-list" id="mn-list"></div>
               <div class="sp-mnem-btns">
                 <button class="sp-regen-all" id="mn-shuffle">↺ Shuffle Patterns</button>
@@ -3342,31 +3395,58 @@ async function boot() {
     }).join(' ').replace(/\s+/g, ' ');
   }
 
-  function genPronounce() {
-    const count   = parseInt(document.getElementById('pr-syl-count').value);
-    const digits  = document.getElementById('pr-digits').checked;
-    const sym     = document.getElementById('pr-symbol').checked;
-    const mixed   = document.getElementById('pr-mixed').checked;
+function genPronounce() {
+    const count  = parseInt(document.getElementById('pr-syl-count').value);
+    const digits = document.getElementById('pr-digits').checked;
+    const sym    = document.getElementById('pr-symbol').checked;
+    const mixed  = document.getElementById('pr-mixed').checked;
+    const inject = document.getElementById('pr-inject').checked;
 
+    // Build syllables
     const syllables = [];
     for (let i = 0; i < count; i++) syllables.push(genSyllable());
 
+    // Mixed case: capitalise a random syllable
     if (mixed) {
       const idx = randInt(syllables.length);
       syllables[idx] = syllables[idx].charAt(0).toUpperCase() + syllables[idx].slice(1);
     }
 
-    let pwd = syllables.join('');
-    if (digits) pwd += randDigits(randInt(1) + 1); // 1-2 digits
-    if (sym)    pwd += pick(PR_SYMBOLS);
+    // Start with base string of characters — we'll inject extras at random positions
+    let chars = syllables.join('').split('');
 
+    if (inject) {
+      // Inject digits and/or symbols at RANDOM positions inside the string
+      // rather than always appending — makes it far less predictable
+      const extras = [];
+      if (digits) {
+        const numDigits = randInt(2) + 1; // 1–2 digits
+        for (let i = 0; i < numDigits; i++) extras.push(String(randInt(10)));
+      }
+      if (sym) {
+        const numSyms = randInt(2) + 1; // 1–2 symbols
+        for (let i = 0; i < numSyms; i++) extras.push(pick(PR_SYMBOLS));
+      }
+      // Insert each extra at a random position (not at index 0 — keep pronounceability)
+      extras.forEach(ch => {
+        const pos = randInt(chars.length - 1) + 1;
+        chars.splice(pos, 0, ch);
+      });
+    } else {
+      // Classic append mode
+      if (digits) chars.push(...randDigits(randInt(1) + 1).split(''));
+      if (sym)    chars.push(pick(PR_SYMBOLS));
+    }
+
+    const pwd   = chars.join('');
     const guide = pronunGuide(pwd);
-    // Pool: 17 consonants * 5 vowels * 18 optional consonants ≈ 1530 possible syllables per slot
+
     const bits = Math.round(count * Math.log2(17 * 5 * 9))
       + (digits ? Math.round(Math.log2(100)) : 0)
-      + (sym    ? Math.round(Math.log2(5))   : 0);
+      + (sym    ? Math.round(Math.log2(5))   : 0)
+      + (inject ? 8 : 0); // bonus unpredictability from random placement
 
-    const pattern = `syl×${count}${digits?'+digit':''}${sym?'+symbol':''}`;
+    const pattern = `syl×${count}${inject?' (injected)':digits||sym?' (appended)':''}`;
     return { pwd, guide, bits, pattern };
   }
 
@@ -3424,53 +3504,101 @@ async function boot() {
   }
 
   function mnPatterns(words) {
-    // words: array of 1-3 strings (at least 1)
-    const w  = words.map(w => w.trim()).filter(Boolean);
-    if (!w.length) return null;
-    const d2  = () => randDigits(2);
-    const sym = () => pick(MN_SYMBOLS);
+      const w = words.map(w => w.trim()).filter(Boolean);
+      if (!w.length) return null;
 
-    const cap  = s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-    const low  = s => s.toLowerCase();
-    const rev  = s => s.split('').reverse().join('');
+      // Read options
+      const useDigits  = document.getElementById('mn-opt-digits').checked;
+      const useSymbols = document.getElementById('mn-opt-symbols').checked;
+      const useLeet    = document.getElementById('mn-opt-leet').checked;
+      const usePad     = document.getElementById('mn-opt-pad').checked;
+      const minLen     = parseInt(document.getElementById('mn-min-len').value) || 12;
 
-    const base = w.map(cap).join('');
-    const results = [];
+      // Read separator
+      const activeSep = document.querySelector('#mn-sep-row .sp-sep-pill.active');
+      const sep = activeSep ? activeSep.dataset.sep : '.';
 
-    // Pattern 1 — Classic Mix
-    results.push({
-      name: 'Classic Mix',
-      pwd:  w.map(cap).join('') + sym() + d2() + sym()
-    });
+      const d  = () => useDigits  ? randDigits(randInt(2) + 1) : '';
+      const s  = () => useSymbols ? pick(MN_SYMBOLS) : '';
+      const cap = str => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+      const low = str => str.toLowerCase();
+      const rev = str => str.split('').reverse().join('');
+      const pad = str => usePad ? pick(['>>','<<','||','**']) + str + pick(['>>','<<','||','**']) : str;
 
-    // Pattern 2 — Reversed Combo
-    results.push({
-      name: 'Reversed Combo',
-      pwd:  w.map(s=>rev(s)).join('_') + '#' + d2()
-    });
+      // Inject a single char at random position inside a string
+      const injectAt = (str, ch) => {
+        if (!ch) return str;
+        const pos = randInt(str.length - 1) + 1;
+        return str.slice(0, pos) + ch + str.slice(pos);
+      };
 
-    // Pattern 3 — Leet Speak
-    results.push({
-      name: 'Leet Speak',
-      pwd:  w.map(s=>leetEncode(cap(s))).join('-') + d2()
-    });
+      // Enforce minimum length by padding with digit+symbol combos
+      const enforce = pwd => {
+        let out = pwd;
+        while (out.length < minLen) out += randDigits(1) + (useSymbols ? pick(MN_SYMBOLS) : '');
+        return out;
+      };
 
-    // Pattern 4 — Camel Inject
-    results.push({
-      name: 'Camel Inject',
-      pwd:  (w.length >= 2
-        ? low(w[0]) + cap(w[1]) + '!' + (w[2] ? low(w[2]) : '') + d2()
-        : low(w[0]) + '!' + d2() + low(w[0]))
-    });
+      const results = [];
 
-    // Pattern 5 — Symbol Sandwich
-    results.push({
-      name: 'Symbol Sandwich',
-      pwd:  '>>' + w.map(cap).join('<<') + d2()
-    });
+      // Pattern 1 — Classic with separator
+      {
+        let parts = w.map(cap);
+        if (useDigits)  parts.push(randDigits(2));
+        if (useSymbols) parts = [pick(MN_SYMBOLS), ...parts, pick(MN_SYMBOLS)];
+        results.push({ name: 'Separated caps', pwd: enforce(parts.join(sep)) });
+      }
 
-    return results;
-  }
+      // Pattern 2 — CamelCase with injected digit
+      {
+        let base = w.map((word, i) => i === 0 ? low(word) : cap(word)).join('');
+        if (useDigits)  base = injectAt(base, randDigits(2));
+        if (useSymbols) base = injectAt(base, pick(MN_SYMBOLS));
+        results.push({ name: 'CamelCase inject', pwd: enforce(base) });
+      }
+
+      // Pattern 3 — Leet or reversed
+      {
+        const transform = useLeet
+          ? w.map(word => leetEncode(cap(word))).join(sep || '-')
+          : w.map(rev).join(sep || '_');
+        const name = useLeet ? 'Leet speak' : 'Word reversal';
+        let pwd = transform;
+        if (useDigits)  pwd = injectAt(pwd, randDigits(2));
+        if (useSymbols) pwd += pick(MN_SYMBOLS);
+        results.push({ name, pwd: enforce(pwd) });
+      }
+
+      // Pattern 4 — Initials + expanded
+      {
+        const initials = w.map(word => word.charAt(0).toUpperCase()).join('');
+        const full = w.map(cap).join('');
+        let pwd = initials + (sep || '') + full;
+        if (useDigits)  pwd = injectAt(pwd, randDigits(2));
+        if (useSymbols) pwd += pick(MN_SYMBOLS);
+        results.push({ name: 'Initials + full', pwd: enforce(pwd) });
+      }
+
+      // Pattern 5 — Padded sandwich
+      {
+        const core = w.map(cap).join(sep || '');
+        let pwd = pad(core);
+        if (useDigits)  pwd = injectAt(pwd, randDigits(2));
+        if (useSymbols) pwd = injectAt(pwd, pick(MN_SYMBOLS));
+        results.push({ name: 'Padded block', pwd: enforce(pwd) });
+      }
+
+      // Pattern 6 — Acronym password (first + last letters)
+      {
+        const acronym = w.map(word => word.charAt(0).toUpperCase() + word.slice(-1).toLowerCase()).join(sep || '');
+        let pwd = acronym;
+        if (useDigits)  pwd += randDigits(3);
+        if (useSymbols) pwd = injectAt(pwd, pick(MN_SYMBOLS));
+        results.push({ name: 'First+last acronym', pwd: enforce(pwd) });
+      }
+
+      return results;
+    }
 
   function buildMnRow(idx, pwd, name) {
     const bits = calcEntropy(pwd, 0);
@@ -3624,7 +3752,7 @@ async function boot() {
       debouncePr();
     });
 
-    ['pr-digits','pr-symbol','pr-mixed'].forEach(id => {
+    ['pr-digits','pr-symbol','pr-mixed','pr-inject'].forEach(id => {
       document.getElementById(id).addEventListener('change', debouncePr);
     });
 
@@ -3635,6 +3763,27 @@ async function boot() {
       const el = document.getElementById(id);
       el.addEventListener('input', debounceMn);
       el.addEventListener('focus', () => renderMnChips(idx));
+    });
+
+    ['mn-opt-digits','mn-opt-symbols','mn-opt-leet','mn-opt-pad'].forEach(id => {
+      document.getElementById(id).addEventListener('change', debounceMn);
+    });
+
+    // Separator pills for mnemonic
+    document.querySelectorAll('#mn-sep-row .sp-sep-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('#mn-sep-row .sp-sep-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        debounceMn();
+      });
+    });
+
+    // Min length slider
+    const mnLenSlider = document.getElementById('mn-min-len');
+    const mnLenLbl    = document.getElementById('mn-min-len-lbl');
+    mnLenSlider.addEventListener('input', () => {
+      mnLenLbl.textContent = mnLenSlider.value;
+      debounceMn();
     });
 
     document.getElementById('mn-shuffle').addEventListener('click', renderMnList);
