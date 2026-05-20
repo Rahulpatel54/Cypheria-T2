@@ -60,6 +60,16 @@ pub struct VaultHeader {
     pub format_version: u16,
 }
 
+impl std::fmt::Debug for VaultHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VaultHeader")
+            .field("vault_name", &self.vault_name)
+            .field("format_version", &self.format_version)
+            .field("created_at", &self.created_at)
+            .field("kdf_memory_kb", &self.kdf_memory_kb)
+            .finish_non_exhaustive()
+    }
+}
 /// The encrypted data section — decrypted by the Vault Key.
 /// This entire struct is serialized with bincode then AES-GCM encrypted.
 /// It never appears on disk in plaintext.

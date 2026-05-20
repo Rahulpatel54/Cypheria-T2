@@ -131,8 +131,8 @@ impl SessionManager {
                 eprintln!("[Cypheria] CRITICAL: persist_vault failed: {:?}", persist_err);
                 return Err(CypheriaError::PersistFailed(
                     format!("Changes were applied in memory but could not be saved to disk. \
-                            Your data is NOT lost yet — lock and unlock the vault to retry. \
-                            Error: {}", persist_err)
+                        WARNING: locking the vault will discard these in-memory changes. \
+                        Error: {}", persist_err)
                 ));
             }
             Ok(result)

@@ -37,7 +37,7 @@ pub async fn copy_entry_password_to_clipboard(
                         &entry_id,
                     )?;
 
-                    // Read clipboard timeout from decrypted settings server-side
+                    // Read clipboard timeout from vault settings; fallback 30s if unreadable
                     let secs: u64 = {
                         let mut settings_key = [0u8; 32];
                         crate::crypto::kdf::derive_subkey(

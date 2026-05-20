@@ -70,10 +70,12 @@ pub async fn change_master_password(
 
             // 2. Generate new salt and new Master Key
             let new_salt = rng::argon2_salt();
-            let new_mk   = kdf::derive_master_key(&new_bytes, &new_salt)?;
+            // Wrap new_mk in Zeroizing so it is wiped on any early return or panic
+            let new_mk_raw = kdf::derive_master_key(&new_bytes, &new_salt)?;
+            let new_mk = zeroize::Zeroizing::new(new_mk_raw);
 
             // 3. Re-wrap VK with new MK
-            let new_vk_wrapped = aes::wrap_key(&new_mk, key_store.vault_key_bytes())?;
+            let new_vk_wrapped = aes::wrap_key(&*new_mk, key_store.vault_key_bytes())?;
 
             // 4. Re-generate Kyber keypair and re-wrap VK post-quantum
             let kp = kyber::generate_keypair();
@@ -83,7 +85,7 @@ pub async fn change_master_password(
 
             let (kyber_ciphertext, vk_wrapped_pq) =
                 kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
-            let kyber_sk_encrypted = aes::encrypt(&new_mk, &sec_key)?;
+            let kyber_sk_encrypted = aes::encrypt(&*new_mk, &sec_key)?;
 
             // 5. Update header
             vault_store.header.argon2_salt          = new_salt;
@@ -96,50 +98,12 @@ pub async fn change_master_password(
             // HIGH-003 fix: re-encrypt settings blob from old MK subkey → new MK subkey.
             // Must happen BEFORE key_store.master_key is updated, so master_key_bytes()
             // still returns the old key during the decrypt step.
-            {
-                let mut old_settings_key = [0u8; 32];
-                let mut new_settings_key = [0u8; 32];
-
-                crate::crypto::kdf::derive_subkey(
-                    key_store.vault_key_bytes(),
-                    b"SETTINGS_ENCRYPTION_VK",
-                    &mut old_settings_key,
-                );
-                crate::crypto::kdf::derive_subkey(
-                    key_store.vault_key_bytes(),
-                    b"SETTINGS_ENCRYPTION_VK",
-                    &mut new_settings_key,
-                );
-
-                let old_plaintext = aes::decrypt(
-                    &old_settings_key,
-                    &vault_store.data.settings.payload_encrypted,
-                );
-                old_settings_key.zeroize();
-
-                match old_plaintext {
-                    Ok(json_bytes) => {
-                        let new_encrypted = aes::encrypt(&new_settings_key, &json_bytes)
-                            .map_err(|e| { new_settings_key.zeroize(); e })?;
-                        new_settings_key.zeroize();
-                        vault_store.data.settings.payload_encrypted = new_encrypted;
-                    }
-                    Err(_) => {
-                        new_settings_key.zeroize();
-                        let default_json = serde_json::to_vec(&crate::models::settings::Settings::default())
-                            .map_err(|_| CypheriaError::SerdeError)?;
-                        let mut fresh_key = [0u8; 32];
-                        kdf::derive_subkey(key_store.vault_key_bytes(), b"SETTINGS_ENCRYPTION_VK", &mut fresh_key);
-                        vault_store.data.settings.payload_encrypted =
-                            aes::encrypt(&fresh_key, &default_json)
-                                .map_err(|e| { fresh_key.zeroize(); e })?;
-                        fresh_key.zeroize();
-                    }
-                }
-            }
+            // Settings are encrypted under a VK-derived subkey (see settings.rs).
+            // The Vault Key does not change during a password rotation, so the settings
+            // blob requires no re-encryption here.
 
             // FIX: IMPROVE-001 — MasterKey::new() replaces direct tuple construction.
-            key_store.master_key = crate::crypto::keys::MasterKey::new(new_mk);
+            key_store.master_key = crate::crypto::keys::MasterKey::new(*new_mk);
 
             // BUG-005 fix: sync KDF params in the header to current constants.
             vault_store.header.kdf_memory_kb   = kdf::ARGON2_MEMORY_KB;
@@ -183,7 +147,16 @@ pub async fn create_vault(
 
     let mut pwd_bytes = password.into_bytes();
     let salt = rng::argon2_salt();
-    let mk_bytes = Zeroizing::new(kdf::derive_master_key(&pwd_bytes, &salt)?);
+
+    // Offload Argon2id KDF to a blocking thread pool thread
+    let pwd_for_kdf = pwd_bytes.clone();
+    let salt_for_kdf = salt;
+    let mk_raw = tokio::task::spawn_blocking(move || {
+        kdf::derive_master_key(&pwd_for_kdf, &salt_for_kdf)
+    })
+    .await
+    .map_err(|_| CypheriaError::InternalError("KDF thread panicked".into()))??;
+    let mk_bytes = Zeroizing::new(mk_raw);
     pwd_bytes.zeroize();
 
     let vk_bytes = Zeroizing::new(rng::entry_key());

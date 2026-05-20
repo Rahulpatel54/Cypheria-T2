@@ -216,3 +216,130 @@ fn validate_entry_input(input: &EntryInput) -> Result<(), CypheriaError> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::vault::format::{VaultData, EncryptedSettings};
+    use chrono::Utc;
+
+    // Helper: empty in-memory vault
+    fn empty_vault_data() -> VaultData {
+        VaultData {
+            entries: vec![],
+            notes: vec![],
+            settings: EncryptedSettings { payload_encrypted: vec![] },
+            updated_at: Utc::now(),
+        }
+    }
+
+    // Fixed test vault key
+    fn test_vk() -> [u8; 32] { [0xAB_u8; 32] }
+
+    // Helper: minimal valid EntryInput
+    fn sample_input(name: &str) -> EntryInput {
+        EntryInput {
+            name: name.to_string(),
+            username: "user@example.com".to_string(),
+            password: "s3cr3t!Password1".to_string(),
+            website: "https://example.com".to_string(),
+            notes: String::new(),
+            is_favorite: Some(false),
+            category: Some("general".into()),
+            color: Some("#8b5cf6".into()),
+            emoji: Some("T".into()),
+        }
+    }
+
+    #[test]
+    fn test_add_and_decrypt_entry_roundtrip() {
+        // Basic add + decrypt must recover correct name and mask password
+        let vk = test_vk();
+        let mut data = empty_vault_data();
+        let id = add_entry(&vk, &mut data, sample_input("TestSite")).unwrap();
+        assert_eq!(data.entries.len(), 1);
+        let view = decrypt_entry(&vk, &data.entries[0]).unwrap();
+        assert_eq!(view.id, id);
+        assert_eq!(view.name, "TestSite");
+        assert_eq!(view.username, "user@example.com");
+        assert!(view.password_masked, "password must be masked in EntryView");
+    }
+
+    #[test]
+    fn test_get_entry_password_returns_correct_value() {
+        // get_entry_password must return the plaintext stored password
+        let vk = test_vk();
+        let mut data = empty_vault_data();
+        let id = add_entry(&vk, &mut data, sample_input("Login")).unwrap();
+        let pwd = get_entry_password(&vk, &data, &id).unwrap();
+        assert_eq!(pwd, "s3cr3t!Password1");
+    }
+
+    #[test]
+    fn test_update_entry_rotates_key() {
+        // Every update must produce a new wrapped Entry Key (forward secrecy)
+        let vk = test_vk();
+        let mut data = empty_vault_data();
+        let id = add_entry(&vk, &mut data, sample_input("Old")).unwrap();
+        let old_ek = data.entries[0].ek_wrapped.clone();
+        update_entry(&vk, &mut data, &id, sample_input("New")).unwrap();
+        assert_ne!(
+            data.entries[0].ek_wrapped, old_ek,
+            "ek_wrapped must differ after update (key rotation)"
+        );
+        let view = decrypt_entry(&vk, &data.entries[0]).unwrap();
+        assert_eq!(view.name, "New");
+    }
+
+    #[test]
+    fn test_decrypt_entry_wrong_key_fails() {
+        // Decryption with a wrong vault key must return an error
+        let vk = test_vk();
+        let wrong_vk = [0x00_u8; 32];
+        let mut data = empty_vault_data();
+        add_entry(&vk, &mut data, sample_input("Secret")).unwrap();
+        assert!(
+            decrypt_entry(&wrong_vk, &data.entries[0]).is_err(),
+            "wrong vault key must not decrypt entry"
+        );
+    }
+
+    #[test]
+    fn test_add_entry_empty_name_rejected() {
+        // Validation must reject an empty entry name
+        let mut input = sample_input("placeholder");
+        input.name = String::new();
+        let mut data = empty_vault_data();
+        assert!(add_entry(&test_vk(), &mut data, input).is_err());
+    }
+
+    #[test]
+    fn test_add_entry_name_too_long_rejected() {
+        // Validation must reject names over 256 characters
+        let long_name = "a".repeat(257);
+        let input = sample_input(&long_name);
+        let mut data = empty_vault_data();
+        assert!(add_entry(&test_vk(), &mut data, input).is_err());
+    }
+
+    #[test]
+    fn test_get_entry_password_nonexistent_id_fails() {
+        // Requesting password for unknown ID must return EntryNotFound
+        let vk = test_vk();
+        let data = empty_vault_data();
+        let result = get_entry_password(&vk, &data, "00000000-0000-0000-0000-000000000000");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_vault_updated_at_stamped_on_add() {
+        // vault_data.updated_at must be refreshed after add
+        let vk = test_vk();
+        let mut data = empty_vault_data();
+        let before = data.updated_at;
+        // Small sleep to ensure timestamp differs
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        add_entry(&vk, &mut data, sample_input("TS")).unwrap();
+        assert!(data.updated_at >= before);
+    }
+}

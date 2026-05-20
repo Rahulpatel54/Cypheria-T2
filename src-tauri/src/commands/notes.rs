@@ -62,17 +62,15 @@ pub async fn save_note(
         }
 
         session
-            .with_session_mut(|key_store, vault_store| match note_id {
-                Some(ref id) => {
-                    notes::update_note(
-                        key_store.vault_key_bytes(),
-                        &mut vault_store.data,
-                        id,
-                        input,
-                    )?;
-                    Ok(id.clone())
-                }
-                None => notes::add_note(key_store.vault_key_bytes(), &mut vault_store.data, input),
+            .with_session(|key_store, vault_store| {
+                catch_sync_panic!({
+                    vault_store
+                        .data
+                        .notes
+                        .iter()
+                        .map(|n| notes::decrypt_note(key_store.vault_key_bytes(), n))
+                        .collect::<Result<Vec<_>, _>>()
+                })
             })
             .await
     })

@@ -2523,7 +2523,7 @@ async function saveEditEntry() {
       isFavorite:  existing?.is_favorite ?? false,
       category:    existing?.category || 'general',
       color:       existing?.color || '#8b5cf6',
-      emoji:       existing?.emoji || title.charAt(0).toUpperCase(),
+      emoji:       existing?.emoji || (title.length > 0 ? title.charAt(0).toUpperCase() : '?'),
     });
     closeModal('modal-edit-entry');
     await loadEntries();

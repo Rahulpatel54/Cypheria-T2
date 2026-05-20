@@ -23,7 +23,7 @@ pub struct VaultStore {
 /// Security steps (in order):
 ///   1. Verify magic bytes
 ///   2. Parse and deserialize the header
-///   3. Verify format version — reject files from incompatible future versions
+///   3. Reject incompatible format versions
 ///   4. Derive Master Key from password + salt using header-stored KDF params
 ///   5. Derive HMAC subkey; verify HMAC over MAGIC+VERSION+HEADER_LEN+HEADER
 ///   6. Unwrap Vault Key (classical path — AES-GCM with MK)
@@ -98,13 +98,22 @@ pub async fn load_and_unlock(
     // Step 3: Derive Master Key
     // ERR-003 fix: use the KDF params stored in the header, not the compile-time
     // constants, so vaults created under old params remain unlockable.
-    let mk_bytes = kdf::derive_master_key_with_params(
-        password,
-        &header.argon2_salt,
-        header.kdf_memory_kb,
-        header.kdf_iterations,
-        header.kdf_parallelism,
-    )?;
+    let password_vec: Vec<u8> = password.to_vec();
+    let argon2_salt = header.argon2_salt;
+    let kdf_memory_kb = header.kdf_memory_kb;
+    let kdf_iterations = header.kdf_iterations;
+    let kdf_parallelism = header.kdf_parallelism;
+    let mk_bytes = tokio::task::spawn_blocking(move || {
+        kdf::derive_master_key_with_params(
+            &password_vec,
+            &argon2_salt,
+            kdf_memory_kb,
+            kdf_iterations,
+            kdf_parallelism,
+        )
+    })
+    .await
+    .map_err(|_| CypheriaError::InternalError("KDF thread panicked".into()))??;
 
     // Step 4: Verify HMAC over exactly MAGIC + VERSION + HEADER_LEN + HEADER
     // This must match what persist_vault() signed.

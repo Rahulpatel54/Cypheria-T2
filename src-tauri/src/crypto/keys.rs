@@ -37,6 +37,13 @@ impl MasterKey {
     }
 }
 
+// Redacting Debug impl — never print key bytes
+impl std::fmt::Debug for MasterKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("MasterKey([REDACTED])")
+    }
+}
+
 /// Vault Key — encrypts all entry keys.
 /// Stored encrypted (wrapped with MK) in the vault header.
 /// Decrypted into memory on unlock; zeroized on lock.
