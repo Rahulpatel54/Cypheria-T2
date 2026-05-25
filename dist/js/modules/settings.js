@@ -14,6 +14,7 @@ export async function loadSettings() {
     if (el('set-startup') && s.launch_at_startup !== undefined) el('set-startup').checked = s.launch_at_startup;
     if (el('set-tray') && s.minimize_to_tray !== undefined) el('set-tray').checked = s.minimize_to_tray;
     if (el('set-showpwd') && s.show_password_default !== undefined) el('set-showpwd').checked = s.show_password_default;
+    if (el('set-autolock') && s.auto_lock_secs !== undefined) el('set-autolock').value = String(s.auto_lock_secs);
   } catch (_) { }
 }
 

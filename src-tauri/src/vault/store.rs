@@ -105,18 +105,26 @@ pub async fn load_and_unlock(
             let expected_hmac  = &file_bytes[hmac_start..hmac_end];
             verify_vault_hmac(covered_region, expected_hmac, &hmac_key)?;
             
-            let data_len_offset = hmac_end;
-            let data_start = data_len_offset + 4;
-            if file_bytes.len() < data_start {
+             let data_len_offset = hmac_end;
+            if file_bytes.len() < data_len_offset + 4 {
                 hmac_key.zeroize();
                 return Err(CypheriaError::VaultCorrupted);
             }
-            let vault_data = decrypt_vault_data(
-                &aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?, 
-                &file_bytes[data_start..]
-            )?;
+            let data_len = u32::from_le_bytes(
+                file_bytes[data_len_offset..data_len_offset + 4]
+                    .try_into()
+                    .map_err(|_| CypheriaError::VaultCorrupted)?,
+            ) as usize;
+            let data_start = data_len_offset + 4;
+            let data_end = data_start + data_len;
+            if file_bytes.len() < data_end {
+                hmac_key.zeroize();
+                return Err(CypheriaError::VaultCorrupted);
+            }
+            let vk_bytes = aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?;
+            let vault_data = decrypt_vault_data(&vk_bytes, &file_bytes[data_start..data_end])?;
             hmac_key.zeroize();
-            let key_store = ActiveKeyStore::new(mk_bytes, aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?);
+            let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
             Ok((key_store, VaultStore { data: vault_data, header }))
         }
         2 => {
@@ -137,12 +145,10 @@ pub async fn load_and_unlock(
                 return Err(CypheriaError::VaultCorrupted);
             }
             let data_start = data_len_offset + 4;
-            let vault_data = decrypt_vault_data(
-                &aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?,
-                &file_bytes[data_start..hmac_start]
-            )?;
+            let vk_bytes = aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?;
+            let vault_data = decrypt_vault_data(&vk_bytes, &file_bytes[data_start..hmac_start])?;
             hmac_key.zeroize();
-            let key_store = ActiveKeyStore::new(mk_bytes, aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?);
+            let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
             Ok((key_store, VaultStore { data: vault_data, header }))
         }
         _ => {

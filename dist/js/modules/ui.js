@@ -8,7 +8,7 @@ import {
   loadEntries, openAddModal, saveNewEntry, saveEditEntry,
   selectEntry
 } from './vault.js';
-import { loadNotes, openNoteModal, saveNote } from './notes.js';
+import { loadNotes, renderNotes, openNoteModal, saveNote } from './notes.js';
 import { generatePassword, copGenPwd } from './generator.js';
 import { 
   showSetupScreen, gotoSetupStep, browseSavePath, createVault, 
@@ -262,7 +262,7 @@ export function wireEvents() {
   document.getElementById('btn-export')?.addEventListener('click', exportVault);
 
   // Confirm modal
-  document.getElementById('btn-confirm-action')?.addEventListener('click', async () => {
+document.getElementById('btn-confirm-action')?.addEventListener('click', async () => {
     if (state.confirmCallback) {
       const btn = document.getElementById('btn-confirm-action');
       btn.disabled = true;
@@ -270,9 +270,13 @@ export function wireEvents() {
         await state.confirmCallback();
         closeModal('modal-confirm');
         showToast('Deleted successfully', 'success');
+      } catch (e) {
+        closeModal('modal-confirm');
+        showToast('Delete failed: ' + String(e).slice(0, 80), 'error');
+      } finally {
+        btn.disabled = false;
+        state.confirmCallback = null;
       }
-      catch (e) { showToast('Delete failed: ' + String(e).slice(0, 80), 'error'); }
-      finally { btn.disabled = false; state.confirmCallback = null; }
     }
   });
 

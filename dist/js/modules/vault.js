@@ -104,7 +104,11 @@ export function renderFavorites() {
     const tdU = document.createElement('td'); tdU.className = 'td-username'; tdU.textContent = e.username || '—';
     const tdD = document.createElement('td'); tdD.className = 'td-date'; tdD.textContent = fmtDate(e.updated_at);
     const tdS = document.createElement('td'); tdS.className = 'td-star';
-    tdS.innerHTML = '<button class="star-btn starred"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>';
+    const sb = document.createElement('button');
+    sb.className = 'star-btn starred';
+    sb.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+    sb.onclick = ev => { ev.stopPropagation(); toggleFavorite(e.id); };
+    tdS.appendChild(sb);
     tr.appendChild(tdT); tr.appendChild(tdU); tr.appendChild(tdD); tr.appendChild(tdS);
     tr.onclick = () => { navigate('vault'); setTimeout(() => selectEntry(e.id), 60); };
     tbody.appendChild(tr);

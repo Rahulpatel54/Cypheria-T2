@@ -52,7 +52,7 @@ function usePassword(pwd) {
     const addPwd = document.getElementById('add-password');
     if (addPwd) {
       addPwd.value = pwd;
-      const { updateAddStrength } = import('./ui.js').then(m => m.updateAddStrength());
+      import('./ui.js').then(m => m.updateAddStrength()).catch(() => {});
     }
   }
 }
@@ -130,8 +130,8 @@ function buildPpRow(idx, data) {
       </div>
       <div class="sp-row-actions">
         <button class="sp-act-btn" title="Regenerate" onclick="spPpRegenRow(${idx})">↺</button>
-        <button class="sp-act-btn" title="Copy" onclick="spPpCopy(this,'${escAttr(pwd)}')">📋</button>
-        <button class="sp-act-btn" title="Use this" onclick="spUse('${escAttr(pwd)}', this)">✅</button>
+        <button class="sp-act-btn" title="Copy" data-pwd="${escAttrFull(pwd)}" onclick="spPpCopyBtn(this)">📋</button>
+        <button class="sp-act-btn" title="Use this" data-pwd="${escAttrFull(pwd)}" onclick="spUseBtn(this)">✅</button>
       </div>
     </div>`;
 }
@@ -148,19 +148,6 @@ window.spPpRegenRow = function (idx) {
 
 window.spPpCopy = function (btn, pwd) { doCopy(btn, pwd); };
 
-window.spUse = function (pwd, btn) {
-  usePassword(pwd);
-  const row = btn.closest('.sp-row');
-  if (row) {
-    const existing = row.querySelector('.sp-sent-label');
-    if (existing) existing.parentNode.removeChild(existing);
-    const lbl = document.createElement('span');
-    lbl.className = 'sp-sent-label';
-    lbl.textContent = '→ Sent to generator';
-    row.querySelector('.sp-row-body').appendChild(lbl);
-    setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
-  }
-};
 
 function renderPpList() {
   const list = document.getElementById('pp-list');
@@ -255,8 +242,8 @@ function buildPrRow(idx, data) {
       </div>
       <div class="sp-row-actions">
         <button class="sp-act-btn" title="Regenerate" onclick="spPrRegenRow(${idx})">↺</button>
-        <button class="sp-act-btn" title="Copy" onclick="spPpCopy(this,'${escAttr(pwd)}')">📋</button>
-        <button class="sp-act-btn" title="Use this" onclick="spUse('${escAttr(pwd)}', this)">✅</button>
+        <button class="sp-act-btn" title="Copy" data-pwd="${escAttrFull(pwd)}" onclick="spPpCopyBtn(this)">📋</button>
+        <button class="sp-act-btn" title="Use this" data-pwd="${escAttrFull(pwd)}" onclick="spUseBtn(this)">✅</button>
       </div>
     </div>`;
 }
@@ -272,6 +259,21 @@ window.spPrRegenRow = function (idx) {
 };
 
 window.spSpeak = function (guide) { speak(guide); };
+
+window.spPpCopyBtn = function(btn) { doCopy(btn, btn.dataset.pwd); };
+window.spUseBtn = function(btn) {
+  usePassword(btn.dataset.pwd);
+  const row = btn.closest('.sp-row');
+  if (row) {
+    const existing = row.querySelector('.sp-sent-label');
+    if (existing) existing.parentNode.removeChild(existing);
+    const lbl = document.createElement('span');
+    lbl.className = 'sp-sent-label';
+    lbl.textContent = '→ Sent to generator';
+    row.querySelector('.sp-row-body').appendChild(lbl);
+    setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
+  }
+};
 
 function renderPrList() {
   const list = document.getElementById('pr-list');
@@ -387,8 +389,8 @@ function buildMnRow(idx, pwd, name) {
         <div class="sp-pattern">${escHTML(name)}</div>
       </div>
       <div class="sp-row-actions">
-        <button class="sp-act-btn" title="Copy" onclick="spPpCopy(this,'${escAttr(pwd)}')">📋</button>
-        <button class="sp-act-btn" title="Use this" onclick="spUse('${escAttr(pwd)}', this)">✅</button>
+        <button class="sp-act-btn" title="Copy" data-pwd="${escAttrFull(pwd)}" onclick="spPpCopyBtn(this)">📋</button>
+        <button class="sp-act-btn" title="Use this" data-pwd="${escAttrFull(pwd)}" onclick="spUseBtn(this)">✅</button>
       </div>
     </div>`;
 }
@@ -447,6 +449,15 @@ function escHTML(s) {
 
 function escAttr(s) {
   return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function escAttrFull(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 let ppDebounce = null, prDebounce = null, mnDebounce = null;

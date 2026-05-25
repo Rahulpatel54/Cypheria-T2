@@ -25,7 +25,7 @@ export async function vaultCall(cmd, args = {}) {
     return await state._invoke(cmd, args);
   } catch (err) {
     const msg = String(err);
-    if (msg.includes('VaultLocked') || msg.includes('Vault is locked') || msg.includes('Session expired')) {
+    if (msg.includes('Vault is locked') || msg.includes('Session expired')) {
       // Import showLockScreen dynamically to avoid circular dependency
       const { showLockScreen } = await import('./auth.js');
       showLockScreen();
