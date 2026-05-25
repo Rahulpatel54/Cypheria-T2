@@ -4,7 +4,7 @@ import { state } from './state.js';
 import { vaultCall } from './bridge.js';
 import { showToast, fmtDate, makeAvatar, copyToClipboard, openModal, closeModal } from './utils.js';
 import { navigate, startClipCountdown } from './ui.js';
-import { navigate } from './ui.js';
+// (removed — navigate called via dynamic import inside click handlers only)
 
 export async function loadEntries() {
   try {
@@ -344,15 +344,15 @@ export function renderSecurityPanel() {
   `;
 
   // Attach click handlers to jump to edit
+  // dynamic import of ui.js for navigate — vault.js cannot statically import ui.js
   container.querySelectorAll('.sec-item-row[data-entry-id]').forEach(row => {
     row.addEventListener('click', () => {
       const id = row.dataset.entryId;
       const entry = state.vaultEntries.find(e => e.id === id);
       if (!entry) return;
-      // import openEditModal lazily to avoid circular dep
-      import('./vault.js').then(m => {
-        navigate('vault');
-        setTimeout(() => m.openEditModal(entry), 80);
+      import('./ui.js').then(m => {
+        m.navigate('vault');
+        setTimeout(() => openEditModal(entry), 80);
       }).catch(() => {});
     });
   });

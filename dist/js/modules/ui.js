@@ -9,7 +9,7 @@ import {
   selectEntry
 } from './vault.js';
 import { loadNotes, renderNotes, openNoteModal, saveNote } from './notes.js';
-import { loadPasswordScores } from './vault.js';
+// (removed — loadPasswordScores called via dynamic import to avoid circular dep)
 import { generatePassword, copGenPwd } from './generator.js';
 import { 
   showSetupScreen, gotoSetupStep, browseSavePath, createVault, 
@@ -45,8 +45,9 @@ export function navigate(page) {
   if (page === 'favorites') renderFavorites();
   if (page === 'notes') renderNotes();
   if (page === 'dashboard') renderDashboard();
+  // dynamic import avoids circular dep (ui.js ← vault.js ← ui.js)
   if (page === 'dashboard' && state.vaultEntries.length > 0 && !Object.keys(state.passwordScores).length) {
-    setTimeout(loadPasswordScores, 120);
+    setTimeout(() => import('./vault.js').then(m => m.loadPasswordScores()).catch(() => {}), 120);
   }
   if (page === 'generator') {
     generatePassword();
