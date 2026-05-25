@@ -2,11 +2,11 @@
 
 import { state } from './state.js';
 import { rawInvoke, persistVaultPath, clearPersistedVaultPath } from './bridge.js';
-import { showToast, closeModal, openModal, toggleEye, pwdStrength } from './utils.js';
+import { showToast, closeModal, openModal, toggleEye, pwdStrength, makeAvatar } from './utils.js';
 import { 
   renderVaultTable, renderDashboard, renderFavorites, 
   loadEntries, openAddModal, saveNewEntry, saveEditEntry,
-  makeAvatar, selectEntry
+  selectEntry
 } from './vault.js';
 import { loadNotes, openNoteModal, saveNote } from './notes.js';
 import { generatePassword, copGenPwd } from './generator.js';

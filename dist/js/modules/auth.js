@@ -2,7 +2,8 @@
 
 import { state } from './state.js';
 import { rawInvoke, persistVaultPath, clearPersistedVaultPath } from './bridge.js';
-import { showToast, showLoading, hideLoading, navigate } from './ui.js';
+import { showLoading, hideLoading, navigate } from './ui.js';
+import { showToast } from './utils.js';
 
 export let setupStep = 0;
 
