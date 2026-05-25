@@ -79,14 +79,24 @@ export async function changeMasterPassword() {
   } finally { if (btn) btn.disabled = false; }
 }
 
+// Export vault: use plugin:dialog|save with correct Tauri 2 arg structure
 export async function exportVault() {
   if (!state._invoke) { showToast('Export requires Tauri backend', 'warning'); return; }
   try {
-    const dest = await rawInvoke('plugin:dialog|save', { title: 'Export Vault Backup', defaultPath: 'cypheria-backup.qvault', filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }] });
+    const dest = await rawInvoke('plugin:dialog|save', {
+      options: {
+        title: 'Export Vault Backup',
+        defaultPath: 'cypheria-backup.qvault',
+        filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
+      }
+    });
     if (!dest) return;
     await vaultCall('export_vault', { destinationPath: dest });
     showToast('Vault exported successfully', 'success');
-  } catch (e) { showToast('Export failed: ' + String(e).slice(0, 80), 'error'); }
+  } catch (e) {
+    const msg = String(e).replace(/^Error: /, '').slice(0, 120);
+    showToast('Export failed: ' + msg, 'error');
+  }
 }
 
 export function switchSettingsTab(tab) {

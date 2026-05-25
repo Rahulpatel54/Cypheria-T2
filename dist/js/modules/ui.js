@@ -120,9 +120,11 @@ export function startClipCountdown() {
 // Autolock countdown — shows live timer in sidebar above lock button
 let _autolockCountdownInterval = null;
 let _autolockDeadline = null; // absolute ms timestamp when vault will lock
+let _autolockTimeoutSecs = 0;
 
 export function startAutolockCountdown(timeoutSecs) {
   clearAutolockCountdown();
+  _autolockTimeoutSecs = timeoutSecs || 0;
   const el = document.getElementById('autolock-countdown');
   const val = document.getElementById('autolock-countdown-val');
   if (!el || !val || !timeoutSecs || timeoutSecs === 0) {
@@ -137,7 +139,6 @@ export function startAutolockCountdown(timeoutSecs) {
     const m = Math.floor(remaining / 60);
     const s = remaining % 60;
     val.textContent = `${m}:${String(s).padStart(2, '0')}`;
-    // Color shift as time runs low
     if (remaining <= 30) {
       val.style.color = 'var(--color-red)';
     } else if (remaining <= 60) {
@@ -145,13 +146,9 @@ export function startAutolockCountdown(timeoutSecs) {
     } else {
       val.style.color = 'var(--accent-light)';
     }
-    // When countdown hits zero, actively lock the vault from the frontend
-    // This ensures the lock screen appears even if the backend event is missed
     if (remaining <= 0) {
       clearAutolockCountdown();
-      import('./auth.js').then(async m => {
-        await m.lockVaultUI();
-      }).catch(() => {});
+      import('./auth.js').then(async m => { await m.lockVaultUI(); }).catch(() => {});
     }
   }
   tick();
@@ -159,18 +156,15 @@ export function startAutolockCountdown(timeoutSecs) {
 }
 
 export function clearAutolockCountdown() {
-  if (_autolockCountdownInterval) {
-    clearInterval(_autolockCountdownInterval);
-    _autolockCountdownInterval = null;
-  }
+  if (_autolockCountdownInterval) { clearInterval(_autolockCountdownInterval); _autolockCountdownInterval = null; }
   _autolockDeadline = null;
   const el = document.getElementById('autolock-countdown');
   if (el) el.style.display = 'none';
 }
 
 export function bumpAutolockCountdown(timeoutSecs) {
-  // Reset the deadline on any user activity
-  if (!timeoutSecs || timeoutSecs === 0) return;
+  // Reset deadline on any user activity — only extend if timer is already running
+  if (!timeoutSecs || timeoutSecs === 0 || !_autolockCountdownInterval) return;
   _autolockDeadline = Date.now() + timeoutSecs * 1000;
 }
 
@@ -253,8 +247,6 @@ export function wireEvents() {
 
   // Titlebar
   document.getElementById('logo-link')?.addEventListener('click', () => navigate('dashboard'));
-  document.getElementById('tb-settings')?.addEventListener('click', () => navigate('settings'));
-  document.getElementById('tb-lock')?.addEventListener('click', lockVaultUI);
   document.getElementById('win-close')?.addEventListener('click', () =>
     rawInvoke('plugin:window|close', { label: 'main' }).catch(() => { }));
   document.getElementById('win-min')?.addEventListener('click', () =>
@@ -407,4 +399,15 @@ document.getElementById('btn-confirm-action')?.addEventListener('click', async (
   if (!window.__TAURI_INTERNALS__?.isTauriDevTools) {
     document.addEventListener('contextmenu', e => e.preventDefault());
   }
+}
+
+// Wire user-activity events to reset the autolock countdown on interaction
+export function wireActivityListeners() {
+  const bump = () => {
+    const secs = parseInt(document.getElementById('set-autolock')?.value || '0');
+    if (secs > 0) bumpAutolockCountdown(secs);
+  };
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'].forEach(evt => {
+    document.addEventListener(evt, bump, { passive: true, capture: true });
+  });
 }

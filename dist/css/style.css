@@ -183,6 +183,105 @@
 }
 
 /* ── Controls row ── */
+.smart-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  align-self: start;
+}
+
+.sp-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 0;
+}
+
+.sp-panel-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sp-panel-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.sp-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sp-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  user-select: none;
+  position: relative;
+  bottom: -1px;
+}
+
+.sp-tab:hover { color: var(--text-secondary); background: var(--bg-card); }
+
+.sp-tab.active {
+  background: var(--bg-card);
+  border-color: var(--border-mid);
+  border-bottom-color: var(--bg-card);
+  color: var(--accent-light);
+}
+
+.sp-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+
+.sp-badge-new { background: rgba(34,197,94,0.15); color: var(--color-green); border: 1px solid rgba(34,197,94,0.3); }
+.sp-tab.active .sp-badge-new { background: rgba(255,255,255,0.15); color: #fff; border-color: transparent; }
+.sp-badge-beta { background: rgba(245,158,11,0.15); color: var(--color-amber); border: 1px solid rgba(245,158,11,0.3); }
+.sp-tab.active .sp-badge-beta { background: rgba(255,255,255,0.15); color: #fff; border-color: transparent; }
+
+.sp-tab-content {
+  display: none;
+  padding: 14px 16px 16px;
+  flex-direction: column;
+  gap: 11px;
+  background: var(--bg-card);
+}
+
+.sp-tab-content.active {
+  display: flex;
+  animation: spFadeIn 0.15s ease;
+}
+
+@keyframes spFadeIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .sp-controls {
   display: flex;
   flex-direction: column;
@@ -200,12 +299,11 @@
   gap: 8px;
 }
 
-/* Slider */
 .sp-slider {
   -webkit-appearance: none;
   appearance: none;
-  width: 110px;
-  height: 4px;
+  width: 100px;
+  height: 3px;
   border-radius: 2px;
   background: var(--border-mid);
   outline: none;
@@ -214,32 +312,27 @@
 
 .sp-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 0 6px rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 5px rgba(139,92,246,0.4);
 }
 
 .sp-slider-val {
   font-size: 11px;
   font-weight: 600;
   color: var(--accent-light);
-  min-width: 60px;
+  min-width: 64px;
   text-align: right;
 }
 
-/* Separator picker pills */
-.sp-sep-row {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
+.sp-sep-row { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .sp-sep-pill {
-  padding: 3px 9px;
-  border-radius: 999px;
+  padding: 3px 8px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   border: 1px solid var(--border-mid);
@@ -250,18 +343,9 @@
   font-family: 'Courier New', monospace;
 }
 
-.sp-sep-pill:hover {
-  border-color: var(--accent);
-  color: var(--accent-light);
-}
+.sp-sep-pill:hover { border-color: var(--accent); color: var(--accent-light); }
+.sp-sep-pill.active { background: var(--accent-dim); border-color: var(--border-accent); color: var(--accent-light); }
 
-.sp-sep-pill.active {
-  background: var(--accent-dim);
-  border-color: var(--border-accent);
-  color: var(--accent-light);
-}
-
-/* Toggle switch — reusing existing .toggle class from settings; aliased here */
 .sp-toggle-row {
   display: flex;
   align-items: center;
@@ -270,12 +354,7 @@
   color: var(--text-secondary);
 }
 
-/* ── Password suggestion list ── */
-.sp-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.sp-list { display: flex; flex-direction: column; gap: 5px; }
 
 .sp-row {
   background: var(--bg-surface);
@@ -288,75 +367,44 @@
   transition: border-color 0.15s, opacity 0.15s;
 }
 
-.sp-row:hover {
-  border-color: var(--border-mid);
-}
+.sp-row:hover { border-color: var(--border-mid); }
+.sp-row.fading { opacity: 0.35; transition: opacity 0.15s; }
 
-.sp-row.fading {
-  opacity: 0.4;
-  transition: opacity 0.15s;
-}
-
-.sp-row-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.sp-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
 .sp-pwd-text {
   font-family: 'Courier New', monospace;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--accent-light);
+  color: var(--text-primary);
   word-break: break-all;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-.sp-pattern {
-  font-size: 10px;
-  color: var(--text-muted);
-  line-height: 1.3;
-}
+.sp-pattern { font-size: 10px; color: var(--text-muted); line-height: 1.3; margin-top: 1px; }
+.sp-pronun { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
 
-/* Pronunciation hint */
-.sp-pronun {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-style: italic;
-  line-height: 1.4;
-}
-
-/* Entropy badge */
 .sp-entropy {
   display: inline-flex;
   align-items: center;
-  padding: 1px 7px;
-  border-radius: 999px;
+  padding: 1px 6px;
+  border-radius: 4px;
   font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+  font-weight: 600;
   margin-top: 2px;
   align-self: flex-start;
 }
 
-.sp-entropy-weak     { background: var(--color-red-dim);   color: var(--color-red);   border: 1px solid rgba(239,68,68,0.3);   }
-.sp-entropy-fair     { background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid rgba(245,158,11,0.3); }
-.sp-entropy-strong   { background: var(--color-blue-dim);  color: var(--color-blue);  border: 1px solid rgba(59,130,246,0.3); }
-.sp-entropy-excel    { background: var(--accent-dim);      color: var(--accent-light);border: 1px solid var(--border-accent);  }
+.sp-entropy-weak   { background: var(--color-red-dim);   color: var(--color-red);   border: 1px solid rgba(239,68,68,0.25); }
+.sp-entropy-fair   { background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid rgba(245,158,11,0.25); }
+.sp-entropy-strong { background: var(--color-blue-dim);  color: var(--color-blue);  border: 1px solid rgba(59,130,246,0.25); }
+.sp-entropy-excel  { background: var(--accent-dim);      color: var(--accent-light);border: 1px solid var(--border-accent); }
 
-/* Row action buttons */
-.sp-row-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex-shrink: 0;
-}
+.sp-row-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
 
 .sp-act-btn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 6px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-card);
@@ -364,27 +412,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
   color: var(--text-muted);
   transition: all 0.12s;
-  line-height: 1;
-  position: relative;
   flex-shrink: 0;
+  position: relative;
 }
 
-.sp-act-btn:hover {
-  border-color: var(--border-accent);
-  color: var(--accent-light);
-  background: var(--accent-dim);
-}
+.sp-act-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sp-act-btn:hover { border-color: var(--border-accent); color: var(--accent-light); background: var(--accent-dim); }
+.sp-act-btn.copied { border-color: rgba(34,197,94,0.4); color: var(--color-green); background: var(--color-green-dim); }
 
-.sp-act-btn.copied {
-  border-color: rgba(34,197,94,0.4);
-  color: var(--color-green);
-  background: var(--color-green-dim);
-}
-
-/* Inline "Copied!" flash */
 .sp-copied-flash {
   position: absolute;
   right: 30px;
@@ -405,10 +442,9 @@
 @keyframes spFlashIn  { from { opacity:0; } to { opacity:1; } }
 @keyframes spFlashOut { from { opacity:1; } to { opacity:0; } }
 
-/* "→ Sent to generator" label */
 .sp-sent-label {
   font-size: 10px;
-  color: var(--accent-light);
+  color: var(--color-green);
   font-weight: 600;
   white-space: nowrap;
   animation: spFlashIn 0.1s ease, spFlashOut 0.3s ease 1.5s forwards;
@@ -416,22 +452,18 @@
   margin-top: 2px;
 }
 
-/* gen-output pulse */
 @keyframes spPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(139,92,246,0.6); }
-  70%  { box-shadow: 0 0 0 10px rgba(139,92,246,0); }
+  0%   { box-shadow: 0 0 0 0 rgba(139,92,246,0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(139,92,246,0); }
   100% { box-shadow: 0 0 0 0 rgba(139,92,246,0); }
 }
 
-.gen-display.sp-pulse {
-  animation: spPulse 0.5s ease;
-}
+.gen-display.sp-pulse { animation: spPulse 0.45s ease; }
 
-/* Regenerate All / Shuffle / Surprise Me buttons */
 .sp-regen-all {
   width: 100%;
   padding: 7px 12px;
-  background: var(--bg-card);
+  background: var(--bg-surface);
   border: 1px solid var(--border-mid);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
@@ -446,17 +478,10 @@
   font-family: 'DM Sans', sans-serif;
 }
 
-.sp-regen-all:hover {
-  border-color: var(--border-accent);
-  color: var(--accent-light);
-  background: var(--accent-dim);
-}
+.sp-regen-all:hover { border-color: var(--border-accent); color: var(--accent-light); background: var(--accent-dim); }
+.sp-regen-all svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
-/* ── Mnemonic word inputs ── */
-.sp-mnem-inputs {
-  display: flex;
-  gap: 6px;
-}
+.sp-mnem-inputs { display: flex; gap: 6px; }
 
 .sp-mnem-input {
   flex: 1;
@@ -472,28 +497,24 @@
   min-width: 0;
 }
 
-.sp-mnem-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(139,92,246,0.12);
-}
+.sp-mnem-input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(139,92,246,0.1); }
 
 .sp-privacy-hint {
   font-size: 10px;
   color: var(--text-muted);
-  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   line-height: 1.4;
 }
 
-/* Suggestion chips */
-.sp-chip-row {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
+.sp-privacy-hint svg { width: 11px; height: 11px; stroke: var(--text-muted); fill: none; stroke-width: 2; flex-shrink: 0; }
+
+.sp-chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .sp-chip {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
   border: 1px solid var(--border-mid);
@@ -503,51 +524,43 @@
   transition: all 0.12s;
 }
 
-.sp-chip:hover {
-  border-color: var(--accent);
-  color: var(--accent-light);
-  background: var(--accent-dim);
-}
+.sp-chip:hover { border-color: var(--accent); color: var(--accent-light); background: var(--accent-dim); }
 
-/* Mnemonic action buttons row */
-.sp-mnem-btns {
-  display: flex;
-  gap: 6px;
-}
+.sp-mnem-btns { display: flex; gap: 6px; }
+.sp-mnem-btns .sp-regen-all { flex: 1; }
 
-.sp-mnem-btns .sp-regen-all {
-  flex: 1;
-}
-
-/* Empty state for Mnemonic */
 .sp-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 30px 16px;
+  padding: 28px 16px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
   text-align: center;
-  gap: 6px;
+  gap: 8px;
   line-height: 1.5;
 }
 
-/* Speak button */
+.sp-empty-state svg { width: 28px; height: 28px; stroke: var(--border-mid); fill: none; stroke-width: 1.5; }
+
 .sp-speak-btn {
-  background: none;
-  border: none;
+  width: 22px;
+  height: 22px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
-  font-size: 13px;
-  padding: 2px 4px;
   border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background 0.12s;
-  line-height: 1;
+  flex-shrink: 0;
 }
 
-.sp-speak-btn:hover {
-  background: var(--accent-dim);
-}
+.sp-speak-btn svg { width: 11px; height: 11px; stroke: var(--text-muted); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sp-speak-btn:hover { background: var(--accent-dim); }
+.sp-speak-btn:hover svg { stroke: var(--accent-light); }
 
 /* ═══════════════════════════════════════════════════
    RESET & BASE

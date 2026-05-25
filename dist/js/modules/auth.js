@@ -215,6 +215,8 @@ export function showLockScreen() {
   document.getElementById('app').classList.remove('visible');
 
   document.getElementById('master-pwd').value = '';
+  const unlockBtn = document.getElementById('unlock-btn');
+  if (unlockBtn) { unlockBtn.disabled = false; unlockBtn.textContent = 'Unlock'; }
   document.getElementById('lock-error').textContent = '';
   document.getElementById('lock-attempts').textContent = '';
 
@@ -255,6 +257,7 @@ export async function tryUnlock() {
     hideLockScreen();
     await afterUnlock();
     showToast('Vault unlocked', 'success');
+  // Reset button text on every exit path so it never stays "Unlocking…"
   } catch (e) {
     pwd = null;
     state.lockAttempts++;
@@ -262,10 +265,14 @@ export async function tryUnlock() {
     if (msg.includes('RateLimited') || msg.includes('Try again in')) {
       const m = msg.match(/(\d+)/);
       startLockCooldown(m ? parseInt(m[1]) : 30);
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
       return;
     }
     if (state.lockAttempts >= 5) {
       startLockCooldown(30);
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
       return;
     }
     const left = 5 - state.lockAttempts;
@@ -316,57 +323,70 @@ export async function lockVaultUI() {
   showLockScreen();
 }
 
+// Show a styled choice modal instead of native dialog for vault switching
 export async function openDifferentVault() {
   if (!state._invoke) { showToast('File dialog requires Tauri backend', 'warning'); return; }
-  let choice;
-  try {
-    choice = await rawInvoke('plugin:dialog|ask', {
-      options: {
-        title: 'Switch Vault',
-        message: 'What would you like to do?',
-        okLabel: 'Open Existing Vault',
-        cancelLabel: 'Create New Vault',
-      },
-    });
-  } catch (_) {
-    choice = true;
-  }
 
-  if (choice) {
+  // Build an inline choice overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:9999;';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:var(--radius-lg);padding:32px;width:380px;text-align:center;box-shadow:var(--glow-purple-md);';
+
+  card.innerHTML = `
+    <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:8px;color:var(--text-primary);">Switch Vault</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6;">Open an existing vault file or start fresh with a new one.</p>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button id="_vswitch_open" style="width:100%;padding:12px 16px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:10px;justify-content:center;">
+        <svg viewBox="0 0 24 24" width="16" height="16" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Open Existing Vault
+      </button>
+      <button id="_vswitch_new" style="width:100%;padding:12px 16px;background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border-mid);border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:10px;justify-content:center;">
+        <svg viewBox="0 0 24 24" width="16" height="16" style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Create New Vault
+      </button>
+      <button id="_vswitch_cancel" style="width:100%;padding:9px 16px;background:none;color:var(--text-muted);border:none;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;">Cancel</button>
+    </div>`;
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  const cleanup = () => document.body.removeChild(overlay);
+
+  document.getElementById('_vswitch_cancel').onclick = cleanup;
+  overlay.onclick = e => { if (e.target === overlay) cleanup(); };
+
+  document.getElementById('_vswitch_open').onclick = async () => {
+    cleanup();
     try {
       const p = await rawInvoke('plugin:dialog|open', {
-        options: {
-          title: 'Open Vault',
-          multiple: false,
-          directory: false,
-          filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
-        },
+        options: { title: 'Open Vault', multiple: false, directory: false, filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }] },
       });
-      if (p) {
-        const path = typeof p === 'string' ? p : p[0];
-        const canonical = await rawInvoke('open_vault', { vaultPath: path });
-        state.currentVaultPath = canonical;
-        await persistVaultPath(canonical);
-        try {
-          const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
-          document.getElementById('lock-vault-name').textContent =
-            meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
-        } catch (_) {
-          document.getElementById('lock-vault-name').textContent =
-            canonical.split(/[\\/]/).pop().replace('.qvault', '');
-        }
-        document.getElementById('lock-error').textContent = '';
-        showToast('Vault loaded — enter your password', 'success');
+      if (!p) return;
+      const path = typeof p === 'string' ? p : p[0];
+      const canonical = await rawInvoke('open_vault', { vaultPath: path });
+      state.currentVaultPath = canonical;
+      const { persistVaultPath } = await import('./bridge.js');
+      await persistVaultPath(canonical);
+      try {
+        const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
+        document.getElementById('lock-vault-name').textContent = meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
+      } catch (_) {
+        document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault', '');
       }
-    } catch (e) {
-      console.error('[Cypheria] openDifferentVault failed:', e);
-      showToast('Could not open vault: ' + String(e).slice(0, 80), 'error');
-    }
-  } else {
+      document.getElementById('lock-error').textContent = '';
+      showToast('Vault loaded — enter your password', 'success');
+    } catch (e) { showToast('Could not open vault: ' + String(e).slice(0, 80), 'error'); }
+  };
+
+  document.getElementById('_vswitch_new').onclick = async () => {
+    cleanup();
+    const { clearPersistedVaultPath } = await import('./bridge.js');
     await clearPersistedVaultPath();
     state.currentVaultPath = null;
     showSetupScreen();
-  }
+  };
 }
 
 // After unlock: load data, start autolock countdown, show app

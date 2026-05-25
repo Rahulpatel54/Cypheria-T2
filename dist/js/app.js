@@ -2,7 +2,7 @@
 
 import { state } from './modules/state.js';
 import { initTauri, rawInvoke, getPersistedVaultPath, persistVaultPath, clearPersistedVaultPath } from './modules/bridge.js';
-import { showLoading, hideLoading, navigate, wireEvents } from './modules/ui.js';
+import { showLoading, hideLoading, navigate, wireEvents, wireActivityListeners } from './modules/ui.js';
 import { showToast } from './modules/utils.js';
 import { showSetupScreen, showLockScreen } from './modules/auth.js';
 import { initSmartPanel } from './modules/smart-panel.js';
@@ -67,6 +67,7 @@ async function boot() {
   try {
     console.log('[DEBUG] wiring events...');
     wireEvents();
+    wireActivityListeners();
     console.log('[DEBUG] events wired');
 
     console.log('[DEBUG] init tauri...');
@@ -108,6 +109,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }, 10000);
 
   initSmartPanel();
+  try {
+    if (window.__TAURI_INTERNALS__?.invoke) {
+      window.__TAURI_INTERNALS__.invoke('plugin:app|version').then(v => {
+        const el = document.getElementById('about-version');
+        if (el && v) el.textContent = v;
+      }).catch(() => {});
+    }
+  } catch (_) {}
   boot().catch(err => {
     console.error('[Cypheria] Boot failed:', err);
     hideLoading();

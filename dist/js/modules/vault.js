@@ -556,9 +556,9 @@ export async function saveEditEntry() {
       emoji: existing?.emoji || (title.length > 0 ? title.charAt(0).toUpperCase() : '?'),
     });
     closeModal('modal-edit-entry');
+    showToast('Entry updated', 'success');
     await loadEntries();
     setTimeout(() => selectEntry(id), 80);
-    showToast('Entry updated', 'success');
   } catch (e) {
     if (errEl) errEl.textContent = String(e).replace(/^Error: /, '').slice(0, 120);
   } finally {

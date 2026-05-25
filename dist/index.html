@@ -168,7 +168,8 @@
       </div>
       <span class="logo-text">cypheria</span>
     </div>
-    <div class="title-search" id="title-search-wrap">
+    <div class="title-spacer"></div>
+    <div class="title-search" id="title-search-wrap" style="position:absolute;left:50%;transform:translateX(-50%);max-width:380px;width:100%;">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="search-input" placeholder="Search entries…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <span class="kbd-badge">Ctrl+K</span>
@@ -176,12 +177,6 @@
     <div class="search-results" id="search-results"></div>
     <div class="title-spacer"></div>
     <div class="title-actions">
-      <button class="title-icon-btn" id="tb-settings" title="Settings">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
-      <button class="title-icon-btn" id="tb-lock" title="Lock vault">
-        <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      </button>
       <div class="win-controls">
         <button class="win-btn win-min" id="win-min" title="Minimize">
           <svg viewBox="0 0 10 1" width="10" height="1"><rect width="10" height="1" fill="currentColor"/></svg>
@@ -440,9 +435,9 @@
             SMART PASSWORD PANEL (right column)
           ═══════════════════════════════════════ -->
           <div class="smart-panel" id="smart-panel">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;">
-              <span style="font-family:'Syne',sans-serif;font-size:13px;font-weight:600;color:var(--text-primary);">Smart Generator</span>
-              <span style="font-size:10px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-muted);">AI-free · local only</span>
+            <div class="sp-panel-header">
+              <span class="sp-panel-title">Smart Generator</span>
+              <span class="sp-panel-badge">Local only</span>
             </div>
             <!-- Tab bar -->
             <div class="sp-tabs">
@@ -490,7 +485,10 @@
                 </div>
               </div>
               <div class="sp-list" id="pp-list"></div>
-              <button class="sp-regen-all" id="pp-regen-all">↺ Regenerate All</button>
+              <button class="sp-regen-all" id="pp-regen-all">
+                <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Regenerate All
+              </button>
             </div>
 
             <!-- ── TAB 2: Pronounceable ── -->
@@ -521,7 +519,10 @@
               </div>
             </div>
               <div class="sp-list" id="pr-list"></div>
-              <button class="sp-regen-all" id="pr-regen-all">↺ Regenerate All</button>
+              <button class="sp-regen-all" id="pr-regen-all">
+                <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Regenerate All
+              </button>
             </div>
 
             <!-- ── TAB 3: Mnemonic ── -->
@@ -581,14 +582,23 @@
                 <span class="sp-slider-val" id="mn-min-len-lbl" style="min-width:28px;">12</span>
               </div>
 
-              <p class="sp-privacy-hint">🔒 Your words never leave this device. Patterns generated locally.</p>
+              <p class="sp-privacy-hint">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Your words never leave this device. Patterns generated locally.
+              </p>
               <div class="sp-list" id="mn-list"></div>
               <div class="sp-mnem-btns">
-                <button class="sp-regen-all" id="mn-shuffle">↺ Shuffle Patterns</button>
-                <button class="sp-regen-all" id="mn-surprise">🎲 Surprise Me</button>
+                <button class="sp-regen-all" id="mn-shuffle">
+                  <svg viewBox="0 0 24 24"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+                  Shuffle
+                </button>
+                <button class="sp-regen-all" id="mn-surprise">
+                  <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Surprise Me
+                </button>
               </div>
             </div>
-          </div><!-- /smart-panel -->
+          </div>
         </div>
       </div>
 
@@ -657,26 +667,135 @@
             </div>
             <div id="stab-security" style="display:none;">
               <div class="settings-section-title">Encryption Details</div>
-              <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;">
-                <div style="font-size:12px;color:var(--text-secondary);line-height:2.2;">
-                  <div>🔐 <strong>Classical:</strong> AES-256-GCM</div>
-                  <div>🔬 <strong>Post-Quantum:</strong> CRYSTALS-Kyber-1024</div>
-                  <div>🔑 <strong>KDF:</strong> Argon2id (64MB, 3 iterations, 4 threads)</div>
-                  <div>🛡️ <strong>HMAC:</strong> SHA-256 tamper detection</div>
-                  <div>🔄 <strong>Key rotation:</strong> Per-entry on update</div>
-                  <div>💾 <strong>Format:</strong> .qvault (encrypted binary)</div>
+              <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);overflow:hidden;">
+                <div style="padding:16px;display:flex;flex-direction:column;gap:0;">
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+                    <div style="width:30px;height:30px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg viewBox="0 0 24 24" width="14" height="14" style="stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+                    <div><div style="font-size:12px;font-weight:600;color:var(--text-primary);">Classical Encryption</div><div style="font-size:11px;color:var(--text-muted);margin-top:1px;">AES-256-GCM authenticated encryption</div></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+                    <div style="width:30px;height:30px;border-radius:8px;background:var(--color-blue-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg viewBox="0 0 24 24" width="14" height="14" style="stroke:var(--color-blue);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                    <div><div style="font-size:12px;font-weight:600;color:var(--text-primary);">Post-Quantum</div><div style="font-size:11px;color:var(--text-muted);margin-top:1px;">CRYSTALS-Kyber-1024 (NIST PQC standard)</div></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+                    <div style="width:30px;height:30px;border-radius:8px;background:var(--color-green-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg viewBox="0 0 24 24" width="14" height="14" style="stroke:var(--color-green);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="8" cy="8" r="2"/><path d="M10 8h11"/><circle cx="16" cy="16" r="2"/><path d="M3 16h11"/></svg></div>
+                    <div><div style="font-size:12px;font-weight:600;color:var(--text-primary);">Key Derivation</div><div style="font-size:11px;color:var(--text-muted);margin-top:1px;">Argon2id — 64 MB, 3 iterations, 4 threads</div></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+                    <div style="width:30px;height:30px;border-radius:8px;background:var(--color-amber-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg viewBox="0 0 24 24" width="14" height="14" style="stroke:var(--color-amber);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>
+                    <div><div style="font-size:12px;font-weight:600;color:var(--text-primary);">Tamper Detection</div><div style="font-size:11px;color:var(--text-muted);margin-top:1px;">HMAC-SHA256 over entire vault file</div></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);">
+                    <div style="width:30px;height:30px;border-radius:8px;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg viewBox="0 0 24 24" width="14" height="14" style="stroke:var(--color-red);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></div>
+                    <div><div style="font-size:12px;font-weight:600;color:var(--text-primary);">Key Rotation</div><div style="font-size:11px;color:var(--text-muted);margin-top:1px;">Fresh entry key generated on every update</div></div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;padding:10px 0;">
+                    <div style="width:30px;height:30px;border-radius:8px;background:var(--bg-panel);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg viewBox="0 0 24 24" width="14" height="14" style="stroke:var(--text-secondary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+                    <div><div style="font-size:12px;font-weight:600;color:var(--text-primary);">Vault Format</div><div style="font-size:11px;color:var(--text-muted);margin-top:1px;">.qvault v2 — encrypted binary, no plaintext fields</div></div>
+                  </div>
                 </div>
               </div>
             </div>
             <div id="stab-about" style="display:none;">
-              <div class="settings-section-title">About Cypheria</div>
-              <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:20px;text-align:center;">
-                <div class="logo-icon" style="margin:0 auto 12px;width:48px;height:48px;border-radius:12px;">
-                  <svg viewBox="0 0 24 24" style="width:22px;height:22px;stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <div style="display:flex;align-items:center;gap:16px;margin-bottom:28px;">
+                <div class="logo-icon" style="width:52px;height:52px;border-radius:14px;flex-shrink:0;">
+                  <svg viewBox="0 0 24 24" style="width:24px;height:24px;stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 </div>
-                <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:4px;">Cypheria</div>
-                <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">Version 0.1.0 — Quantum-Resistant</div>
-                <div style="font-size:12px;color:var(--text-secondary);line-height:1.8;">Built with Rust + Tauri 2.x<br>Zero cloud. Zero telemetry.<br>Your data never leaves your device.</div>
+                <div>
+                  <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:var(--text-primary);">Cypheria</div>
+                  <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">Version <span id="about-version">0.1.0</span> &nbsp;·&nbsp; Quantum-Resistant Password Manager</div>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+                <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <svg viewBox="0 0 24 24" width="15" height="15" style="stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Post-Quantum Encryption</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);line-height:1.7;">Dual-path protection using CRYSTALS-Kyber-1024 (NIST PQC standard) alongside AES-256-GCM. Your vault stays safe even against future quantum computers.</p>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--color-green-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <svg viewBox="0 0 24 24" width="15" height="15" style="stroke:var(--color-green);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.56 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Zero Network Access</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);line-height:1.7;">Completely offline. No telemetry, no cloud sync, no analytics. Your credentials never touch a server. The vault file lives only on your machine.</p>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--color-blue-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <svg viewBox="0 0 24 24" width="15" height="15" style="stroke:var(--color-blue);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><circle cx="8" cy="8" r="2"/><path d="M10 8h11"/><circle cx="16" cy="16" r="2"/><path d="M3 16h11"/></svg>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Argon2id Key Derivation</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);line-height:1.7;">OWASP-compliant KDF with 64 MB memory cost, 3 iterations, and 4-thread parallelism. Defeats GPU and ASIC brute-force attacks on your master password.</p>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--color-amber-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <svg viewBox="0 0 24 24" width="15" height="15" style="stroke:var(--color-amber);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Per-Entry Key Rotation</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);line-height:1.7;">Every update generates a fresh Entry Key. Old snapshots of the vault cannot decrypt updated entries — forward secrecy baked into every save.</p>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:rgba(239,68,68,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <svg viewBox="0 0 24 24" width="15" height="15" style="stroke:var(--color-red);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Auto-Clear Clipboard</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);line-height:1.7;">Copied passwords are overwritten with random noise then cleared automatically. Clipboard history managers won't retain your credentials past the timeout.</p>
+                </div>
+
+                <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div style="width:32px;height:32px;border-radius:8px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                      <svg viewBox="0 0 24 24" width="15" height="15" style="stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </div>
+                    <span style="font-size:13px;font-weight:600;color:var(--text-primary);">Encrypted Secure Notes</span>
+                  </div>
+                  <p style="font-size:12px;color:var(--text-secondary);line-height:1.7;">Store sensitive text — recovery codes, API keys, private notes — encrypted with the same AES-256-GCM + unique Note Key architecture as entries.</p>
+                </div>
+              </div>
+
+              <div style="background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:16px;margin-bottom:16px;">
+                <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Technical Stack</div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                  <div style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div>Rust + Tauri 2.x
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--color-blue);flex-shrink:0;"></div>CRYSTALS-Kyber-1024
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--color-green);flex-shrink:0;"></div>AES-256-GCM
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--color-amber);flex-shrink:0;"></div>Argon2id KDF
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--color-red);flex-shrink:0;"></div>HMAC-SHA256 Integrity
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
+                    <div style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);flex-shrink:0;"></div>Zero network, zero cloud
+                  </div>
+                </div>
+              </div>
+
+              <div style="text-align:center;font-size:11px;color:var(--text-muted);line-height:1.8;">
+                Built with care. No ads. No tracking. No compromises.<br>
+                <span style="color:var(--accent-light);font-weight:600;">Your data belongs to you — always.</span>
               </div>
             </div>
           </div>
