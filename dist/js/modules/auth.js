@@ -376,6 +376,7 @@ export async function afterUnlock() {
     const { loadNotes } = await import('./notes.js');
     const { loadSettings } = await import('./settings.js');
     await Promise.all([loadEntries(), loadNotes(), loadSettings()]);
+    import('./vault.js').then(m => m.loadPasswordScores()).catch(() => {});
   } catch (e) {
     console.warn('[Cypheria] Partial load after unlock:', e);
   }

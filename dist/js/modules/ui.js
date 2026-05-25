@@ -9,6 +9,7 @@ import {
   selectEntry
 } from './vault.js';
 import { loadNotes, renderNotes, openNoteModal, saveNote } from './notes.js';
+import { loadPasswordScores } from './vault.js';
 import { generatePassword, copGenPwd } from './generator.js';
 import { 
   showSetupScreen, gotoSetupStep, browseSavePath, createVault, 
@@ -44,6 +45,9 @@ export function navigate(page) {
   if (page === 'favorites') renderFavorites();
   if (page === 'notes') renderNotes();
   if (page === 'dashboard') renderDashboard();
+  if (page === 'dashboard' && state.vaultEntries.length > 0 && !Object.keys(state.passwordScores).length) {
+    setTimeout(loadPasswordScores, 120);
+  }
   if (page === 'generator') {
     generatePassword();
     setTimeout(() => {
@@ -215,6 +219,10 @@ export function wireEvents() {
   // Vault
   document.getElementById('vault-add-entry')?.addEventListener('click', openAddModal);
   document.getElementById('vault-refresh')?.addEventListener('click', loadEntries);
+  document.getElementById('security-refresh-btn')?.addEventListener('click', () => {
+    state.passwordScores = {};
+    import('./vault.js').then(m => m.loadPasswordScores()).catch(() => {});
+  });
   document.getElementById('vault-sort')?.addEventListener('change', renderVaultTable);
 
   // Favorites

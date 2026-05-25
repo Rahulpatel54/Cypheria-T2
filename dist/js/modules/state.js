@@ -14,5 +14,6 @@ export const state = {
   settingsDebounce: null,
   confirmCallback: null,
   passwordRevealTimers: new Map(),
-  appUnlocked: false
+  appUnlocked: false,
+  passwordScores: {}
 };

@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { vaultCall } from './bridge.js';
 import { showToast, fmtDate, makeAvatar, copyToClipboard, openModal, closeModal } from './utils.js';
 import { navigate, startClipCountdown } from './ui.js';
+import { navigate } from './ui.js';
 
 export async function loadEntries() {
   try {
@@ -113,6 +114,254 @@ export function renderFavorites() {
     tr.onclick = () => { navigate('vault'); setTimeout(() => selectEntry(e.id), 60); };
     tbody.appendChild(tr);
   });
+}
+// ── Security audit: fetch all passwords in batches, compute scores, render panel ──
+const BATCH_SIZE = 5;
+const STALE_DAYS = 180;
+
+function secPwdScore(pwd) {
+  if (!pwd) return 0;
+  let s = 0;
+  if (pwd.length >= 8)  s += 20;
+  if (pwd.length >= 12) s += 10;
+  if (pwd.length >= 16) s += 10;
+  if (pwd.length >= 24) s += 10;
+  if (/[A-Z]/.test(pwd)) s += 15;
+  if (/[a-z]/.test(pwd)) s += 15;
+  if (/[0-9]/.test(pwd)) s += 10;
+  if (/[^A-Za-z0-9]/.test(pwd)) s += 10;
+  return Math.min(s, 100);
+}
+
+function secTier(score) {
+  if (score === 0)  return 'empty';
+  if (score < 50)   return 'weak';
+  if (score < 75)   return 'moderate';
+  return 'strong';
+}
+
+function secDaysSince(iso) {
+  if (!iso) return 9999;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+}
+
+export async function loadPasswordScores() {
+  // skip if no entries or vault locked
+  if (!state.vaultEntries.length) { state.passwordScores = {}; return; }
+  const scores = {};
+  const entries = [...state.vaultEntries];
+  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+    const batch = entries.slice(i, i + BATCH_SIZE);
+    await Promise.allSettled(batch.map(async e => {
+      try {
+        const pwd = await vaultCall('get_entry_password', { entryId: e.id });
+        scores[e.id] = { pwd, score: secPwdScore(pwd) };
+      } catch (_) {
+        scores[e.id] = { pwd: '', score: 0 };
+      }
+    }));
+    // small yield between batches to avoid blocking the event loop
+    if (i + BATCH_SIZE < entries.length) await new Promise(r => setTimeout(r, 20));
+  }
+  state.passwordScores = scores;
+  renderSecurityPanel();
+}
+
+export function renderSecurityPanel() {
+  const container = document.getElementById('security-panel-body');
+  if (!container) return;
+  const entries = state.vaultEntries;
+  const scores  = state.passwordScores;
+  const total   = entries.length;
+
+  if (total === 0) {
+    container.innerHTML = '<div class="sec-empty">Add entries to see your security score.</div>';
+    return;
+  }
+
+  // ── Tally buckets ──
+  const counts = { strong: 0, moderate: 0, weak: 0, empty: 0 };
+  const weakList = [], staleList = [], pwdMap = {};
+
+  entries.forEach(e => {
+    const s = scores[e.id];
+    if (!s) return; // not yet fetched
+    const t = secTier(s.score);
+    counts[t]++;
+    if (t === 'weak' || t === 'empty') weakList.push({ ...e, _score: s.score, _tier: t });
+    if (secDaysSince(e.updated_at) > STALE_DAYS) staleList.push({ ...e, _days: secDaysSince(e.updated_at) });
+    if (s.pwd) {
+      if (!pwdMap[s.pwd]) pwdMap[s.pwd] = [];
+      pwdMap[s.pwd].push(e);
+    }
+  });
+
+  const dupGroups   = Object.values(pwdMap).filter(g => g.length > 1);
+  const dupFlat     = dupGroups.flat();
+  const pct         = n => total > 0 ? Math.round(n / total * 100) : 0;
+  const penaltyWeak = Math.min(counts.weak * 20 + counts.empty * 30, 50);
+  const penaltyDup  = Math.min(dupFlat.length * 10, 30);
+  const penaltyStale= Math.min(staleList.length * 5, 15);
+  const bonusStrong = Math.round(counts.strong / total * 40);
+  const health = Math.max(0, Math.min(100, 50 + bonusStrong - penaltyWeak - penaltyDup - penaltyStale));
+
+  // ── Ring colours mapped to Cypheria tokens ──
+  const ringColor = health >= 75 ? 'var(--color-green)' : health >= 50 ? 'var(--color-amber)' : 'var(--color-red)';
+  const ringCirc  = 175.9;
+  const ringOffset= ringCirc - (health / 100) * ringCirc;
+  const label     = health >= 80 ? 'Excellent' : health >= 60 ? 'Good' : health >= 40 ? 'Fair' : 'Needs work';
+
+  const issueParts = [];
+  if (counts.weak  > 0)    issueParts.push(counts.weak + ' weak');
+  if (counts.empty > 0)    issueParts.push(counts.empty + ' missing');
+  if (dupFlat.length > 0)  issueParts.push(dupFlat.length + ' reused');
+  if (staleList.length > 0) issueParts.push(staleList.length + ' stale');
+  const descText = issueParts.length ? issueParts.join(' · ') : counts.strong + ' of ' + total + ' entries are strong';
+
+  // ── Tips pool (priority-ordered by most urgent issue) ──
+  const tips = counts.empty > 0
+    ? ['You have ' + counts.empty + ' entries without passwords. Add passwords to protect those accounts.']
+    : counts.weak > 0
+    ? ['Use the generator (16+ chars, mixed + symbols) to replace weak passwords one by one.']
+    : dupFlat.length > 0
+    ? ['Never reuse passwords — a breach at one site exposes every account using the same password.']
+    : ['Great habits! Review stale passwords every 6 months, especially email and banking accounts.'];
+  tips.push(
+    'Enable 2FA on critical accounts (email, banking, cloud) for a second layer of protection.',
+    'A strong password is 16+ characters with uppercase, lowercase, numbers, and symbols.',
+    'Check entries with no website set — they may be orphaned accounts worth reviewing.'
+  );
+  const tip = tips[Math.floor(Math.random() * tips.length)];
+
+  // ── Build markup ──
+  function makeSecAvatar(e) {
+    const letter = (e.emoji || e.name?.charAt(0) || '?').toUpperCase().slice(0, 2);
+    const color  = e.color || '#8b5cf6';
+    return `<div class="sec-avatar" style="background:${color}22;color:${color};border:1px solid ${color}44">${letter}</div>`;
+  }
+
+  function makeSecRow(e, badgeTxt, badgeCls, sub) {
+    return `<div class="sec-item-row" data-entry-id="${e.id}">
+      ${makeSecAvatar(e)}
+      <div class="sec-item-info">
+        <div class="sec-item-name">${escSecHTML(e.name || 'Untitled')}</div>
+        <div class="sec-item-sub">${escSecHTML(sub)}</div>
+      </div>
+      <span class="sec-badge sec-badge-${badgeCls}">${badgeTxt}</span>
+    </div>`;
+  }
+
+  // Action list (weak + missing, up to 5)
+  const actionRows = weakList.slice(0, 5).map(e => {
+    const isEmpty = e._tier === 'empty';
+    return makeSecRow(e,
+      isEmpty ? 'Missing' : 'Weak',
+      isEmpty ? 'gray'   : 'red',
+      isEmpty ? 'No password set' : 'Strength: ' + e._score + '/100'
+    );
+  }).join('');
+
+  // Duplicates
+  const dupRows = dupGroups.slice(0, 4).flatMap(g =>
+    g.map(e => makeSecRow(e, 'Reused', 'amber',
+      'Shared with ' + (g.length - 1) + ' other entr' + (g.length > 2 ? 'ies' : 'y')
+    ))
+  ).join('');
+
+  // Stale
+  const staleRows = staleList.slice(0, 4).map(e => {
+    const mo = Math.floor(e._days / 30);
+    return makeSecRow(e, mo + 'mo old', 'amber', 'Not updated in ' + mo + ' months');
+  }).join('');
+
+  container.innerHTML = `
+    <div class="sec-score-row">
+      <div class="sec-ring">
+        <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true" style="transform:rotate(-90deg)">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="var(--border-mid)" stroke-width="7"/>
+          <circle cx="36" cy="36" r="28" fill="none" stroke="${ringColor}" stroke-width="7"
+            stroke-linecap="round" stroke-dasharray="${ringCirc}"
+            stroke-dashoffset="${ringOffset}" style="transition:stroke-dashoffset 0.6s ease,stroke 0.4s"/>
+        </svg>
+        <div class="sec-ring-center">
+          <span class="sec-ring-num" style="color:${ringColor}">${health}</span>
+          <span class="sec-ring-lbl">score</span>
+        </div>
+      </div>
+      <div class="sec-score-info">
+        <div class="sec-score-label">${label}</div>
+        <div class="sec-score-desc">${descText}</div>
+      </div>
+    </div>
+
+    <div class="sec-bar-grid">
+      <div class="sec-bar-item">
+        <div class="sec-bar-label">Strong <span>${counts.strong}</span></div>
+        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.strong)}%;background:var(--color-green)"></div></div>
+      </div>
+      <div class="sec-bar-item">
+        <div class="sec-bar-label">Moderate <span>${counts.moderate}</span></div>
+        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.moderate)}%;background:var(--color-amber)"></div></div>
+      </div>
+      <div class="sec-bar-item">
+        <div class="sec-bar-label">Weak <span>${counts.weak}</span></div>
+        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.weak)}%;background:var(--color-red)"></div></div>
+      </div>
+      <div class="sec-bar-item">
+        <div class="sec-bar-label">No password <span>${counts.empty}</span></div>
+        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.empty)}%;background:var(--text-muted)"></div></div>
+      </div>
+    </div>
+
+    ${weakList.length > 0 ? `
+    <div class="sec-section">
+      <div class="sec-section-title">Needs attention (${Math.min(weakList.length, 5)})</div>
+      <div class="sec-item-list">${actionRows}</div>
+    </div>` : `
+    <div class="sec-section">
+      <div class="sec-item-list"><div class="sec-empty">No weak passwords — nice work!</div></div>
+    </div>`}
+
+    ${dupGroups.length > 0 ? `
+    <div class="sec-divider"></div>
+    <div class="sec-section">
+      <div class="sec-section-title">Reused passwords</div>
+      <div class="sec-item-list">${dupRows}</div>
+    </div>` : ''}
+
+    ${staleList.length > 0 ? `
+    <div class="sec-divider"></div>
+    <div class="sec-section">
+      <div class="sec-section-title">Not updated recently</div>
+      <div class="sec-item-list">${staleRows}</div>
+    </div>` : ''}
+
+    <div class="sec-divider"></div>
+    <div class="sec-tip">
+      <svg viewBox="0 0 24 24" width="15" height="15" style="flex-shrink:0;margin-top:1px"><path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.4 4.8-3.5 6.1V17a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-1.9C6.4 13.8 5 11.5 5 9a7 7 0 0 1 7-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="21" x2="15" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>${escSecHTML(tip)}</span>
+    </div>
+  `;
+
+  // Attach click handlers to jump to edit
+  container.querySelectorAll('.sec-item-row[data-entry-id]').forEach(row => {
+    row.addEventListener('click', () => {
+      const id = row.dataset.entryId;
+      const entry = state.vaultEntries.find(e => e.id === id);
+      if (!entry) return;
+      // import openEditModal lazily to avoid circular dep
+      import('./vault.js').then(m => {
+        navigate('vault');
+        setTimeout(() => m.openEditModal(entry), 80);
+      }).catch(() => {});
+    });
+  });
+}
+
+function escSecHTML(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 export async function selectEntry(id) {
