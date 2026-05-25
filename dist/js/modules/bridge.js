@@ -18,15 +18,20 @@ export async function initTauri() {
   }
 }
 
-// Session-guarded vault calls (bumps inactivity timer)
+// Session-guarded vault calls — bumps inactivity timer and resets UI countdown
 export async function vaultCall(cmd, args = {}) {
   if (!state._invoke) throw new Error('Backend unavailable');
   try {
-    return await state._invoke(cmd, args);
+    const result = await state._invoke(cmd, args);
+    // Reset the UI countdown on every successful vault command
+    const timeoutSecs = parseInt(document.getElementById('set-autolock')?.value || '0');
+    if (timeoutSecs > 0) {
+      import('./ui.js').then(m => m.bumpAutolockCountdown(timeoutSecs)).catch(() => {});
+    }
+    return result;
   } catch (err) {
     const msg = String(err);
     if (msg.includes('Vault is locked') || msg.includes('Session expired')) {
-      // Import showLockScreen dynamically to avoid circular dependency
       const { showLockScreen } = await import('./auth.js');
       showLockScreen();
       throw err;

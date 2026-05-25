@@ -160,6 +160,8 @@ export async function createVault() {
 }
 
 export function showLockScreen() {
+  // Clear the sidebar countdown timer when locking
+  import('./ui.js').then(m => { m.clearAutolockCountdown(); }).catch(() => {});
   state.appUnlocked = false;
 
   state.vaultEntries = [];
@@ -297,6 +299,8 @@ function startLockCooldown(seconds) {
 }
 
 export async function lockVaultUI() {
+  // Stop the sidebar countdown timer immediately on manual lock
+  import('./ui.js').then(m => m.clearAutolockCountdown()).catch(() => {});
   if (state.clipTimer) { clearTimeout(state.clipTimer); state.clipTimer = null; }
   if (state.clipInterval) { clearInterval(state.clipInterval); state.clipInterval = null; }
   const clipInd = document.getElementById('clip-indicator');
@@ -365,6 +369,7 @@ export async function openDifferentVault() {
   }
 }
 
+// After unlock: load data, start autolock countdown, show app
 export async function afterUnlock() {
   showLoading('Loading vault…');
   document.getElementById('lock-screen').classList.add('hidden');
@@ -381,4 +386,15 @@ export async function afterUnlock() {
     console.warn('[Cypheria] Partial load after unlock:', e);
   }
   hideLoading();
+
+  // Start autolock countdown using current settings
+  try {
+    const { state } = await import('./state.js');
+    const timeoutSecs = state.clipSecs !== undefined
+      ? parseInt(document.getElementById('set-autolock')?.value || '300')
+      : 300;
+    const actualTimeout = parseInt(document.getElementById('set-autolock')?.value || '300');
+    const { startAutolockCountdown } = await import('./ui.js');
+    startAutolockCountdown(actualTimeout);
+  } catch (_) {}
 }

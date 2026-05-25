@@ -12,14 +12,20 @@ async function setupTauriEvents() {
     const listen = window.__TAURI_INTERNALS__?.listen || window.__TAURI__?.event?.listen;
     if (listen) {
       await listen('vault-auto-locked', async () => {
-        if (state._invoke) await rawInvoke('clear_clipboard').catch(() => { });
-        showLockScreen();
-        showToast('Vault locked due to inactivity', 'warning');
-      });
-      await listen('vault-locked', async () => {
-        if (state._invoke) await rawInvoke('clear_clipboard').catch(() => { });
-        showLockScreen();
-      });
+          if (state._invoke) await rawInvoke('clear_clipboard').catch(() => { });
+          const { clearAutolockCountdown } = await import('./modules/ui.js');
+          clearAutolockCountdown();
+          const { showLockScreen } = await import('./modules/auth.js');
+          showLockScreen();
+          showToast('Vault locked due to inactivity', 'warning');
+        });
+        await listen('vault-locked', async () => {
+          if (state._invoke) await rawInvoke('clear_clipboard').catch(() => { });
+          const { clearAutolockCountdown } = await import('./modules/ui.js');
+          clearAutolockCountdown();
+          const { showLockScreen } = await import('./modules/auth.js');
+          showLockScreen();
+        });
     }
   } catch (_) { }
 }

@@ -117,6 +117,63 @@ export function startClipCountdown() {
   }, s * 1000);
 }
 
+// Autolock countdown — shows live timer in sidebar above lock button
+let _autolockCountdownInterval = null;
+let _autolockDeadline = null; // absolute ms timestamp when vault will lock
+
+export function startAutolockCountdown(timeoutSecs) {
+  clearAutolockCountdown();
+  const el = document.getElementById('autolock-countdown');
+  const val = document.getElementById('autolock-countdown-val');
+  if (!el || !val || !timeoutSecs || timeoutSecs === 0) {
+    if (el) el.style.display = 'none';
+    return;
+  }
+  _autolockDeadline = Date.now() + timeoutSecs * 1000;
+  el.style.display = '';
+
+  function tick() {
+    const remaining = Math.max(0, Math.ceil((_autolockDeadline - Date.now()) / 1000));
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    val.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    // Color shift as time runs low
+    if (remaining <= 30) {
+      val.style.color = 'var(--color-red)';
+    } else if (remaining <= 60) {
+      val.style.color = 'var(--color-amber)';
+    } else {
+      val.style.color = 'var(--accent-light)';
+    }
+    // When countdown hits zero, actively lock the vault from the frontend
+    // This ensures the lock screen appears even if the backend event is missed
+    if (remaining <= 0) {
+      clearAutolockCountdown();
+      import('./auth.js').then(async m => {
+        await m.lockVaultUI();
+      }).catch(() => {});
+    }
+  }
+  tick();
+  _autolockCountdownInterval = setInterval(tick, 1000);
+}
+
+export function clearAutolockCountdown() {
+  if (_autolockCountdownInterval) {
+    clearInterval(_autolockCountdownInterval);
+    _autolockCountdownInterval = null;
+  }
+  _autolockDeadline = null;
+  const el = document.getElementById('autolock-countdown');
+  if (el) el.style.display = 'none';
+}
+
+export function bumpAutolockCountdown(timeoutSecs) {
+  // Reset the deadline on any user activity
+  if (!timeoutSecs || timeoutSecs === 0) return;
+  _autolockDeadline = Date.now() + timeoutSecs * 1000;
+}
+
 export function updateAddStrength() {
   const pwd = document.getElementById('add-password').value;
   const { score, label, color } = pwdStrength(pwd);

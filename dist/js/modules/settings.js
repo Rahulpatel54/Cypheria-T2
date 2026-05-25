@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { vaultCall, rawInvoke } from './bridge.js';
 import { showToast, closeModal } from './utils.js';
 
+// Load settings and (re)start the autolock countdown with persisted timeout
 export async function loadSettings() {
   try {
     const s = await vaultCall('get_settings');
@@ -14,10 +15,15 @@ export async function loadSettings() {
     if (el('set-startup') && s.launch_at_startup !== undefined) el('set-startup').checked = s.launch_at_startup;
     if (el('set-tray') && s.minimize_to_tray !== undefined) el('set-tray').checked = s.minimize_to_tray;
     if (el('set-showpwd') && s.show_password_default !== undefined) el('set-showpwd').checked = s.show_password_default;
-    if (el('set-autolock') && s.auto_lock_secs !== undefined) el('set-autolock').value = String(s.auto_lock_secs);
+    if (el('set-autolock') && s.auto_lock_secs !== undefined) {
+      el('set-autolock').value = String(s.auto_lock_secs);
+      // Start or restart countdown with the actual persisted timeout
+      import('./ui.js').then(m => m.startAutolockCountdown(s.auto_lock_secs)).catch(() => {});
+    }
   } catch (_) { }
 }
 
+// Save settings and restart autolock countdown with new timeout
 export async function saveSettings() {
   if (state.settingsDebounce) clearTimeout(state.settingsDebounce);
   state.settingsDebounce = setTimeout(async () => {
@@ -32,6 +38,8 @@ export async function saveSettings() {
       };
       state.clipSecs = settings.clear_clipboard_secs;
       await vaultCall('save_settings', { settings });
+      // Restart countdown with new timeout value
+      import('./ui.js').then(m => m.startAutolockCountdown(settings.auto_lock_secs)).catch(() => {});
     } catch (_) { showToast('Failed to save settings', 'error'); }
   }, 600);
 }
