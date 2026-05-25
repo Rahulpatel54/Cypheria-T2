@@ -1,0 +1,99 @@
+'use strict';
+
+import { state } from './state.js';
+import { rawInvoke } from './bridge.js';
+
+export function showToast(msg, type = '') {
+  const c = document.getElementById('toast-container');
+  if (!c) return;
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  const ico = type === 'success' ? '✓' : type === 'warning' ? '⚠' : type === 'error' ? '✕' : 'ℹ';
+  const is = document.createElement('span');
+  is.style.opacity = '0.7';
+  is.textContent = ico;
+  const ms = document.createElement('span');
+  ms.textContent = msg;
+  t.appendChild(is);
+  t.appendChild(ms);
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.animation = 'toastOut 0.2s ease forwards';
+    setTimeout(() => t.remove(), 200);
+  }, 3500);
+}
+
+export function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) {
+      console.warn('[Cypheria] fmtDate: invalid timestamp value:', iso);
+      return '—';
+    }
+    return d.toLocaleDateString(navigator.language || undefined, {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+  } catch (e) {
+    console.warn('[Cypheria] fmtDate failed for value:', iso, e);
+    return '—';
+  }
+}
+
+export function makeAvatar(entry, size = 28) {
+  const letter = (entry.emoji || entry.name?.charAt(0) || '?').toUpperCase().slice(0, 2);
+  const color = entry.color || '#8b5cf6';
+  const r = size <= 28 ? 7 : 10;
+  const div = document.createElement('div');
+  div.className = 'site-avatar';
+  div.style.cssText = `width:${size}px;height:${size}px;border-radius:${r}px;background:${color}22;border:1px solid ${color}44;color:${color};font-size:${Math.floor(size * 0.42)}px;`;
+  div.textContent = letter;
+  return div;
+}
+
+export async function copyToClipboard(value, label) {
+  if (!navigator.clipboard) {
+    showToast('Clipboard not available', 'error');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    showToast(`${label} copied`, 'success');
+    const { startClipCountdown } = await import('./ui.js');
+    startClipCountdown();
+  } catch (e) {
+    showToast('Copy failed', 'error');
+  }
+}
+
+export function pwdStrength(pwd) {
+  if (!pwd) return { score: 0, label: '', color: 'var(--text-muted)' };
+  let s = 0;
+  if (pwd.length >= 8) s += 20;
+  if (pwd.length >= 12) s += 10;
+  if (pwd.length >= 16) s += 10;
+  if (pwd.length >= 24) s += 10;
+  if (/[A-Z]/.test(pwd)) s += 15;
+  if (/[a-z]/.test(pwd)) s += 15;
+  if (/[0-9]/.test(pwd)) s += 10;
+  if (/[^A-Za-z0-9]/.test(pwd)) s += 10;
+  s = Math.min(s, 100);
+  if (s < 30) return { score: s, label: 'Very Weak', color: 'var(--color-red)' };
+  if (s < 50) return { score: s, label: 'Weak', color: 'var(--color-red)' };
+  if (s < 65) return { score: s, label: 'Moderate', color: 'var(--color-amber)' };
+  if (s < 80) return { score: s, label: 'Strong', color: 'var(--color-blue)' };
+  return { score: s, label: 'Very Strong', color: 'var(--color-green)' };
+}
+
+export function toggleEye(inputId) {
+  const inp = document.getElementById(inputId);
+  if (inp) inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+export function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+
+export function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}

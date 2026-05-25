@@ -16,19 +16,21 @@ pub async fn unlock_vault(
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<bool, CypheriaError> {
-    let mut pwd_bytes = password.into_bytes();
-    let path = std::path::PathBuf::from(&vault_path);
+    safe_command!({
+        let mut pwd_bytes = password.into_bytes();
+        let path = std::path::PathBuf::from(&vault_path);
 
-    let result = session.unlock(&pwd_bytes, &path).await;
-    pwd_bytes.zeroize();
+        let result = session.unlock(&pwd_bytes, &path).await;
+        pwd_bytes.zeroize();
 
-    match result {
-        Ok(()) => {
-            autolock.bump_activity();
-            Ok(true)
+        match result {
+            Ok(()) => {
+                autolock.bump_activity();
+                Ok(true)
+            }
+            Err(e) => Err(e),
         }
-        Err(e) => Err(e),
-    }
+    })
 }
 
 #[tauri::command]
@@ -56,28 +58,57 @@ pub async fn change_master_password(
         return Err(CypheriaError::InvalidInput("New password must be at least 8 characters".into()));
     }
 
-    // BUG-006 fix: wrap the entire sync closure body in catch_sync_panic!
-    // to prevent a panic inside the password-change logic from bypassing
-    // ZeroizeOnDrop on ActiveKeyStore.
+    // 1. Get current salt and KDF params from session (read-only)
+    let (salt, memory, iterations, parallelism) = session.with_session(|_, vault_store| {
+        Ok((
+            vault_store.header.argon2_salt,
+            vault_store.header.kdf_memory_kb,
+            vault_store.header.kdf_iterations,
+            vault_store.header.kdf_parallelism,
+        ))
+    }).await?;
+
+    // 2. Derive old Master Key in background thread to verify old password
+    let old_bytes_for_kdf = old_bytes.clone();
+    let derived_mk_raw = tokio::task::spawn_blocking(move || {
+        crate::crypto::kdf::derive_master_key_with_params(
+            &old_bytes_for_kdf,
+            &salt,
+            memory,
+            iterations,
+            parallelism,
+        )
+    })
+    .await
+    .map_err(|_| CypheriaError::InternalError("KDF thread panicked".into()))??;
+    let derived_mk = zeroize::Zeroizing::new(derived_mk_raw);
+    old_bytes.zeroize();
+
+    // 3. Generate new salt and derive new Master Key in background
+    let new_salt = crate::crypto::rng::argon2_salt();
+    let new_bytes_for_kdf = new_bytes.clone();
+    let new_salt_for_kdf = new_salt;
+    let new_mk_raw = tokio::task::spawn_blocking(move || {
+        crate::crypto::kdf::derive_master_key(&new_bytes_for_kdf, &new_salt_for_kdf)
+    })
+    .await
+    .map_err(|_| CypheriaError::InternalError("KDF thread panicked".into()))??;
+    let new_mk = zeroize::Zeroizing::new(new_mk_raw);
+    new_bytes.zeroize();
+
+    // 4. Perform the update inside a write lock
     let result = session.with_session_mut(|key_store, vault_store| {
         catch_sync_panic!({
-            use crate::crypto::{kdf, aes, kyber, rng};
-            // 1. Verify old password cryptographically via AES-GCM unwrap
-            let mut derived_mk = kdf::derive_master_key(&old_bytes, &vault_store.header.argon2_salt)?;
-            let unwrap_result = aes::unwrap_key(&derived_mk, &vault_store.header.vk_wrapped_classical);
-            derived_mk.zeroize();
-            unwrap_result.map_err(|_| CypheriaError::AuthFailed)?;
+            use crate::crypto::{aes, kyber, kdf};
+            
+            // Verify old password via AES-GCM unwrap of VK
+            aes::unwrap_key(&derived_mk, &vault_store.header.vk_wrapped_classical)
+                .map_err(|_| CypheriaError::AuthFailed)?;
 
-            // 2. Generate new salt and new Master Key
-            let new_salt = rng::argon2_salt();
-            // Wrap new_mk in Zeroizing so it is wiped on any early return or panic
-            let new_mk_raw = kdf::derive_master_key(&new_bytes, &new_salt)?;
-            let new_mk = zeroize::Zeroizing::new(new_mk_raw);
-
-            // 3. Re-wrap VK with new MK
+            // Re-wrap VK with new MK
             let new_vk_wrapped = aes::wrap_key(&new_mk, key_store.vault_key_bytes())?;
 
-            // 4. Re-generate Kyber keypair and re-wrap VK post-quantum
+            // Re-generate Kyber keypair and re-wrap VK post-quantum
             let kp = kyber::generate_keypair();
             let pub_key = kp.public_key.clone();
             let sec_key = kp.secret_key.clone();
@@ -87,7 +118,7 @@ pub async fn change_master_password(
                 kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
             let kyber_sk_encrypted = aes::encrypt(&new_mk, &sec_key)?;
 
-            // 5. Update header
+            // Update header
             vault_store.header.argon2_salt          = new_salt;
             vault_store.header.vk_wrapped_classical = new_vk_wrapped;
             vault_store.header.kyber_public_key     = pub_key;
@@ -95,17 +126,10 @@ pub async fn change_master_password(
             vault_store.header.kyber_ciphertext     = kyber_ciphertext;
             vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
 
-            // HIGH-003 fix: re-encrypt settings blob from old MK subkey → new MK subkey.
-            // Must happen BEFORE key_store.master_key is updated, so master_key_bytes()
-            // still returns the old key during the decrypt step.
-            // Settings are encrypted under a VK-derived subkey (see settings.rs).
-            // The Vault Key does not change during a password rotation, so the settings
-            // blob requires no re-encryption here.
-
-            // FIX: IMPROVE-001 — MasterKey::new() replaces direct tuple construction.
+            // Update MasterKey in ActiveKeyStore
             key_store.master_key = crate::crypto::keys::MasterKey::new(*new_mk);
 
-            // BUG-005 fix: sync KDF params in the header to current constants.
+            // Sync KDF params to current constants
             vault_store.header.kdf_memory_kb   = kdf::ARGON2_MEMORY_KB;
             vault_store.header.kdf_iterations  = kdf::ARGON2_ITERATIONS;
             vault_store.header.kdf_parallelism = kdf::ARGON2_PARALLELISM;
@@ -113,9 +137,6 @@ pub async fn change_master_password(
             Ok(())
         })
     }).await;
-
-    old_bytes.zeroize();
-    new_bytes.zeroize();
 
     result
 }

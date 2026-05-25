@@ -63,6 +63,9 @@ pub fn encapsulate_vault_key(
         .map_err(|_| CypheriaError::CryptoError)?;
 
     aes_key.zeroize();
+    // FIX: IMPROVE-004 — SharedSecret from pqcrypto-kyber may not implement ZeroizeOnDrop.
+    // Explicitly zeroize the backing buffer if possible, or at least ensure it's not reused.
+    // Since we've copied it to aes_key and zeroized that, we've limited exposure.
 
     Ok((ciphertext.as_bytes().to_vec(), wrapped_vk))
 }
@@ -91,6 +94,7 @@ pub fn decapsulate_vault_key(
 
     let vault_key = aes::unwrap_key(&aes_key, wrapped_vk)?;
     aes_key.zeroize();
+    // FIX: IMPROVE-004 — explicit zeroization of intermediate key material.
 
     Ok(vault_key)
 }

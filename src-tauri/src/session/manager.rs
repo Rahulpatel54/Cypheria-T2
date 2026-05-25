@@ -98,19 +98,30 @@ impl SessionManager {
     where
         F: FnOnce(&ActiveKeyStore, &VaultStore) -> Result<T, CypheriaError>,
     {
-        let state = self.state.read().await;
-        match &*state {
-            SessionState::Unlocked { key_store, vault_store, .. } => f(key_store, vault_store),
-            SessionState::RateLimited { locked_until, .. } => {
-                if Instant::now() < *locked_until {
-                    let remaining = locked_until.duration_since(Instant::now()).as_secs();
-                    Err(CypheriaError::RateLimited(remaining))
-                } else {
-                    Err(CypheriaError::VaultLocked)
+        // First check with read lock
+        {
+            let state = self.state.read().await;
+            match &*state {
+                SessionState::Unlocked { key_store, vault_store, .. } => return f(key_store, vault_store),
+                SessionState::RateLimited { locked_until, .. } => {
+                    if Instant::now() < *locked_until {
+                        let remaining = locked_until.duration_since(Instant::now()).as_secs();
+                        return Err(CypheriaError::RateLimited(remaining));
+                    }
                 }
+                SessionState::Locked => return Err(CypheriaError::VaultLocked),
             }
-            SessionState::Locked => Err(CypheriaError::VaultLocked),
         }
+
+        // If we reached here, it means we were RateLimited but the time has expired.
+        // Transition back to Locked state.
+        let mut state = self.state.write().await;
+        if let SessionState::RateLimited { locked_until, .. } = &*state {
+            if Instant::now() >= *locked_until {
+                *state = SessionState::Locked;
+            }
+        }
+        Err(CypheriaError::VaultLocked)
     }
 
     pub async fn with_session_mut<T, F>(&self, f: F) -> Result<T, CypheriaError>
@@ -120,28 +131,30 @@ impl SessionManager {
         let mut state = self.state.write().await;
         match &mut *state {
             SessionState::Unlocked { ref mut key_store, vault_store, vault_path, .. } => {
-            let result = f(key_store, vault_store)?;
-            // Persist AFTER successful mutation. If persist fails, surface a clear error.
-            if let Err(persist_err) = crate::vault::store::persist_vault(
-                key_store,
-                &vault_store.data,
-                &vault_store.header,
-                vault_path,
-            ).await {
-                eprintln!("[Cypheria] CRITICAL: persist_vault failed: {:?}", persist_err);
-                return Err(CypheriaError::PersistFailed(
-                    format!("Changes were applied in memory but could not be saved to disk. \
-                        WARNING: locking the vault will discard these in-memory changes. \
-                        Error: {}", persist_err)
-                ));
+                let result = f(key_store, vault_store)?;
+                // Persist AFTER successful mutation. If persist fails, surface a clear error.
+                if let Err(persist_err) = crate::vault::store::persist_vault(
+                    key_store,
+                    &vault_store.data,
+                    &vault_store.header,
+                    vault_path,
+                ).await {
+                    eprintln!("[Cypheria] CRITICAL: persist_vault failed: {:?}", persist_err);
+                    return Err(CypheriaError::PersistFailed(
+                        format!("Changes were applied in memory but could not be saved to disk. \
+                            WARNING: locking the vault will discard these in-memory changes. \
+                            Error: {}", persist_err)
+                    ));
+                }
+                Ok(result)
             }
-            Ok(result)
-        }
             SessionState::RateLimited { locked_until, .. } => {
                 if Instant::now() < *locked_until {
                     let remaining = locked_until.duration_since(Instant::now()).as_secs();
                     Err(CypheriaError::RateLimited(remaining))
                 } else {
+                    // Time expired, transition to Locked
+                    *state = SessionState::Locked;
                     Err(CypheriaError::VaultLocked)
                 }
             }

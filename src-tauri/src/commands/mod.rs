@@ -22,11 +22,12 @@
 /// `CypheriaError::InternalError` rather than crashing the process.
 ///
 /// All #[tauri::command] functions MUST use this macro as their outer wrapper.
-/// Do NOT use .await inside the direct body of this macro — use it to wrap
-/// the outer command logic, with async calls made before entering sub-closures.
 #[macro_export]
 macro_rules! safe_command {
     ($body:block) => {
+        // For now, this is a marker macro for command entry points.
+        // Future improvements could include automated logging or 
+        // telemetry here.
         $body
     };
 }

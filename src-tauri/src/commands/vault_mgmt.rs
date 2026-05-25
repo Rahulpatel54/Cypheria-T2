@@ -92,47 +92,45 @@ pub struct VaultMetaView {
 /// vault_name and created_at are stored in plaintext in VaultHeader by design.
 #[tauri::command]
 pub async fn get_vault_meta(vault_path: String) -> Result<VaultMetaView, CypheriaError> {
-    use crate::vault::format::MAGIC;
+    safe_command!({
+        use crate::vault::format::MAGIC;
+        use tokio::io::AsyncReadExt;
+        use tokio::io::AsyncSeekExt;
 
-    let path = std::path::PathBuf::from(&vault_path);
+        let path = std::path::PathBuf::from(&vault_path);
 
-    if !path.exists() {
-        return Err(CypheriaError::VaultNotFound);
-    }
+        if !path.exists() {
+            return Err(CypheriaError::VaultNotFound);
+        }
 
-    let file_bytes = tokio::fs::read(&path).await?;
+        let mut file = tokio::fs::File::open(&path).await?;
+        
+        // Step 1: Verify Magic
+        let mut magic_buf = [0u8; 9];
+        file.read_exact(&mut magic_buf).await.map_err(|_| CypheriaError::VaultCorrupted)?;
+        if magic_buf != MAGIC {
+            return Err(CypheriaError::VaultCorrupted);
+        }
 
-    if !file_bytes.starts_with(MAGIC) {
-        return Err(CypheriaError::VaultCorrupted);
-    }
+        // Step 2: Skip Version (2 bytes)
+        file.seek(std::io::SeekFrom::Current(2)).await?;
 
-    // Layout: MAGIC(9) + VERSION(2) + HEADER_LEN(4) + HEADER(n) + ...
-    let magic_len = MAGIC.len();           // 9
-    let header_len_offset = magic_len + 2; // 11
+        // Step 3: Read Header Len
+        let mut len_buf = [0u8; 4];
+        file.read_exact(&mut len_buf).await.map_err(|_| CypheriaError::VaultCorrupted)?;
+        let header_len = u32::from_le_bytes(len_buf) as usize;
 
-    if file_bytes.len() < header_len_offset + 4 {
-        return Err(CypheriaError::VaultCorrupted);
-    }
+        // Step 4: Read Header
+        let mut header_bytes = vec![0u8; header_len];
+        file.read_exact(&mut header_bytes).await.map_err(|_| CypheriaError::VaultCorrupted)?;
 
-    let header_len = u32::from_le_bytes(
-        file_bytes[header_len_offset..header_len_offset + 4]
-            .try_into()
-            .map_err(|_| CypheriaError::VaultCorrupted)?,
-    ) as usize;
+        let header: VaultHeader = bincode::deserialize(&header_bytes)
+            .map_err(|_| CypheriaError::VaultCorrupted)?;
 
-    let header_start = header_len_offset + 4;
-    let header_end   = header_start + header_len;
-
-    if file_bytes.len() < header_end {
-        return Err(CypheriaError::VaultCorrupted);
-    }
-
-    let header: VaultHeader = bincode::deserialize(&file_bytes[header_start..header_end])
-        .map_err(|_| CypheriaError::VaultCorrupted)?;
-
-    Ok(VaultMetaView {
-        vault_name:     header.vault_name.clone(),
-        created_at:     header.created_at.to_rfc3339(),
-        format_version: header.format_version,
+        Ok(VaultMetaView {
+            vault_name:     header.vault_name.clone(),
+            created_at:     header.created_at.to_rfc3339(),
+            format_version: header.format_version,
+        })
     })
 }

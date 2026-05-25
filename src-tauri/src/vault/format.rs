@@ -1,26 +1,37 @@
-//! .qvault binary file format — version 1.
+//! .qvault binary file format — version 2.
 //!
-//! File layout:
+//! File layout (Version 2):
 //! ┌─────────────────────────────────────────────────┐
 //! │ MAGIC        "CYPHERIA\x01"   (9 bytes)         │
 //! │ VERSION      u16 little-endian (2 bytes)        │
 //! │ HEADER_LEN   u32 little-endian (4 bytes)        │
 //! │ HEADER       bincode(VaultHeader) bytes         │
+//! │ DATA_LEN     u32 little-endian (4 bytes)        │
+//! │ DATA         AES-256-GCM encrypted VaultData    │
 //! │ HMAC         HMAC-SHA256 of all bytes above     │
 //! │               (32 bytes)                        │
+//! └─────────────────────────────────────────────────┘
+//!
+//! File layout (Version 1 — legacy support):
+//! ┌─────────────────────────────────────────────────┐
+//! │ MAGIC        "CYPHERIA\x01"   (9 bytes)         │
+//! │ VERSION      u16 little-endian (2 bytes)        │
+//! │ HEADER_LEN   u32 little-endian (4 bytes)        │
+//! │ HEADER       bincode(VaultHeader) bytes         │
+//! │ HMAC         HMAC-SHA256 of first 4 sections    │
 //! │ DATA_LEN     u32 little-endian (4 bytes)        │
 //! │ DATA         AES-256-GCM encrypted VaultData    │
 //! └─────────────────────────────────────────────────┘
 //!
-//! The HMAC covers everything from MAGIC through the last byte of HEADER.
-//! It is verified with a subkey derived from the Master Key BEFORE any
-//! decryption is attempted, providing early tamper detection.
+//! The HMAC covers everything from MAGIC through the last byte of DATA.
+//! It is verified with a subkey derived from the Master Key.
+//! Version 2 improves integrity by signing the encrypted payload as well.
 
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 
 pub const MAGIC: &[u8] = b"CYPHERIA\x01";
-pub const FORMAT_VERSION: u16 = 1;
+pub const FORMAT_VERSION: u16 = 2;
 
 /// Stored in plaintext in the header section.
 /// Contains everything needed to re-derive keys and verify integrity.
