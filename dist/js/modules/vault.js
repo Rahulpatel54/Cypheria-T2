@@ -1,4 +1,6 @@
 'use strict';
+let _uiMod = null;
+const getUI = () => _uiMod ? Promise.resolve(_uiMod) : import('./ui.js').then(m => { _uiMod = m; return m; });
 
 import { state } from './state.js';
 import { vaultCall } from './bridge.js';
@@ -79,7 +81,7 @@ export function renderDashboard() {
     info.appendChild(n); info.appendChild(u);
     const d = document.createElement('div'); d.className = 'recent-date'; d.textContent = fmtDate(e.updated_at);
     row.appendChild(makeAvatar(e)); row.appendChild(info); row.appendChild(d);
-    row.onclick = () => { navigate('vault'); setTimeout(() => selectEntry(e.id), 60); };
+    row.onclick = () => { getUI().then(m => { m.navigate('vault'); setTimeout(() => selectEntry(e.id), 60); }).catch(() => {}); };
     container.appendChild(row);
   });
 }
@@ -111,7 +113,7 @@ export function renderFavorites() {
     sb.onclick = ev => { ev.stopPropagation(); toggleFavorite(e.id); };
     tdS.appendChild(sb);
     tr.appendChild(tdT); tr.appendChild(tdU); tr.appendChild(tdD); tr.appendChild(tdS);
-    tr.onclick = () => { navigate('vault'); setTimeout(() => selectEntry(e.id), 60); };
+    tr.onclick = () => { getUI().then(m => { m.navigate('vault'); setTimeout(() => selectEntry(e.id), 60); }).catch(() => {}); };
     tbody.appendChild(tr);
   });
 }
@@ -146,25 +148,28 @@ function secDaysSince(iso) {
 }
 
 export async function loadPasswordScores() {
-  // skip if no entries or vault locked
-  if (!state.vaultEntries.length) { state.passwordScores = {}; return; }
+  if (!state.vaultEntries.length || state.auditInProgress) { state.passwordScores = {}; return; }
+  state.auditInProgress = true;
   const scores = {};
   const entries = [...state.vaultEntries];
-  for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-    const batch = entries.slice(i, i + BATCH_SIZE);
-    await Promise.allSettled(batch.map(async e => {
-      try {
-        const pwd = await vaultCall('get_entry_password', { entryId: e.id });
-        scores[e.id] = { pwd, score: secPwdScore(pwd) };
-      } catch (_) {
-        scores[e.id] = { pwd: '', score: 0 };
-      }
-    }));
-    // small yield between batches to avoid blocking the event loop
-    if (i + BATCH_SIZE < entries.length) await new Promise(r => setTimeout(r, 20));
+  try {
+    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+      const batch = entries.slice(i, i + BATCH_SIZE);
+      await Promise.allSettled(batch.map(async e => {
+        try {
+          const pwd = await vaultCall('get_entry_password', { entryId: e.id });
+          scores[e.id] = { pwd, score: secPwdScore(pwd) };
+        } catch (_) {
+          scores[e.id] = { pwd: '', score: 0 };
+        }
+      }));
+      if (i + BATCH_SIZE < entries.length) await new Promise(r => setTimeout(r, 20));
+    }
+    state.passwordScores = scores;
+    renderSecurityPanel();
+  } finally {
+    state.auditInProgress = false;
   }
-  state.passwordScores = scores;
-  renderSecurityPanel();
 }
 
 export function renderSecurityPanel() {
@@ -346,16 +351,16 @@ export function renderSecurityPanel() {
   // Attach click handlers to jump to edit
   // dynamic import of ui.js for navigate — vault.js cannot statically import ui.js
   container.querySelectorAll('.sec-item-row[data-entry-id]').forEach(row => {
-    row.addEventListener('click', () => {
-      const id = row.dataset.entryId;
-      const entry = state.vaultEntries.find(e => e.id === id);
-      if (!entry) return;
-      import('./ui.js').then(m => {
-        m.navigate('vault');
-        setTimeout(() => openEditModal(entry), 80);
-      }).catch(() => {});
-    });
+  row.addEventListener('click', () => {
+    const id = row.dataset.entryId;
+    const entry = state.vaultEntries.find(e => e.id === id);
+    if (!entry) return;
+    getUI().then(m => {
+      m.navigate('vault');
+      setTimeout(() => openEditModal(entry), 80);
+    }).catch(() => {});
   });
+});
 }
 
 function escSecHTML(s) {

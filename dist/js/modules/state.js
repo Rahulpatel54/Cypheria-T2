@@ -5,7 +5,7 @@ export const state = {
   vaultEntries: [],
   vaultNotes: [],
   currentVaultPath: null,
-  currentVaultName: null,        // human-readable vault name shown in titlebar
+  currentVaultName: null,
   selectedEntryId: null,
   lockAttempts: 0,
   lockCooldown: false,
@@ -16,5 +16,6 @@ export const state = {
   confirmCallback: null,
   passwordRevealTimers: new Map(),
   appUnlocked: false,
-  passwordScores: {}
+  passwordScores: {},
+  auditInProgress: false,
 };

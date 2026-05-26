@@ -192,6 +192,22 @@ fn decrypt_vault_data(vault_key: &[u8; 32], blob: &[u8]) -> Result<VaultData, Cy
     bincode::deserialize(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)
 }
 
+pub fn read_settings(
+    vault_key: &[u8; 32],
+    vault_data: &crate::vault::format::VaultData,
+) -> crate::models::settings::Settings {
+    use zeroize::Zeroize;
+    let mut settings_key = [0u8; 32];
+    crate::crypto::kdf::derive_subkey(vault_key, b"SETTINGS_ENCRYPTION_VK", &mut settings_key);
+    let result = crate::crypto::aes::decrypt(&settings_key, &vault_data.settings.payload_encrypted);
+    settings_key.zeroize();
+    match result {
+        Ok(json) => serde_json::from_slice::<crate::models::settings::Settings>(&json)
+            .unwrap_or_default(),
+        Err(_) => crate::models::settings::Settings::default(),
+    }
+}
+
 /// Persist the current vault state to disk.
 ///
 /// Writes in Version 2 format:

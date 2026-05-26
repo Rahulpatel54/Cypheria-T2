@@ -4,7 +4,6 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tauri::State;
-use zeroize::Zeroize;
 use crate::{
     error::CypheriaError,
     session::{manager::SessionManager, autolock::AutoLockTimer},
@@ -63,39 +62,21 @@ pub async fn copy_entry_password_to_clipboard(
         crate::commands::validate_uuid(&entry_id)?;
 
         let (password, timeout_secs) = session
-            .with_session(|key_store, vault_store| {
-                catch_sync_panic!({
-                    let pwd = entry::get_entry_password(
-                        key_store.vault_key_bytes(),
-                        &vault_store.data,
-                        &entry_id,
-                    )?;
-
-                    // Read clipboard timeout from vault settings; fallback 30s if unreadable
-                    let secs: u64 = {
-                        let mut settings_key = [0u8; 32];
-                        crate::crypto::kdf::derive_subkey(
-                            key_store.vault_key_bytes(),
-                            b"SETTINGS_ENCRYPTION_VK",
-                            &mut settings_key,
-                        );
-                        let result = crate::crypto::aes::decrypt(
-                            &settings_key,
-                            &vault_store.data.settings.payload_encrypted,
-                        );
-                        settings_key.zeroize();
-                        match result {
-                            Ok(json) => serde_json::from_slice::<crate::models::settings::Settings>(&json)
-                                .map(|s| s.clear_clipboard_secs)
-                                .unwrap_or(30),
-                            Err(_) => 30,
-                        }
-                    };
-
-                    Ok((pwd, secs))
-                })
-            })
-            .await?;
+    .with_session(|key_store, vault_store| {
+        catch_sync_panic!({
+            let pwd = entry::get_entry_password(
+                key_store.vault_key_bytes(),
+                &vault_store.data,
+                &entry_id,
+            )?;
+            let secs = crate::vault::store::read_settings(
+                key_store.vault_key_bytes(),
+                &vault_store.data,
+            ).clear_clipboard_secs;
+            Ok((pwd, secs))
+        })
+    })
+    .await?;
 
         // Write password to clipboard
         write_password_to_clipboard(&password)?;

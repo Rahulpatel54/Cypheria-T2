@@ -415,43 +415,43 @@ export async function afterUnlock() {
     const { loadNotes }   = await import('./notes.js');
     const { loadSettings } = await import('./settings.js');
     await Promise.all([loadEntries(), loadNotes(), loadSettings()]);
+
+    // Single metadata fetch — reused for all consumers below
+    let vaultName = '';
     try {
       const meta = await rawInvoke('get_vault_meta', { vaultPath: state.currentVaultPath });
-      const name = meta.vault_name || state.currentVaultPath?.split(/[\\/]/).pop().replace('.qvault','') || '';
-      const nameEl = document.getElementById('dash-vault-name');
-      const badge = document.getElementById('dash-vault-badge');
-      if (nameEl) nameEl.textContent = name;
-      if (badge && name) badge.style.display = 'inline-flex';
-    } catch (_) {}
+      vaultName = meta?.vault_name
+        || state.currentVaultPath?.split(/[\\/]/).pop().replace(/\.qvault$/i, '')
+        || '';
+      state.currentVaultName = vaultName;
+    } catch (_) {
+      vaultName = state.currentVaultPath
+        ? state.currentVaultPath.split(/[\\/]/).pop().replace(/\.qvault$/i, '')
+        : 'Vault';
+      state.currentVaultName = vaultName;
+    }
+
+    // Dashboard badge
+    const nameEl = document.getElementById('dash-vault-name');
+    const dashBadge = document.getElementById('dash-vault-badge');
+    if (nameEl) nameEl.textContent = vaultName;
+    if (dashBadge && vaultName) dashBadge.style.display = 'inline-flex';
+
+    // Titlebar badge
+    const badge     = document.getElementById('vault-name-badge');
+    const badgeText = document.getElementById('vault-name-badge-text');
+    if (badge && badgeText && vaultName) {
+      badgeText.textContent = vaultName;
+      badge.style.display   = 'flex';
+    }
+
     import('./vault.js').then(m => m.loadPasswordScores()).catch(() => {});
   } catch (e) {
     console.warn('[Cypheria] Partial load after unlock:', e);
   }
 
-  // Resolve and store vault name, then show the titlebar badge
-  try {
-    if (state.currentVaultPath) {
-      const meta = await rawInvoke('get_vault_meta', { vaultPath: state.currentVaultPath });
-      state.currentVaultName = meta?.vault_name
-        || state.currentVaultPath.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
-    }
-  } catch (_) {
-    // Fall back to filename if meta read fails
-    state.currentVaultName = state.currentVaultPath
-      ? state.currentVaultPath.split(/[\\/]/).pop().replace(/\.qvault$/i, '')
-      : 'Vault';
-  }
-
-  const badge     = document.getElementById('vault-name-badge');
-  const badgeText = document.getElementById('vault-name-badge-text');
-  if (badge && badgeText && state.currentVaultName) {
-    badgeText.textContent = state.currentVaultName;
-    badge.style.display   = 'flex';
-  }
-
   hideLoading();
 
-  // Start autolock countdown using persisted timeout from settings
   try {
     const actualTimeout = parseInt(document.getElementById('set-autolock')?.value || '300');
     const { startAutolockCountdown } = await import('./ui.js');

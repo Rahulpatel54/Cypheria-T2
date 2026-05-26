@@ -14,21 +14,13 @@ pub async fn get_settings(
 ) -> Result<Settings, CypheriaError> {
     safe_command!({
         autolock.bump_activity();
+        // DRY: delegate to shared read_settings helper
         session
             .with_session(|key_store, vault_store| {
-                let mut settings_key = [0u8; 32];
-                crate::crypto::kdf::derive_subkey(
+                Ok(crate::vault::store::read_settings(
                     key_store.vault_key_bytes(),
-                    b"SETTINGS_ENCRYPTION_VK",
-                    &mut settings_key,
-                );
-                let result = crate::crypto::aes::decrypt(
-                    &settings_key,
-                    &vault_store.data.settings.payload_encrypted,
-                );
-                settings_key.zeroize();
-                let plaintext = result?;
-                serde_json::from_slice(&plaintext).or_else(|_| Ok(Settings::default()))
+                    &vault_store.data,
+                ))
             })
             .await
     })

@@ -39,6 +39,9 @@ async function checkInitialState() {
   ]).catch(() => null);
   if (!stored) { showSetupScreen(); return; }
 
+  const canonical = stored;
+  state.currentVaultPath = canonical;
+
  try {
   const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
   const name = meta?.vault_name
@@ -50,6 +53,8 @@ async function checkInitialState() {
   state.currentVaultName = name;
   document.getElementById('lock-vault-name').textContent = name;
 }
+
+  showLockScreen();
 }
 
 async function boot() {
