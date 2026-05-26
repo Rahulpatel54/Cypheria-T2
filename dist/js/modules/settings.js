@@ -83,16 +83,27 @@ export async function changeMasterPassword() {
 export async function exportVault() {
   if (!state._invoke) { showToast('Export requires Tauri backend', 'warning'); return; }
   try {
+    // Build a filesystem-safe dated filename from the current vault name
+    const now      = new Date();
+    const dateStr  = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+    const safeName = (state.currentVaultName || 'vault')
+      .replace(/[^a-zA-Z0-9_\-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+    const defaultFilename = `${safeName}-backup-${dateStr}.qvault`;
+
     const dest = await rawInvoke('plugin:dialog|save', {
       options: {
         title: 'Export Vault Backup',
-        defaultPath: 'cypheria-backup.qvault',
+        defaultPath: defaultFilename,
         filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
       }
     });
     if (!dest) return;
     await vaultCall('export_vault', { destinationPath: dest });
-    showToast('Vault exported successfully', 'success');
+    showToast('Vault exported — ' + defaultFilename, 'success');
   } catch (e) {
     const msg = String(e).replace(/^Error: /, '').slice(0, 120);
     showToast('Export failed: ' + msg, 'error');

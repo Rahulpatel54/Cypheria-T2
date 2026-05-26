@@ -1,4 +1,6 @@
 //! Cypheria — Quantum-Resistant Offline Password Manager
+//! Bundle identifier: com.cypheria.vault
+//! (NOT .app — that suffix conflicts with macOS application bundle extension)
 //! Rust/Tauri backend entry point.
 //!
 //! Registers all Tauri commands and initializes shared application state:

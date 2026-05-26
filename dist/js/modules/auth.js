@@ -165,6 +165,11 @@ export function showLockScreen() {
   state.appUnlocked = false;
 
   state.vaultEntries = [];
+   // Hide vault badge and clear name on lock
+  const dashVaultName = document.getElementById('dash-vault-name');
+  const dashVaultBadge = document.getElementById('dash-vault-badge');
+  if (dashVaultName) dashVaultName.textContent = '';
+  if (dashVaultBadge) dashVaultBadge.style.display = 'none';
   state.vaultNotes = [];
   state.selectedEntryId = null;
 
@@ -215,6 +220,10 @@ export function showLockScreen() {
   document.getElementById('app').classList.remove('visible');
 
   document.getElementById('master-pwd').value = '';
+
+  const badge = document.getElementById('vault-name-badge');
+  if (badge) badge.style.display = 'none';
+  state.currentVaultName = null;
   const unlockBtn = document.getElementById('unlock-btn');
   if (unlockBtn) { unlockBtn.disabled = false; unlockBtn.textContent = 'Unlock'; }
   document.getElementById('lock-error').textContent = '';
@@ -369,12 +378,17 @@ export async function openDifferentVault() {
       state.currentVaultPath = canonical;
       const { persistVaultPath } = await import('./bridge.js');
       await persistVaultPath(canonical);
-      try {
-        const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
-        document.getElementById('lock-vault-name').textContent = meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
-      } catch (_) {
-        document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault', '');
-      }
+        try {
+          const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
+          const name = meta?.vault_name
+            || canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+          document.getElementById('lock-vault-name').textContent = name;
+          state.currentVaultName = name;
+        } catch (_) {
+          const name = canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+          document.getElementById('lock-vault-name').textContent = name;
+          state.currentVaultName = name;
+        }
       document.getElementById('lock-error').textContent = '';
       showToast('Vault loaded — enter your password', 'success');
     } catch (e) { showToast('Could not open vault: ' + String(e).slice(0, 80), 'error'); }
@@ -389,30 +403,56 @@ export async function openDifferentVault() {
   };
 }
 
-// After unlock: load data, start autolock countdown, show app
 export async function afterUnlock() {
   showLoading('Loading vault…');
   document.getElementById('lock-screen').classList.add('hidden');
   document.getElementById('setup-screen').classList.add('hidden');
   document.getElementById('app').classList.add('visible');
   navigate('dashboard');
+
   try {
     const { loadEntries } = await import('./vault.js');
-    const { loadNotes } = await import('./notes.js');
+    const { loadNotes }   = await import('./notes.js');
     const { loadSettings } = await import('./settings.js');
     await Promise.all([loadEntries(), loadNotes(), loadSettings()]);
+    try {
+      const meta = await rawInvoke('get_vault_meta', { vaultPath: state.currentVaultPath });
+      const name = meta.vault_name || state.currentVaultPath?.split(/[\\/]/).pop().replace('.qvault','') || '';
+      const nameEl = document.getElementById('dash-vault-name');
+      const badge = document.getElementById('dash-vault-badge');
+      if (nameEl) nameEl.textContent = name;
+      if (badge && name) badge.style.display = 'inline-flex';
+    } catch (_) {}
     import('./vault.js').then(m => m.loadPasswordScores()).catch(() => {});
   } catch (e) {
     console.warn('[Cypheria] Partial load after unlock:', e);
   }
+
+  // Resolve and store vault name, then show the titlebar badge
+  try {
+    if (state.currentVaultPath) {
+      const meta = await rawInvoke('get_vault_meta', { vaultPath: state.currentVaultPath });
+      state.currentVaultName = meta?.vault_name
+        || state.currentVaultPath.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+    }
+  } catch (_) {
+    // Fall back to filename if meta read fails
+    state.currentVaultName = state.currentVaultPath
+      ? state.currentVaultPath.split(/[\\/]/).pop().replace(/\.qvault$/i, '')
+      : 'Vault';
+  }
+
+  const badge     = document.getElementById('vault-name-badge');
+  const badgeText = document.getElementById('vault-name-badge-text');
+  if (badge && badgeText && state.currentVaultName) {
+    badgeText.textContent = state.currentVaultName;
+    badge.style.display   = 'flex';
+  }
+
   hideLoading();
 
-  // Start autolock countdown using current settings
+  // Start autolock countdown using persisted timeout from settings
   try {
-    const { state } = await import('./state.js');
-    const timeoutSecs = state.clipSecs !== undefined
-      ? parseInt(document.getElementById('set-autolock')?.value || '300')
-      : 300;
     const actualTimeout = parseInt(document.getElementById('set-autolock')?.value || '300');
     const { startAutolockCountdown } = await import('./ui.js');
     startAutolockCountdown(actualTimeout);

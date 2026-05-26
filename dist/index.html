@@ -169,6 +169,32 @@
       <span class="logo-text">cypheria</span>
     </div>
     <div class="title-spacer"></div>
+    <div id="vault-name-badge"
+     title="Current vault file"
+     style="display:none;
+            align-items:center;
+            gap:5px;
+            font-size:11px;
+            font-weight:500;
+            color:var(--text-muted);
+            background:var(--bg-card);
+            border:1px solid var(--border-mid);
+            border-radius:6px;
+            padding:3px 10px;
+            max-width:180px;
+            overflow:hidden;
+            text-overflow:ellipsis;
+            white-space:nowrap;
+            cursor:default;
+            flex-shrink:0;">
+  <svg viewBox="0 0 24 24" width="11" height="11"
+       style="stroke:var(--color-green);fill:none;stroke-width:2.5;
+              stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+  </svg>
+  <span id="vault-name-badge-text"></span>
+</div>
     <div class="title-search" id="title-search-wrap" style="position:absolute;left:50%;transform:translateX(-50%);max-width:380px;width:100%;">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <input type="text" id="search-input" placeholder="Search entries…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
@@ -240,6 +266,10 @@
           <div>
             <div class="page-title">Dashboard</div>
             <div class="page-subtitle">Welcome back — your vault is secure</div>
+            <div id="dash-vault-badge" style="display:none;margin-top:6px;align-items:center;gap:5px;background:var(--accent-dim);border:1px solid var(--border-accent);border-radius:6px;padding:3px 10px;width:fit-content;">
+              <svg viewBox="0 0 24 24" width="11" height="11" style="stroke:var(--accent-light);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span id="dash-vault-name" style="font-size:11px;font-weight:600;color:var(--accent-light);letter-spacing:0.02em;"></span>
+            </div>
           </div>
           <button class="btn btn-primary" id="dash-add-entry">
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -305,7 +335,7 @@
             </div>
           </div>
         </div>
-      </div>
+        </div>
 
       <!-- VAULT -->
       <div class="page" id="page-vault">

@@ -40,24 +40,16 @@ async function checkInitialState() {
   if (!stored) { showSetupScreen(); return; }
 
  try {
-    const canonical = await Promise.race([
-      rawInvoke('open_vault', { vaultPath: stored }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-    ]);
-    state.currentVaultPath = canonical;
-    await persistVaultPath(canonical);
-    try {
-      const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
-      document.getElementById('lock-vault-name').textContent = meta.vault_name || canonical.split(/[\\/]/).pop().replace('.qvault', '');
-    } catch (_) {
-      document.getElementById('lock-vault-name').textContent = canonical.split(/[\\/]/).pop().replace('.qvault', '');
-    }
-    showLockScreen();
-  } catch (_) {
-    await clearPersistedVaultPath();
-    state.currentVaultPath = null;
-    showSetupScreen();
-  }
+  const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
+  const name = meta?.vault_name
+    || canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+  state.currentVaultName = name;
+  document.getElementById('lock-vault-name').textContent = name;
+} catch (_) {
+  const name = canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+  state.currentVaultName = name;
+  document.getElementById('lock-vault-name').textContent = name;
+}
 }
 
 async function boot() {

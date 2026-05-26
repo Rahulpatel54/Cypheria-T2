@@ -5,6 +5,7 @@ export const state = {
   vaultEntries: [],
   vaultNotes: [],
   currentVaultPath: null,
+  currentVaultName: null,        // human-readable vault name shown in titlebar
   selectedEntryId: null,
   lockAttempts: 0,
   lockCooldown: false,
