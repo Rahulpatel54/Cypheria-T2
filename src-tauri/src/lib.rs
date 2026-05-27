@@ -6,7 +6,7 @@
 //! Registers all Tauri commands and initializes shared application state:
 //!   - SessionManager: vault lock/unlock state machine
 //!   - AutoLockTimer: inactivity timer background task
-
+use tauri::Manager;
 use std::sync::Arc;
 
 pub mod error;
