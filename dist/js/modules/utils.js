@@ -66,23 +66,23 @@ export function makeAvatar(entry, size = 28) {
 }
 
 export async function copyToClipboard(value, label) {
-    try {
-        const { vaultCall } = await import('./bridge.js');
-        await vaultCall('copy_text_to_clipboard', { text: value });
+  try {
+    const { vaultCall } = await import('./bridge.js');
+    await vaultCall('copy_text_to_clipboard', { text: value });
+    showToast(`${label} copied`, 'success');
+    const { startClipCountdown } = await import('./ui.js');
+    startClipCountdown();
+  } catch (e) {
+    // Fallback only in browser preview mode (no Tauri backend)
+    if (!window.__TAURI_INTERNALS__?.invoke) {
+      try {
+        await navigator.clipboard.writeText(value);
         showToast(`${label} copied`, 'success');
-        const { startClipCountdown } = await import('./ui.js');
-        startClipCountdown();
-    } catch (e) {
-        // Fallback only in preview mode (no Tauri backend available)
-        if (!window.__TAURI_INTERNALS__?.invoke) {
-            try {
-                await navigator.clipboard.writeText(value);
-                showToast(`${label} copied`, 'success');
-            } catch (_) { showToast('Copy failed', 'error'); }
-        } else {
-            showToast('Copy failed', 'error');
-        }
+      } catch (_) { showToast('Copy failed', 'error'); }
+    } else {
+      showToast('Copy failed', 'error');
     }
+  }
 }
 
 export function pwdStrength(pwd) {

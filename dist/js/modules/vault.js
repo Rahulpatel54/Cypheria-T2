@@ -242,7 +242,7 @@ export async function loadPasswordScores() {
           const enc = new TextEncoder().encode(pwd);
           const hashBuf = await crypto.subtle.digest('SHA-256', enc);
           const pwdHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-          // pwd is not stored — only the hash and score
+          // pwd goes out of scope here; only hash and score are retained
           scores[e.id] = { score, pwdHash, expired: isExpired, daysSince };
         } catch (_) {
           scores[e.id] = { score: 0, pwdHash: null, expired: false, daysSince: 0 };
