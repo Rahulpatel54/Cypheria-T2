@@ -61,20 +61,19 @@ export function makeAvatar(entry, size = 28) {
   const div    = document.createElement('div');
   div.className = 'site-avatar';
   div.style.cssText = `width:${size}px;height:${size}px;border-radius:${r}px;background:${color}22;border:1px solid ${color}44;color:${color};font-size:${Math.floor(size * 0.42)}px;overflow:hidden;`;
-
   div.textContent = letter;
   return div;
 }
 
 export async function copyToClipboard(value, label) {
-    const { vaultCall } = await import('./bridge.js');
     try {
+        const { vaultCall } = await import('./bridge.js');
         await vaultCall('copy_text_to_clipboard', { text: value });
         showToast(`${label} copied`, 'success');
         const { startClipCountdown } = await import('./ui.js');
         startClipCountdown();
     } catch (e) {
-        // Fallback to browser clipboard API in non-Tauri preview mode
+        // Fallback only in preview mode (no Tauri backend available)
         if (!window.__TAURI_INTERNALS__?.invoke) {
             try {
                 await navigator.clipboard.writeText(value);

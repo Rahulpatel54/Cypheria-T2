@@ -135,28 +135,19 @@ function buildPpRow(idx, data) {
         <div class="sp-pattern">${escHTML(pattern)}</div>
       </div>
       <div class="sp-row-actions">
-        <button class="sp-act-btn sp-regen-btn" data-idx="${idx}" title="Regenerate">
+        <button class="sp-act-btn sp-regen-btn" data-idx="${idx}" title="Regenerate" data-action="regen-pp">
           <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </button>
-        <button class="sp-act-btn sp-copy-btn" data-pwd="${escAttrFull(pwd)}" title="Copy">
+        <button class="sp-act-btn sp-copy-btn" data-pwd="${escAttrFull(pwd)}" title="Copy" data-action="copy">
           <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </button>
-        <button class="sp-act-btn sp-use-btn" data-pwd="${escAttrFull(pwd)}" title="Use this">
+        <button class="sp-act-btn sp-use-btn" data-pwd="${escAttrFull(pwd)}" title="Use this" data-action="use">
           <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
       </div>
     </div>`;
 }
 
-window.spPpRegenRow = function (idx) {
-  const rowEl = document.getElementById(`pp-row-${idx}`);
-  if (!rowEl) return;
-  ppData[idx] = genPassphrase();
-  rowEl.classList.add('fading');
-  setTimeout(() => {
-    rowEl.outerHTML = buildPpRow(idx, ppData[idx]);
-  }, 150);
-};
 
 window.spPpCopy = function (btn, pwd) { doCopy(btn, pwd); };
 
@@ -242,7 +233,7 @@ function buildPrRow(idx, data) {
   const { pwd, guide, bits, pattern } = data;
   const id = `pr-row-${idx}`;
   const speakBtn = hasSpeech
-    ? `<button class="sp-speak-btn sp-speak-action" data-guide="${escAttrFull(guide)}" title="Speak aloud"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>`
+    ? `<button class="sp-speak-btn" data-guide="${escAttrFull(guide)}" data-action="speak" title="Speak aloud"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>`
     : '';
   return `
     <div class="sp-row" id="${id}" data-idx="${idx}" data-pwd="${escAttrFull(pwd)}">
@@ -253,13 +244,13 @@ function buildPrRow(idx, data) {
         <div class="sp-pattern">${escHTML(pattern)}</div>
       </div>
       <div class="sp-row-actions">
-        <button class="sp-act-btn sp-pr-regen-btn" data-idx="${idx}" title="Regenerate">
+        <button class="sp-act-btn sp-pr-regen-btn" data-idx="${idx}" title="Regenerate" data-action="regen-pr">
           <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         </button>
-        <button class="sp-act-btn sp-copy-btn" data-pwd="${escAttrFull(pwd)}" title="Copy">
+        <button class="sp-act-btn sp-copy-btn" data-pwd="${escAttrFull(pwd)}" title="Copy" data-action="copy">
           <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </button>
-        <button class="sp-act-btn sp-use-btn" data-pwd="${escAttrFull(pwd)}" title="Use this">
+        <button class="sp-act-btn sp-use-btn" data-pwd="${escAttrFull(pwd)}" title="Use this" data-action="use">
           <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
       </div>
@@ -274,23 +265,6 @@ window.spPrRegenRow = function (idx) {
   prData[idx] = genPronounce();
   rowEl.classList.add('fading');
   setTimeout(() => { rowEl.outerHTML = buildPrRow(idx, prData[idx]); }, 150);
-};
-
-window.spSpeak = function (guide) { speak(guide); };
-
-window.spPpCopyBtn = function(btn) { doCopy(btn, btn.dataset.pwd); };
-window.spUseBtn = function(btn) {
-  usePassword(btn.dataset.pwd);
-  const row = btn.closest('.sp-row');
-  if (row) {
-    const existing = row.querySelector('.sp-sent-label');
-    if (existing) existing.parentNode.removeChild(existing);
-    const lbl = document.createElement('span');
-    lbl.className = 'sp-sent-label';
-    lbl.textContent = '→ Sent to generator';
-    row.querySelector('.sp-row-body').appendChild(lbl);
-    setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
-  }
 };
 
 function renderPrList() {
@@ -446,15 +420,9 @@ function renderMnChips(inputIdx) {
   const pool = MN_CHIP_DATA[inputIdx] || MN_COLORS;
   const shown = [...pool].sort(() => Math.random() - 0.5).slice(0, 4);
   chipRow.innerHTML = shown.map(w =>
-    `<button class="sp-chip" data-input-idx="${inputIdx}" data-word="${escAttrFull(w)}">${escHTML(w)}</button>`
+    `<button class="sp-chip" data-input-idx="${inputIdx}" data-word="${escAttrFull(w)}" data-action="chip">${escHTML(w)}</button>`
   ).join('');
 }
-
-window.spMnChip = function (inputIdx, word) {
-  const inputs = ['mn-word1', 'mn-word2', 'mn-word3'];
-  const el = document.getElementById(inputs[inputIdx]);
-  if (el) { el.value = word; renderMnList(); }
-};
 
 function mnSurpriseMe() {
   document.getElementById('mn-word1').value = pick(MN_COLORS);
@@ -587,51 +555,62 @@ export function wireSmartPanel() {
   const chipRow = document.getElementById('mn-chips');
 
   function handleSpClick(e) {
-    const regenPp  = e.target.closest('.sp-regen-btn');
-    const regenPr  = e.target.closest('.sp-pr-regen-btn');
-    const copyBtn  = e.target.closest('.sp-copy-btn');
-    const useBtn   = e.target.closest('.sp-use-btn');
-    const speakBtn = e.target.closest('.sp-speak-action');
-    const chip     = e.target.closest('.sp-chip');
+  const regenPp  = e.target.closest('[data-action="regen-pp"]');
+  const regenPr  = e.target.closest('[data-action="regen-pr"]');
+  const copyBtn  = e.target.closest('[data-action="copy"]');
+  const useBtn   = e.target.closest('[data-action="use"]');
+  const speakBtn = e.target.closest('[data-action="speak"]');
+  const chip     = e.target.closest('[data-action="chip"]');
 
-    if (regenPp) {
-      const idx = parseInt(regenPp.dataset.idx, 10);
-      const rowEl = document.getElementById(`pp-row-${idx}`);
-      if (!rowEl) return;
-      ppData[idx] = genPassphrase();
-      rowEl.classList.add('fading');
-      setTimeout(() => { rowEl.outerHTML = buildPpRow(idx, ppData[idx]); }, 150);
-    }
-    if (regenPr) {
-      const idx = parseInt(regenPr.dataset.idx, 10);
-      const rowEl = document.getElementById(`pr-row-${idx}`);
-      if (!rowEl) return;
-      prData[idx] = genPronounce();
-      rowEl.classList.add('fading');
-      setTimeout(() => { rowEl.outerHTML = buildPrRow(idx, prData[idx]); }, 150);
-    }
-    if (copyBtn) { doCopy(copyBtn, copyBtn.dataset.pwd); }
-    if (useBtn)  {
-      usePassword(useBtn.dataset.pwd);
-      const row = useBtn.closest('.sp-row');
-      if (row) {
-        const existing = row.querySelector('.sp-sent-label');
-        if (existing) existing.parentNode.removeChild(existing);
-        const lbl = document.createElement('span');
-        lbl.className = 'sp-sent-label';
-        lbl.textContent = '→ Sent to generator';
-        row.querySelector('.sp-row-body').appendChild(lbl);
-        setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
-      }
-    }
-    if (speakBtn) { speak(speakBtn.dataset.guide); }
-    if (chip) {
-      const inputIdx = parseInt(chip.dataset.inputIdx, 10);
-      const inputs = ['mn-word1', 'mn-word2', 'mn-word3'];
-      const el = document.getElementById(inputs[inputIdx]);
-      if (el) { el.value = chip.dataset.word; renderMnList(); }
+  if (regenPp) {
+    const idx = parseInt(regenPp.dataset.idx, 10);
+    const rowEl = document.getElementById(`pp-row-${idx}`);
+    if (!rowEl) return;
+    ppData[idx] = genPassphrase();
+    rowEl.classList.add('fading');
+    setTimeout(() => { rowEl.outerHTML = buildPpRow(idx, ppData[idx]); }, 150);
+  }
+  if (regenPr) {
+    const idx = parseInt(regenPr.dataset.idx, 10);
+    const rowEl = document.getElementById(`pr-row-${idx}`);
+    if (!rowEl) return;
+    prData[idx] = genPronounce();
+    rowEl.classList.add('fading');
+    setTimeout(() => { rowEl.outerHTML = buildPrRow(idx, prData[idx]); }, 150);
+  }
+  if (copyBtn) { doCopy(copyBtn, copyBtn.dataset.pwd); }
+  if (useBtn)  {
+    usePassword(useBtn.dataset.pwd);
+    const row = useBtn.closest('.sp-row');
+    if (row) {
+      const existing = row.querySelector('.sp-sent-label');
+      if (existing) existing.parentNode.removeChild(existing);
+      const lbl = document.createElement('span');
+      lbl.className = 'sp-sent-label';
+      lbl.textContent = '→ Sent to generator';
+      row.querySelector('.sp-row-body').appendChild(lbl);
+      setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
     }
   }
+  if (speakBtn) { speak(speakBtn.dataset.guide); }
+  if (chip) {
+    const inputIdx = parseInt(chip.dataset.inputIdx, 10);
+    const inputs = ['mn-word1', 'mn-word2', 'mn-word3'];
+    const el = document.getElementById(inputs[inputIdx]);
+    if (el) { el.value = chip.dataset.word; renderMnList(); }
+  }
+}
+
+// Attach unified delegated event listeners to list containers
+const ppList = document.getElementById('pp-list');
+const prList = document.getElementById('pr-list');
+const mnList = document.getElementById('mn-list');
+const chipRow = document.getElementById('mn-chips');
+
+ppList?.addEventListener('click', handleSpClick);
+prList?.addEventListener('click', handleSpClick);
+mnList?.addEventListener('click', handleSpClick);
+chipRow?.addEventListener('click', handleSpClick);
 
   ppList?.addEventListener('click', handleSpClick);
   prList?.addEventListener('click', handleSpClick);

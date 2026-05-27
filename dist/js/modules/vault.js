@@ -233,20 +233,21 @@ export async function loadPasswordScores() {
       const batch = entries.slice(i, i + BATCH_SIZE);
       await Promise.allSettled(batch.map(async e => {
         try {
-            const pwd = await vaultCall('get_entry_password', { entryId: e.id });
-            const score = secPwdScore(pwd);
-            const daysSince  = secDaysSince(e.updated_at);
-            const expiryDays = state.expiryDays || 0;
-            const isExpired  = expiryDays > 0 && daysSince > expiryDays;
-            // Hash password for duplicate detection — never store plaintext
-            const enc = new TextEncoder().encode(pwd);
-            const hashBuf = await crypto.subtle.digest('SHA-256', enc);
-            const pwdHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-            scores[e.id] = { score, pwdHash, expired: isExpired, daysSince };
+          const pwd = await vaultCall('get_entry_password', { entryId: e.id });
+          const score = secPwdScore(pwd);
+          const daysSince  = secDaysSince(e.updated_at);
+          const expiryDays = state.expiryDays || 0;
+          const isExpired  = expiryDays > 0 && daysSince > expiryDays;
+          // Hash password for duplicate detection — never store plaintext in state
+          const enc = new TextEncoder().encode(pwd);
+          const hashBuf = await crypto.subtle.digest('SHA-256', enc);
+          const pwdHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+          // pwd is not stored — only the hash and score
+          scores[e.id] = { score, pwdHash, expired: isExpired, daysSince };
         } catch (_) {
-            scores[e.id] = { score: 0, pwdHash: null, expired: false, daysSince: 0 };
+          scores[e.id] = { score: 0, pwdHash: null, expired: false, daysSince: 0 };
         }
-    }));
+      }));
       if (i + BATCH_SIZE < entries.length) await new Promise(r => setTimeout(r, 20));
     }
     state.passwordScores = scores;

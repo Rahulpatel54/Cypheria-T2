@@ -71,7 +71,7 @@ pub async fn change_master_password(
     let new_mk = zeroize::Zeroizing::new(new_mk_raw);
     new_bytes.zeroize();
 
-    // Keep old_bytes alive so the closure can use it for verification
+    // Keep old_bytes alive so the closure can re-derive and verify
     let old_bytes_capture = old_bytes.clone();
     old_bytes.zeroize();
 
