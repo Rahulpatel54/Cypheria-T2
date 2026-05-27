@@ -49,6 +49,7 @@ pub async fn change_master_password(
     new_password: String,
     session: State<'_, Arc<SessionManager>>,
 ) -> Result<(), CypheriaError> {
+    // Validate lengths before any crypto work
     let mut old_bytes = old_password.into_bytes();
     let mut new_bytes = new_password.into_bytes();
 
@@ -58,9 +59,7 @@ pub async fn change_master_password(
         return Err(CypheriaError::InvalidInput("New password must be at least 8 characters".into()));
     }
 
-    // Perf: verify old password by attempting to unwrap VK with current MK —
-    // avoids a full 64MB Argon2id re-derivation since MK is already in session.
-    // Generate new salt and derive new MK in background.
+    // Derive new salt and new MK from new password on a blocking thread
     let new_salt = crate::crypto::rng::argon2_salt();
     let new_bytes_for_kdf = new_bytes.clone();
     let new_salt_for_kdf = new_salt;
@@ -71,17 +70,33 @@ pub async fn change_master_password(
     .map_err(|_| CypheriaError::InternalError("KDF thread panicked".into()))??;
     let new_mk = zeroize::Zeroizing::new(new_mk_raw);
     new_bytes.zeroize();
+
+    // Keep old_bytes alive so the closure can use it for verification
+    let old_bytes_capture = old_bytes.clone();
     old_bytes.zeroize();
 
     let result = session.with_session_mut(|key_store, vault_store| {
         catch_sync_panic!({
             use crate::crypto::{aes, kyber, kdf};
 
-            // Verify old password: try to unwrap VK using the current MK already in session.
-            // This is cryptographically equivalent to re-deriving — if the stored VK
-            // unwraps correctly with the current session MK, the old password was valid.
-            aes::unwrap_key(key_store.master_key_bytes(), &vault_store.header.vk_wrapped_classical)
-                .map_err(|_| CypheriaError::AuthFailed)?;
+            // Re-derive MK from the provided old password and compare to the session key.
+            // This is the authoritative check — without it, any authenticated caller could
+            // change the password to anything without knowing the current one.
+            let old_mk_derived = kdf::derive_master_key_with_params(
+                old_bytes_capture.as_slice(),
+                &vault_store.header.argon2_salt,
+                vault_store.header.kdf_memory_kb,
+                vault_store.header.kdf_iterations,
+                vault_store.header.kdf_parallelism,
+            ).map_err(|_| CypheriaError::KdfError)?;
+
+            let keys_match = old_mk_derived == *key_store.master_key_bytes();
+            let mut z = old_mk_derived;
+            z.zeroize();
+
+            if !keys_match {
+                return Err(CypheriaError::AuthFailed);
+            }
 
             // Re-wrap VK with new MK
             let new_vk_wrapped = aes::wrap_key(&new_mk, key_store.vault_key_bytes())?;
@@ -96,7 +111,7 @@ pub async fn change_master_password(
                 kyber::encapsulate_vault_key(&pub_key, key_store.vault_key_bytes())?;
             let kyber_sk_encrypted = aes::encrypt(&new_mk, &sec_key)?;
 
-            // Update header
+            // Update header with new key material
             vault_store.header.argon2_salt          = new_salt;
             vault_store.header.vk_wrapped_classical = new_vk_wrapped;
             vault_store.header.kyber_public_key     = pub_key;
@@ -104,7 +119,7 @@ pub async fn change_master_password(
             vault_store.header.kyber_ciphertext     = kyber_ciphertext;
             vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
 
-            // Update MasterKey in ActiveKeyStore
+            // Update in-memory MK so subsequent operations use the new key
             key_store.master_key = crate::crypto::keys::MasterKey::new(*new_mk);
 
             // Sync KDF params to current constants

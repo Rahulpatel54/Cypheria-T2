@@ -600,6 +600,7 @@ dependencies = [
  "argon2",
  "bincode",
  "chrono",
+ "dirs",
  "getrandom 0.2.17",
  "hmac",
  "pqcrypto-kyber",

@@ -67,13 +67,41 @@ pub fn run() {
             commands::vault_path::clear_last_vault_path,
             commands::clipboard::copy_entry_password_to_clipboard,
             commands::clipboard::clear_clipboard,
+            commands::clipboard::copy_text_to_clipboard,
         ])
         .setup(move |app| {
-            // Start auto-lock background task (needs AppHandle for event emission)
+            // Start auto-lock background task
             let autolock_clone  = autolock.clone();
             let session_clone   = session.clone();
             let app_handle      = app.handle().clone();
-            autolock_clone.start(session_clone, app_handle);
+            autolock_clone.start(session_clone.clone(), app_handle.clone());
+
+            // Lock-on-blur: watch for window focus loss in the Tauri backend,
+            // not the webview, so it cannot be bypassed by frontend JS crashes.
+            let session_blur = session_clone.clone();
+            let app_blur     = app_handle.clone();
+            app.get_webview_window("main").map(|win| {
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(false) = event {
+                        // Read the lock-on-blur setting from the session if unlocked
+                        let session_ref = session_blur.clone();
+                        let app_ref     = app_blur.clone();
+                        tauri::async_runtime::spawn(async move {
+                            let should_lock = session_ref.with_session(|ks, vs| {
+                                Ok(crate::vault::store::read_settings(
+                                    ks.vault_key_bytes(), &vs.data,
+                                ).lock_on_blur)
+                            }).await.unwrap_or(false);
+
+                            if should_lock {
+                                session_ref.lock().await;
+                                use tauri::Emitter;
+                                let _ = app_ref.emit("vault-locked", ());
+                            }
+                        });
+                    }
+                });
+            });
 
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Regular);

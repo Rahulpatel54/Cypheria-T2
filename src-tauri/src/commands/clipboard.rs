@@ -10,14 +10,7 @@ use crate::{
     vault::entry,
 };
 
-/// Holds a handle to the active clipboard-clear timer so it can be cancelled
-/// when a new password is copied before the previous timer fires.
 pub struct ClipboardTimer(pub Arc<Mutex<Option<JoinHandle<()>>>>);
-
-/// Writes text to clipboard. Attempts to push the sensitive content out of
-/// clipboard history by writing multiple unique noise strings before and after,
-/// making the password a non-recent entry in any clipboard history manager.
-/// The actual password is written last so it is available for immediate paste.
 fn write_password_to_clipboard(text: &str) -> Result<(), CypheriaError> {
     let mut cb = arboard::Clipboard::new()
         .map_err(|_| CypheriaError::InternalError("Clipboard unavailable".into()))?;
@@ -123,6 +116,44 @@ pub async fn clear_clipboard(
         // history, then clear the active clipboard content
         overwrite_and_clear_clipboard().await;
 
+        Ok(())
+    })
+}
+
+#[tauri::command]
+pub async fn copy_text_to_clipboard(
+    text: String,
+    session: State<'_, Arc<SessionManager>>,
+    autolock: State<'_, Arc<AutoLockTimer>>,
+    clip_timer: State<'_, Arc<ClipboardTimer>>,
+) -> Result<(), CypheriaError> {
+    safe_command!({
+        autolock.bump_activity();
+        // Reject if vault is locked to prevent clipboard use without authentication
+        if !session.is_unlocked().await {
+            return Err(CypheriaError::VaultLocked);
+        }
+        write_password_to_clipboard(&text)?;
+
+        // Read clipboard timeout from settings
+        let timeout_secs = session.with_session(|ks, vs| {
+            Ok(crate::vault::store::read_settings(ks.vault_key_bytes(), &vs.data)
+                .clear_clipboard_secs)
+        }).await.unwrap_or(30);
+        let secs = if timeout_secs == 0 { 30 } else { timeout_secs };
+
+        let timer_arc = clip_timer.0.clone();
+        let timer_arc_for_task = clip_timer.0.clone();
+        let mut guard = timer_arc.lock().await;
+        if let Some(old_handle) = guard.take() { old_handle.abort(); }
+        let new_handle = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
+            overwrite_and_clear_clipboard().await;
+            let mut g = timer_arc_for_task.lock().await;
+            *g = None;
+        });
+        *guard = Some(new_handle);
+        drop(guard);
         Ok(())
     })
 }

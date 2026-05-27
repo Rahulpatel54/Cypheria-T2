@@ -62,46 +62,28 @@ export function makeAvatar(entry, size = 28) {
   div.className = 'site-avatar';
   div.style.cssText = `width:${size}px;height:${size}px;border-radius:${r}px;background:${color}22;border:1px solid ${color}44;color:${color};font-size:${Math.floor(size * 0.42)}px;overflow:hidden;`;
 
-  if (entry.website) {
-    try {
-      const url      = entry.website.startsWith('http') ? entry.website : 'https://' + entry.website;
-      const hostname = new URL(url).hostname;
-      // Use DuckDuckGo favicon service — no tracking, works offline if cached, no API key
-      const faviconUrl = `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
-      const img = document.createElement('img');
-      img.width  = size;
-      img.height = size;
-      img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;border-radius:${r - 1}px;display:block;`;
-      img.src = faviconUrl;
-      // On error, fall back to letter avatar — remove img, show text
-      img.onerror = () => {
-        img.remove();
-        div.textContent = letter;
-      };
-      div.appendChild(img);
-      return div;
-    } catch (_) {
-      // Invalid URL — fall through to letter
-    }
-  }
-
   div.textContent = letter;
   return div;
 }
 
 export async function copyToClipboard(value, label) {
-  if (!navigator.clipboard) {
-    showToast('Clipboard not available', 'error');
-    return;
-  }
-  try {
-    await navigator.clipboard.writeText(value);
-    showToast(`${label} copied`, 'success');
-    const { startClipCountdown } = await import('./ui.js');
-    startClipCountdown();
-  } catch (e) {
-    showToast('Copy failed', 'error');
-  }
+    const { vaultCall } = await import('./bridge.js');
+    try {
+        await vaultCall('copy_text_to_clipboard', { text: value });
+        showToast(`${label} copied`, 'success');
+        const { startClipCountdown } = await import('./ui.js');
+        startClipCountdown();
+    } catch (e) {
+        // Fallback to browser clipboard API in non-Tauri preview mode
+        if (!window.__TAURI_INTERNALS__?.invoke) {
+            try {
+                await navigator.clipboard.writeText(value);
+                showToast(`${label} copied`, 'success');
+            } catch (_) { showToast('Copy failed', 'error'); }
+        } else {
+            showToast('Copy failed', 'error');
+        }
+    }
 }
 
 export function pwdStrength(pwd) {

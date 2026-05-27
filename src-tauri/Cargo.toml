@@ -16,6 +16,7 @@ tauri = { version = "2", features = ["macos-private-api"] }
 tauri-plugin-dialog = "2"
 serde       = { version = "1", features = ["derive"] }
 serde_json  = "1"
+dirs = "6"
 
 # Cryptography — classical
 aes-gcm     = { version = "0.10", features = ["aes"] }
