@@ -21,4 +21,5 @@ export const state = {
   passwordScores: {},
   auditInProgress: false,
   expiryDays: 90,
+  lockOnBlur: false,
 };

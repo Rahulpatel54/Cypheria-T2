@@ -17,6 +17,7 @@ export async function loadSettings() {
     if (el('set-showpwd') && s.show_password_default !== undefined) el('set-showpwd').checked = s.show_password_default;
     if (el('set-lock-on-blur') && s.lock_on_blur !== undefined) {
       el('set-lock-on-blur').checked = s.lock_on_blur;
+      state.lockOnBlur = s.lock_on_blur;
     }
     if (el('set-expiry') && s.expiry_days !== undefined) {
       el('set-expiry').value = String(s.expiry_days);
@@ -45,6 +46,7 @@ export async function saveSettings() {
         expiry_days: parseInt(document.getElementById('set-expiry')?.value ?? '90'),
         lock_on_blur: document.getElementById('set-lock-on-blur')?.checked ?? false,
       };
+      state.lockOnBlur = settings.lock_on_blur;
       state.clipSecs = settings.clear_clipboard_secs;
       state.expiryDays = settings.expiry_days ?? 90;
       await vaultCall('save_settings', { settings });

@@ -491,12 +491,11 @@ export function wireActivityListeners() {
     document.addEventListener(evt, bump, { passive: true, capture: true });
   });
   document.addEventListener('visibilitychange', async () => {
-    if (document.hidden) {
-      const lockOnBlur = document.getElementById('set-lock-on-blur')?.checked;
-      if (lockOnBlur) {
-        const { lockVaultUI } = await import('./auth.js');
-        await lockVaultUI();
-      }
-    }
+          if (document.hidden) {
+            if (state.lockOnBlur) {   // ← was: document.getElementById('set-lock-on-blur')?.checked
+              const { lockVaultUI } = await import('./auth.js');
+              await lockVaultUI();
+            }
+          }
   });
 }
