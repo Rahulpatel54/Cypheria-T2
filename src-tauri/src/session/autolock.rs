@@ -58,26 +58,26 @@ impl AutoLockTimer {
         let timer_ref = self.clone();
         tauri::async_runtime::spawn(async move {
             loop {
-                sleep(Duration::from_secs(10)).await; // Poll every 10 seconds
+                sleep(Duration::from_secs(1)).await;
 
-                // Exit if stopped
                 if !timer_ref.running.load(Ordering::Relaxed) {
                     timer_ref.running.store(false, Ordering::Relaxed);
                     break;
                 }
 
-                let now     = now_secs();
-                let last    = timer_ref.last_activity_unix_secs.load(Ordering::Relaxed);
                 let timeout = timer_ref.timeout_secs.load(Ordering::Relaxed);
+                if timeout == 0 {
+                    continue;
+                }
 
-                // Skip if timeout is 0 (disabled)
-                if timeout == 0 { continue; }
+                let now  = now_secs();
+                let last = timer_ref.last_activity_unix_secs.load(Ordering::Relaxed);
 
                 if now.saturating_sub(last) >= timeout && session.is_unlocked().await {
                     session.lock().await;
                     use tauri::Emitter;
                     let _ = app.emit("vault-auto-locked", ());
-                }   
+                }
             }
         });
     }

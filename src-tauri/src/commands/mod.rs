@@ -72,6 +72,8 @@ pub mod settings;
 pub mod vault_mgmt;
 pub mod vault_path;
 pub mod clipboard;
+pub mod reveal;
+
 
 /// Validate that `id` is a well-formed UUID string.
 /// Returns `Err(InvalidInput)` if parsing fails.

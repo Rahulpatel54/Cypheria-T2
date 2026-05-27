@@ -72,7 +72,16 @@ pub async fn export_vault(
             ));
         }
 
-        tokio::fs::copy(&vault_path, &dest).await?;
+        let tmp_dest = dest.with_extension("qvault.tmp");
+        match tokio::fs::copy(&vault_path, &tmp_dest).await {
+            Ok(_) => {},
+            Err(e) => return Err(CypheriaError::IoError(e)),
+        }
+        let rename_result = tokio::fs::rename(&tmp_dest, &dest).await;
+        if rename_result.is_err() {
+            let _ = tokio::fs::remove_file(&tmp_dest).await;
+            rename_result?;
+        }
         Ok(())
     })
 }

@@ -39,6 +39,66 @@ function entropyBadgeHTML(bits) {
   return `<span class="sp-entropy ${cls}">${label}</span>`;
 }
 
+// Issue 3 fix: shared DOM helpers replacing inline HTML strings in row builders
+
+function _entropyMeta(bits) {
+  if (bits < 40) return { cls: 'sp-entropy-weak',   label: `~${bits} bits · Weak` };
+  if (bits < 60) return { cls: 'sp-entropy-fair',   label: `~${bits} bits · Fair` };
+  if (bits < 80) return { cls: 'sp-entropy-strong', label: `~${bits} bits · Strong` };
+  return           { cls: 'sp-entropy-excel',  label: `~${bits} bits · Excellent` };
+}
+
+function _makeActBtn(action, idx, pwd, svgEl) {
+  const btn = document.createElement('button');
+  btn.className = 'sp-act-btn';
+  btn.dataset.action = action;
+  if (idx !== null) btn.dataset.idx = String(idx);
+  if (pwd !== null) btn.dataset.pwd = pwd;
+  btn.title = action === 'copy' ? 'Copy' : action === 'use' ? 'Use this' : 'Regenerate';
+  btn.appendChild(svgEl);
+  return btn;
+}
+
+function _svgRefresh() {
+  const s = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  s.setAttribute('viewBox','0 0 24 24');
+  const p = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  p.setAttribute('points','23 4 23 10 17 10');
+  const pa = document.createElementNS('http://www.w3.org/2000/svg','path');
+  pa.setAttribute('d','M20.49 15a9 9 0 1 1-2.12-9.36L23 10');
+  s.appendChild(p); s.appendChild(pa); return s;
+}
+
+function _svgCopy() {
+  const s = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  s.setAttribute('viewBox','0 0 24 24');
+  const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  r.setAttribute('x','9'); r.setAttribute('y','9'); r.setAttribute('width','13'); r.setAttribute('height','13'); r.setAttribute('rx','2'); r.setAttribute('ry','2');
+  const pa = document.createElementNS('http://www.w3.org/2000/svg','path');
+  pa.setAttribute('d','M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
+  s.appendChild(r); s.appendChild(pa); return s;
+}
+
+function _svgCheck() {
+  const s = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  s.setAttribute('viewBox','0 0 24 24');
+  const p = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+  p.setAttribute('points','20 6 9 17 4 12');
+  s.appendChild(p); return s;
+}
+
+function _svgSpeak() {
+  const s = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  s.setAttribute('viewBox','0 0 24 24'); s.setAttribute('width','11'); s.setAttribute('height','11');
+  const pg = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  pg.setAttribute('points','11 5 6 9 2 9 2 15 6 15 11 19 11 5');
+  const p1 = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p1.setAttribute('d','M19.07 4.93a10 10 0 0 1 0 14.14');
+  const p2 = document.createElementNS('http://www.w3.org/2000/svg','path');
+  p2.setAttribute('d','M15.54 8.46a5 5 0 0 1 0 7.07');
+  s.appendChild(pg); s.appendChild(p1); s.appendChild(p2); return s;
+}
+
 function usePassword(pwd) {
   const out = document.getElementById('gen-output');
   if (out) {
@@ -126,38 +186,34 @@ function genPassphrase() {
 
 function buildPpRow(idx, data) {
   const { pwd, bits, pattern } = data;
-  const id = `pp-row-${idx}`;
-  return `
-    <div class="sp-row" id="${id}" data-idx="${idx}" data-pwd="${escAttrFull(pwd)}">
-      <div class="sp-row-body">
-        <div class="sp-pwd-text">${escHTML(pwd)}</div>
-        ${entropyBadgeHTML(bits)}
-        <div class="sp-pattern">${escHTML(pattern)}</div>
-      </div>
-      <div class="sp-row-actions">
-        <button class="sp-act-btn" title="Regenerate" data-action="regen-pp" data-idx="${idx}">
-          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        </button>
-        <button class="sp-act-btn" data-pwd="${escAttrFull(pwd)}" title="Copy" data-action="copy">
-          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-        <button class="sp-act-btn" data-pwd="${escAttrFull(pwd)}" title="Use this" data-action="use">
-          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-      </div>
-    </div>`;
+  const row = document.createElement('div');
+  row.className = 'sp-row'; row.id = `pp-row-${idx}`; row.dataset.idx = String(idx); row.dataset.pwd = pwd;
+
+  const body = document.createElement('div'); body.className = 'sp-row-body';
+  const pwdEl = document.createElement('div'); pwdEl.className = 'sp-pwd-text'; pwdEl.textContent = pwd;
+  const entEl = document.createElement('span');
+  const { cls: eCls, label: eLabel } = _entropyMeta(bits);
+  entEl.className = `sp-entropy ${eCls}`; entEl.textContent = eLabel;
+  const patEl = document.createElement('div'); patEl.className = 'sp-pattern'; patEl.textContent = pattern;
+  body.appendChild(pwdEl); body.appendChild(entEl); body.appendChild(patEl);
+
+  const actions = document.createElement('div'); actions.className = 'sp-row-actions';
+  actions.appendChild(_makeActBtn('regen-pp', idx, null, _svgRefresh()));
+  actions.appendChild(_makeActBtn('copy', null, pwd, _svgCopy()));
+  actions.appendChild(_makeActBtn('use', null, pwd, _svgCheck()));
+  row.appendChild(body); row.appendChild(actions);
+  return row;
 }
 
 
 function renderPpList() {
   const list = document.getElementById('pp-list');
   if (!list) return;
-  let html = '';
+  list.innerHTML = '';
   for (let i = 0; i < 5; i++) {
     ppData[i] = genPassphrase();
-    html += buildPpRow(i, ppData[i]);
+    list.appendChild(buildPpRow(i, ppData[i]));
   }
-  list.innerHTML = html;
 }
 
 function genSyllable() {
@@ -228,30 +284,36 @@ function genPronounce() {
 
 function buildPrRow(idx, data) {
   const { pwd, guide, bits, pattern } = data;
-  const id = `pr-row-${idx}`;
-  const speakBtn = hasSpeech
-    ? `<button class="sp-speak-btn" data-guide="${escAttrFull(guide)}" data-action="speak" title="⚠ Reads password aloud — use only in private"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg></button>`
-    : '';
-  return `
-    <div class="sp-row" id="${id}" data-idx="${idx}" data-pwd="${escAttrFull(pwd)}">
-      <div class="sp-row-body">
-        <div class="sp-pwd-text">${escHTML(pwd)}</div>
-        ${entropyBadgeHTML(bits)}
-        <div class="sp-pronun" style="display:flex;align-items:center;gap:4px;">${speakBtn}<span style="font-style:italic;">${escHTML(guide)}</span></div>
-        <div class="sp-pattern">${escHTML(pattern)}</div>
-      </div>
-      <div class="sp-row-actions">
-        <button class="sp-act-btn" data-idx="${idx}" title="Regenerate" data-action="regen-pr">
-          <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        </button>
-        <button class="sp-act-btn" data-pwd="${escAttrFull(pwd)}" title="Copy" data-action="copy">
-          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-        <button class="sp-act-btn" data-pwd="${escAttrFull(pwd)}" title="Use this" data-action="use">
-          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-      </div>
-    </div>`;
+  const row = document.createElement('div');
+  row.className = 'sp-row'; row.id = `pr-row-${idx}`; row.dataset.idx = String(idx); row.dataset.pwd = pwd;
+
+  const body = document.createElement('div'); body.className = 'sp-row-body';
+  const pwdEl = document.createElement('div'); pwdEl.className = 'sp-pwd-text'; pwdEl.textContent = pwd;
+  const entEl = document.createElement('span');
+  const { cls: eCls, label: eLabel } = _entropyMeta(bits);
+  entEl.className = `sp-entropy ${eCls}`; entEl.textContent = eLabel;
+
+  const pronDiv = document.createElement('div');
+  pronDiv.className = 'sp-pronun'; pronDiv.style.cssText = 'display:flex;align-items:center;gap:4px;';
+  if (hasSpeech) {
+    const speakBtn = document.createElement('button');
+    speakBtn.className = 'sp-speak-btn'; speakBtn.dataset.guide = guide; speakBtn.dataset.action = 'speak';
+    speakBtn.title = '⚠ Reads password aloud — use only in private';
+    speakBtn.appendChild(_svgSpeak());
+    pronDiv.appendChild(speakBtn);
+  }
+  const guideSpan = document.createElement('span'); guideSpan.style.fontStyle = 'italic'; guideSpan.textContent = guide;
+  pronDiv.appendChild(guideSpan);
+
+  const patEl = document.createElement('div'); patEl.className = 'sp-pattern'; patEl.textContent = pattern;
+  body.appendChild(pwdEl); body.appendChild(entEl); body.appendChild(pronDiv); body.appendChild(patEl);
+
+  const actions = document.createElement('div'); actions.className = 'sp-row-actions';
+  actions.appendChild(_makeActBtn('regen-pr', idx, null, _svgRefresh()));
+  actions.appendChild(_makeActBtn('copy', null, pwd, _svgCopy()));
+  actions.appendChild(_makeActBtn('use', null, pwd, _svgCheck()));
+  row.appendChild(body); row.appendChild(actions);
+  return row;
 }
 
 const prData = [null, null, null, null, null];
@@ -259,12 +321,11 @@ const prData = [null, null, null, null, null];
 function renderPrList() {
   const list = document.getElementById('pr-list');
   if (!list) return;
-  let html = '';
+  list.innerHTML = '';
   for (let i = 0; i < 5; i++) {
     prData[i] = genPronounce();
-    html += buildPrRow(i, prData[i]);
+    list.appendChild(buildPrRow(i, prData[i]));
   }
-  list.innerHTML = html;
 }
 
 function leetEncode(str) {
@@ -359,25 +420,24 @@ function mnPatterns(words) {
 }
 
 function buildMnRow(idx, pwd, name) {
-  const bits = calcEntropy(pwd, 0);
-  const id = `mn-row-${idx}`;
   while (pwd.length < 12) pwd += randInt(10);
-  return `
-    <div class="sp-row" id="${id}" data-idx="${idx}" data-pwd="${escAttrFull(pwd)}">
-      <div class="sp-row-body">
-        <div class="sp-pwd-text">${escHTML(pwd)}</div>
-        ${entropyBadgeHTML(bits)}
-        <div class="sp-pattern">${escHTML(name)}</div>
-      </div>
-      <div class="sp-row-actions">
-        <button class="sp-act-btn sp-copy-btn" data-pwd="${escAttrFull(pwd)}" title="Copy">
-          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        </button>
-        <button class="sp-act-btn sp-use-btn" data-pwd="${escAttrFull(pwd)}" title="Use this">
-          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>
-      </div>
-    </div>`;
+  const bits = calcEntropy(pwd, 0);
+  const row = document.createElement('div');
+  row.className = 'sp-row'; row.id = `mn-row-${idx}`; row.dataset.idx = String(idx); row.dataset.pwd = pwd;
+
+  const body = document.createElement('div'); body.className = 'sp-row-body';
+  const pwdEl = document.createElement('div'); pwdEl.className = 'sp-pwd-text'; pwdEl.textContent = pwd;
+  const entEl = document.createElement('span');
+  const { cls: eCls, label: eLabel } = _entropyMeta(bits);
+  entEl.className = `sp-entropy ${eCls}`; entEl.textContent = eLabel;
+  const patEl = document.createElement('div'); patEl.className = 'sp-pattern'; patEl.textContent = name;
+  body.appendChild(pwdEl); body.appendChild(entEl); body.appendChild(patEl);
+
+  const actions = document.createElement('div'); actions.className = 'sp-row-actions';
+  actions.appendChild(_makeActBtn('copy', null, pwd, _svgCopy()));
+  actions.appendChild(_makeActBtn('use', null, pwd, _svgCheck()));
+  row.appendChild(body); row.appendChild(actions);
+  return row;
 }
 
 function getMnWords() {
@@ -393,12 +453,16 @@ function renderMnList() {
   if (!list) return;
   const words = getMnWords();
   if (!words.length) {
-    list.innerHTML = `<div class="sp-empty-state">✏️ Enter 1–3 hint words above<br>to generate memorable passwords</div>`;
+    list.innerHTML = '';
+    const empty = document.createElement('div'); empty.className = 'sp-empty-state';
+    empty.textContent = '✏️ Enter 1–3 hint words above to generate memorable passwords';
+    list.appendChild(empty);
     return;
   }
+  list.innerHTML = '';
   const patterns = mnPatterns(words);
-  if (!patterns) { list.innerHTML = ''; return; }
-  list.innerHTML = patterns.map((p, i) => buildMnRow(i, p.pwd, p.name)).join('');
+  if (!patterns) return;
+  patterns.forEach((p, i) => list.appendChild(buildMnRow(i, p.pwd, p.name)));
 }
 
 const MN_CHIP_DATA = [MN_COLORS, MN_ANIMALS, MN_PLACES];
@@ -418,25 +482,6 @@ function mnSurpriseMe() {
   document.getElementById('mn-word2').value = pick(MN_ANIMALS);
   document.getElementById('mn-word3').value = pick(MN_PLACES);
   renderMnList();
-}
-
-function escHTML(s) {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function escAttr(s) {
-  return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
-
-function escAttrFull(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
 }
 
 let ppDebounce = null, prDebounce = null, mnDebounce = null;
@@ -550,17 +595,31 @@ export function wireSmartPanel() {
       const idx = parseInt(regenPp.dataset.idx, 10);
       const rowEl = document.getElementById(`pp-row-${idx}`);
       if (!rowEl) return;
+
       ppData[idx] = genPassphrase();
+
+      const newRow = buildPpRow(idx, ppData[idx]);
+
       rowEl.classList.add('fading');
-      setTimeout(() => { rowEl.outerHTML = buildPpRow(idx, ppData[idx]); }, 150);
+
+      setTimeout(() => {
+        rowEl.parentNode && rowEl.parentNode.replaceChild(newRow, rowEl);
+      }, 150);
     }
     if (regenPr) {
       const idx = parseInt(regenPr.dataset.idx, 10);
       const rowEl = document.getElementById(`pr-row-${idx}`);
       if (!rowEl) return;
+
       prData[idx] = genPronounce();
+
+      const newRow = buildPrRow(idx, prData[idx]);
+
       rowEl.classList.add('fading');
-      setTimeout(() => { rowEl.outerHTML = buildPrRow(idx, prData[idx]); }, 150);
+
+      setTimeout(() => {
+        rowEl.parentNode && rowEl.parentNode.replaceChild(newRow, rowEl);
+      }, 150);
     }
     if (copyBtn) { doCopy(copyBtn, copyBtn.dataset.pwd); }
     if (useBtn) {

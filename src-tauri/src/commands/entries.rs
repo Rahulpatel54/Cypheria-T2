@@ -154,6 +154,40 @@ pub async fn toggle_favorite(
     })
 }
 
+// Issue 4 fix: one-use reveal token — password never returned directly over IPC from this path
+#[tauri::command]
+pub async fn request_reveal_token(
+    entry_id: String,
+    session: State<'_, Arc<SessionManager>>,
+    autolock: State<'_, Arc<AutoLockTimer>>,
+    reveal_store: State<'_, Arc<crate::commands::reveal::RevealStore>>,
+) -> Result<String, CypheriaError> {
+    safe_command!({
+        autolock.bump_activity();
+        validate_uuid(&entry_id)?;
+        let password = session
+            .with_session(|key_store, vault_store| {
+                catch_sync_panic!({
+                    entry::get_entry_password(key_store.vault_key_bytes(), &vault_store.data, &entry_id)
+                })
+            })
+            .await?;
+        let token = reveal_store.store(password);
+        Ok(token)
+    })
+}
+
+// Issue 4 fix: consume the one-use token and return the password — token is deleted immediately
+#[tauri::command]
+pub async fn consume_reveal_token(
+    token: String,
+    reveal_store: State<'_, Arc<crate::commands::reveal::RevealStore>>,
+) -> Result<String, CypheriaError> {
+    safe_command!({
+        reveal_store.consume(&token).ok_or(CypheriaError::InvalidInput("Invalid or expired token".into()))
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 #[tauri::command]
 pub async fn update_entry_keep_password(

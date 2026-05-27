@@ -337,16 +337,6 @@ export function renderSecurityPanel() {
     return `<div class="sec-avatar" style="background:${color}22;color:${color};border:1px solid ${color}44">${letter}</div>`;
   }
 
-  function makeSecRow(e, badgeTxt, badgeCls, sub) {
-    return `<div class="sec-item-row" data-entry-id="${e.id}">
-      ${makeSecAvatar(e)}
-      <div class="sec-item-info">
-        <div class="sec-item-name">${escSecHTML(e.name || 'Untitled')}</div>
-        <div class="sec-item-sub">${escSecHTML(sub)}</div>
-      </div>
-      <span class="sec-badge sec-badge-${badgeCls}">${badgeTxt}</span>
-    </div>`;
-  }
 
   // Action list (weak + missing, up to 5)
   const actionRows = weakList.slice(0, 5).map(e => {
@@ -370,83 +360,166 @@ export function renderSecurityPanel() {
     const mo = Math.floor(e._days / 30);
     return makeSecRow(e, mo + 'mo old', 'amber', 'Not updated in ' + mo + ' months');
   }).join('');
+  // Issue 2 fix: build security panel via DOM API — eliminates innerHTML XSS surface
 
-  container.innerHTML = `
-    <div class="sec-score-row">
-      <div class="sec-ring">
-        <svg width="72" height="72" viewBox="0 0 72 72" aria-hidden="true" style="transform:rotate(-90deg)">
-          <circle cx="36" cy="36" r="28" fill="none" stroke="var(--border-mid)" stroke-width="7"/>
-          <circle cx="36" cy="36" r="28" fill="none" stroke="${ringColor}" stroke-width="7"
-            stroke-linecap="round" stroke-dasharray="${ringCirc}"
-            stroke-dashoffset="${ringOffset}" style="transition:stroke-dashoffset 0.6s ease,stroke 0.4s"/>
-        </svg>
-        <div class="sec-ring-center">
-          <span class="sec-ring-num" style="color:${ringColor}">${health}</span>
-          <span class="sec-ring-lbl">score</span>
-        </div>
-      </div>
-      <div class="sec-score-info">
-        <div class="sec-score-label">${label}</div>
-        <div class="sec-score-desc">${descText}</div>
-      </div>
-    </div>
+  // Score row
+  const scoreRow = document.createElement('div');
+  scoreRow.className = 'sec-score-row';
 
-    <div class="sec-bar-grid">
-      <div class="sec-bar-item">
-        <div class="sec-bar-label">Strong <span>${counts.strong}</span></div>
-        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.strong)}%;background:var(--color-green)"></div></div>
-      </div>
-      <div class="sec-bar-item">
-        <div class="sec-bar-label">Moderate <span>${counts.moderate}</span></div>
-        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.moderate)}%;background:var(--color-amber)"></div></div>
-      </div>
-      <div class="sec-bar-item">
-        <div class="sec-bar-label">Weak <span>${counts.weak}</span></div>
-        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.weak)}%;background:var(--color-red)"></div></div>
-      </div>
-      <div class="sec-bar-item">
-        <div class="sec-bar-label">No password <span>${counts.empty}</span></div>
-        <div class="sec-bar-track"><div class="sec-bar-fill" style="width:${pct(counts.empty)}%;background:var(--text-muted)"></div></div>
-      </div>
-    </div>
+  const ringDiv = document.createElement('div');
+  ringDiv.className = 'sec-ring';
+  const ringSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  ringSvg.setAttribute('width', '72'); ringSvg.setAttribute('height', '72');
+  ringSvg.setAttribute('viewBox', '0 0 72 72');
+  ringSvg.setAttribute('aria-hidden', 'true');
+  ringSvg.style.transform = 'rotate(-90deg)';
+  const ringBg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  ringBg.setAttribute('cx','36'); ringBg.setAttribute('cy','36'); ringBg.setAttribute('r','28');
+  ringBg.setAttribute('fill','none'); ringBg.setAttribute('stroke','var(--border-mid)'); ringBg.setAttribute('stroke-width','7');
+  const ringFg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  ringFg.setAttribute('cx','36'); ringFg.setAttribute('cy','36'); ringFg.setAttribute('r','28');
+  ringFg.setAttribute('fill','none'); ringFg.setAttribute('stroke', ringColor); ringFg.setAttribute('stroke-width','7');
+  ringFg.setAttribute('stroke-linecap','round');
+  ringFg.setAttribute('stroke-dasharray', String(ringCirc));
+  ringFg.setAttribute('stroke-dashoffset', String(ringOffset));
+  ringFg.style.transition = 'stroke-dashoffset 0.6s ease,stroke 0.4s';
+  ringSvg.appendChild(ringBg); ringSvg.appendChild(ringFg);
+  const ringCenter = document.createElement('div');
+  ringCenter.className = 'sec-ring-center';
+  const ringNum = document.createElement('span');
+  ringNum.className = 'sec-ring-num'; ringNum.style.color = ringColor; ringNum.textContent = String(health);
+  const ringLbl = document.createElement('span');
+  ringLbl.className = 'sec-ring-lbl'; ringLbl.textContent = 'score';
+  ringCenter.appendChild(ringNum); ringCenter.appendChild(ringLbl);
+  ringDiv.appendChild(ringSvg); ringDiv.appendChild(ringCenter);
 
-    ${weakList.length > 0 ? `
-    <div class="sec-section">
-      <div class="sec-section-title">Needs attention (${Math.min(weakList.length, 5)})</div>
-      <div class="sec-item-list">${actionRows}</div>
-    </div>` : `
-    <div class="sec-section">
-      <div class="sec-item-list"><div class="sec-empty">No weak passwords — nice work!</div></div>
-    </div>`}
+  const scoreInfo = document.createElement('div');
+  scoreInfo.className = 'sec-score-info';
+  const scoreLbl = document.createElement('div');
+  scoreLbl.className = 'sec-score-label'; scoreLbl.textContent = label;
+  const scoreDesc = document.createElement('div');
+  scoreDesc.className = 'sec-score-desc'; scoreDesc.textContent = descText;
+  scoreInfo.appendChild(scoreLbl); scoreInfo.appendChild(scoreDesc);
+  scoreRow.appendChild(ringDiv); scoreRow.appendChild(scoreInfo);
+  container.appendChild(scoreRow);
 
-    ${dupGroups.length > 0 ? `
-    <div class="sec-divider"></div>
-    <div class="sec-section">
-      <div class="sec-section-title">Reused passwords</div>
-      <div class="sec-item-list">${dupRows}</div>
-    </div>` : ''}
+  // Bar grid
+  const barGrid = document.createElement('div');
+  barGrid.className = 'sec-bar-grid';
+  [
+    { label: 'Strong', count: counts.strong, color: 'var(--color-green)' },
+    { label: 'Moderate', count: counts.moderate, color: 'var(--color-amber)' },
+    { label: 'Weak', count: counts.weak, color: 'var(--color-red)' },
+    { label: 'No password', count: counts.empty, color: 'var(--text-muted)' },
+  ].forEach(({ label: bl, count, color: bc }) => {
+    const item = document.createElement('div'); item.className = 'sec-bar-item';
+    const lbl2 = document.createElement('div'); lbl2.className = 'sec-bar-label';
+    lbl2.textContent = bl;
+    const cnt2 = document.createElement('span'); cnt2.textContent = String(count);
+    lbl2.appendChild(cnt2);
+    const track = document.createElement('div'); track.className = 'sec-bar-track';
+    const fill = document.createElement('div'); fill.className = 'sec-bar-fill';
+    fill.style.width = pct(count) + '%'; fill.style.background = bc;
+    track.appendChild(fill); item.appendChild(lbl2); item.appendChild(track);
+    barGrid.appendChild(item);
+  });
+  container.appendChild(barGrid);
 
-    ${staleList.length > 0 ? `
-    <div class="sec-divider"></div>
-    <div class="sec-section">
-      <div class="sec-section-title">Not updated recently</div>
-      <div class="sec-item-list">${staleRows}</div>
-    </div>` : ''}
+  // Helper: build a sec-item-row via DOM
+  function makeSecRow_dom(e, badgeTxt, badgeCls, sub) {
+    const row = document.createElement('div');
+    row.className = 'sec-item-row'; row.dataset.entryId = e.id;
+    const av = document.createElement('div');
+    av.className = 'sec-avatar';
+    av.style.cssText = `background:${e.color||'#8b5cf6'}22;color:${e.color||'#8b5cf6'};border:1px solid ${e.color||'#8b5cf6'}44`;
+    av.textContent = (e.emoji || e.name?.charAt(0) || '?').toUpperCase().slice(0,2);
+    const info = document.createElement('div'); info.className = 'sec-item-info';
+    const nm = document.createElement('div'); nm.className = 'sec-item-name'; nm.textContent = e.name || 'Untitled';
+    const sb2 = document.createElement('div'); sb2.className = 'sec-item-sub'; sb2.textContent = sub;
+    info.appendChild(nm); info.appendChild(sb2);
+    const badge = document.createElement('span');
+    badge.className = `sec-badge sec-badge-${badgeCls}`; badge.textContent = badgeTxt;
+    row.appendChild(av); row.appendChild(info); row.appendChild(badge);
+    return row;
+  }
 
-    <div class="sec-divider"></div>
-    <div class="sec-tip">
-      <svg viewBox="0 0 24 24" width="15" height="15" style="flex-shrink:0;margin-top:1px"><path d="M12 2a7 7 0 0 1 7 7c0 2.5-1.4 4.8-3.5 6.1V17a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-1.9C6.4 13.8 5 11.5 5 9a7 7 0 0 1 7-7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="21" x2="15" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      <span>${escSecHTML(tip)}</span>
-    </div>
-  `;
+  // Needs-attention section
+  const attnSection = document.createElement('div'); attnSection.className = 'sec-section';
+  const attnTitle = document.createElement('div'); attnTitle.className = 'sec-section-title';
+  const attnList = document.createElement('div'); attnList.className = 'sec-item-list';
+  if (weakList.length > 0) {
+    attnTitle.textContent = `Needs attention (${Math.min(weakList.length,5)})`;
+    weakList.slice(0,5).forEach(e => {
+      const isEmpty = e._tier === 'empty';
+      attnList.appendChild(makeSecRow_dom(e,
+        isEmpty ? 'Missing' : 'Weak',
+        isEmpty ? 'gray' : 'red',
+        isEmpty ? 'No password set' : 'Strength: ' + e._score + '/100'
+      ));
+    });
+  } else {
+    attnTitle.textContent = '';
+    const ok = document.createElement('div'); ok.className = 'sec-empty'; ok.textContent = 'No weak passwords — nice work!';
+    attnList.appendChild(ok);
+  }
+  attnSection.appendChild(attnTitle); attnSection.appendChild(attnList);
+  container.appendChild(attnSection);
+
+  // Duplicates section
+  if (dupGroups.length > 0) {
+    const div = document.createElement('div'); div.className = 'sec-divider'; container.appendChild(div);
+    const dupSec = document.createElement('div'); dupSec.className = 'sec-section';
+    const dupTitle = document.createElement('div'); dupTitle.className = 'sec-section-title'; dupTitle.textContent = 'Reused passwords';
+    const dupList = document.createElement('div'); dupList.className = 'sec-item-list';
+    dupGroups.slice(0,4).forEach(g => g.forEach(e => {
+      dupList.appendChild(makeSecRow_dom(e, 'Reused', 'amber',
+        'Shared with ' + (g.length-1) + ' other entr' + (g.length>2?'ies':'y')));
+    }));
+    dupSec.appendChild(dupTitle); dupSec.appendChild(dupList);
+    container.appendChild(dupSec);
+  }
+
+  // Stale section
+  if (staleList.length > 0) {
+    const div2 = document.createElement('div'); div2.className = 'sec-divider'; container.appendChild(div2);
+    const staleSec = document.createElement('div'); staleSec.className = 'sec-section';
+    const staleTitle = document.createElement('div'); staleTitle.className = 'sec-section-title'; staleTitle.textContent = 'Not updated recently';
+    const staleList2 = document.createElement('div'); staleList2.className = 'sec-item-list';
+    staleList.slice(0,4).forEach(e => {
+      const mo = Math.floor(e._days/30);
+      staleList2.appendChild(makeSecRow_dom(e, mo+'mo old', 'amber', 'Not updated in '+mo+' months'));
+    });
+    staleSec.appendChild(staleTitle); staleSec.appendChild(staleList2);
+    container.appendChild(staleSec);
+  }
+
+  // Tip
+  const divTip = document.createElement('div'); divTip.className = 'sec-divider'; container.appendChild(divTip);
+  const tipDiv = document.createElement('div'); tipDiv.className = 'sec-tip';
+  const tipSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  tipSvg.setAttribute('viewBox','0 0 24 24'); tipSvg.setAttribute('width','15'); tipSvg.setAttribute('height','15');
+  tipSvg.style.cssText = 'flex-shrink:0;margin-top:1px';
+  const tipPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+  tipPath.setAttribute('d','M12 2a7 7 0 0 1 7 7c0 2.5-1.4 4.8-3.5 6.1V17a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1v-1.9C6.4 13.8 5 11.5 5 9a7 7 0 0 1 7-7z');
+  tipPath.setAttribute('fill','none'); tipPath.setAttribute('stroke','currentColor'); tipPath.setAttribute('stroke-width','2'); tipPath.setAttribute('stroke-linecap','round');
+  const tipLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+  tipLine.setAttribute('x1','9'); tipLine.setAttribute('y1','21'); tipLine.setAttribute('x2','15'); tipLine.setAttribute('y2','21');
+  tipLine.setAttribute('stroke','currentColor'); tipLine.setAttribute('stroke-width','2'); tipLine.setAttribute('stroke-linecap','round');
+  tipSvg.appendChild(tipPath); tipSvg.appendChild(tipLine);
+  const tipSpan = document.createElement('span'); tipSpan.textContent = tip;
+  tipDiv.appendChild(tipSvg); tipDiv.appendChild(tipSpan);
+  container.appendChild(tipDiv);
 
   // Attach click handlers to jump to edit
   // dynamic import of ui.js for navigate — vault.js cannot statically import ui.js
-  container.querySelectorAll('.sec-item-row[data-entry-id]').forEach(row => {
+  container.querySelectorAll('.sec-item-row').forEach(row => {
   row.addEventListener('click', () => {
     const id = row.dataset.entryId;
+    if (!id) return;
+
     const entry = state.vaultEntries.find(e => e.id === id);
     if (!entry) return;
+
     getUI().then(m => {
       m.navigate('vault');
       setTimeout(() => openEditModal(entry), 80);
@@ -455,11 +528,6 @@ export function renderSecurityPanel() {
 });
 }
 
-function escSecHTML(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
 
 export async function selectEntry(id) {
   state.passwordRevealTimers.forEach((tid) => clearTimeout(tid));

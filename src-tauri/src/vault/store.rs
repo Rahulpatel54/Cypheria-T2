@@ -125,7 +125,17 @@ pub async fn load_and_unlock(
             let vault_data = decrypt_vault_data(&vk_bytes, &file_bytes[data_start..data_end])?;
             hmac_key.zeroize();
             let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
-            Ok((key_store, VaultStore { data: vault_data, header }))
+            let vault_store = VaultStore { data: vault_data, header };
+
+            // Re-persist immediately as V2 so future loads get full-file HMAC coverage
+            if let Err(e) = persist_vault(&key_store, &vault_store.data, &vault_store.header, path).await {
+                eprintln!(
+                    "[Cypheria] V1→V2 migration persist failed (non-fatal): {:?}",
+                    e
+                );
+            }
+
+            Ok((key_store, vault_store))
         }
         2 => {
             // Version 2: HMAC(32) is at the VERY END. Covers everything before it.
