@@ -707,20 +707,21 @@
               <div class="settings-row">
                 <div><div class="settings-row-label">Show password by default</div></div>
                 <label class="toggle"><input type="checkbox" id="set-showpwd"><span class="toggle-slider"></span></label>
-                  <div class="settings-row">
-                    <div>
-                      <div class="settings-row-label">Password expiry reminder</div>
-                      <div class="settings-row-sub">Warn when passwords haven't been changed</div>
-                    </div>
-                    <select class="settings-select" id="set-expiry">
-                      <option value="0">Never</option>
-                      <option value="30">30 days</option>
-                      <option value="60">60 days</option>
-                      <option value="90" selected>90 days</option>
-                      <option value="180">180 days</option>
-                      <option value="365">1 year</option>
-                    </select>
-                  </div>
+              </div>
+              <!-- Password expiry reminder — separate row, not nested -->
+              <div class="settings-row">
+                <div>
+                  <div class="settings-row-label">Password expiry reminder</div>
+                  <div class="settings-row-sub">Warn when passwords haven't been changed</div>
+                </div>
+                <select class="settings-select" id="set-expiry">
+                  <option value="0">Never</option>
+                  <option value="30">30 days</option>
+                  <option value="60">60 days</option>
+                  <option value="90" selected>90 days</option>
+                  <option value="180">180 days</option>
+                  <option value="365">1 year</option>
+                </select>
               </div>
               <div class="settings-section-title" style="margin-top:24px;">Vault</div>
               <div class="settings-row">
