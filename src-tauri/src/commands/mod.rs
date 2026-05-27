@@ -24,12 +24,32 @@
 /// All #[tauri::command] functions MUST use this macro as their outer wrapper.
 #[macro_export]
 macro_rules! safe_command {
-    ($body:block) => {
-        // For now, this is a marker macro for command entry points.
-        // Future improvements could include automated logging or 
-        // telemetry here.
-        $body
-    };
+    ($body:block) => {{
+        use std::panic::{self, AssertUnwindSafe};
+        use $crate::error::CypheriaError;
+
+        #[cfg(debug_assertions)]
+        let _cmd_start = std::time::Instant::now();
+
+        let result = panic::catch_unwind(AssertUnwindSafe(|| $body));
+
+        #[cfg(debug_assertions)]
+        eprintln!("[Cypheria] command completed in {:.2}ms", _cmd_start.elapsed().as_secs_f64() * 1000.0);
+
+        result.unwrap_or_else(|payload| {
+            let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = payload.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic payload".to_string()
+            };
+            eprintln!("[Cypheria] PANIC caught in command entry point: {msg}");
+            Err(CypheriaError::InternalError(
+                "An unexpected internal error occurred".to_string(),
+            ))
+        })
+    }};
 }
 
 #[macro_export]

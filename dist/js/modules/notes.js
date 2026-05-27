@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { vaultCall } from './bridge.js';
 import { showToast, fmtDate, openModal, closeModal } from './utils.js';
 import { confirmDelete } from './vault.js';
+let _noteDirty = false;
 
 export async function loadNotes() {
   try {
@@ -38,6 +39,7 @@ export function renderNotes() {
 }
 
 export async function openNoteModal(note = null) {
+  _noteDirty = false;
   document.getElementById('note-id').value = note?.id || '';
   document.getElementById('note-title').value = note?.title || '';
   document.getElementById('note-content').value = '';
@@ -53,14 +55,27 @@ export async function openNoteModal(note = null) {
         'Could not load note content: ' + String(e).replace(/^Error: /, '').slice(0, 120);
     }
   }
+
+  // Mark dirty on any input change after modal is populated
+  const markDirty = () => { _noteDirty = true; };
+  const titleEl   = document.getElementById('note-title');
+  const contentEl = document.getElementById('note-content');
+  // Remove any previous listeners by cloning (keeps modal lightweight)
+  const newTitle   = titleEl.cloneNode(true);
+  const newContent = contentEl.cloneNode(true);
+  titleEl.replaceWith(newTitle);
+  contentEl.replaceWith(newContent);
+  newTitle.addEventListener('input', markDirty);
+  newContent.addEventListener('input', markDirty);
+
   openModal('modal-note');
 }
 
 export async function saveNote() {
-  const id = document.getElementById('note-id').value || null;
-  const title = document.getElementById('note-title').value.trim();
+  const id      = document.getElementById('note-id').value || null;
+  const title   = document.getElementById('note-title').value.trim();
   const content = document.getElementById('note-content').value;
-  const errEl = document.getElementById('note-error');
+  const errEl   = document.getElementById('note-error');
   if (errEl) errEl.textContent = '';
 
   if (content.length > 1048576) {
@@ -71,9 +86,16 @@ export async function saveNote() {
   const btn = document.getElementById('btn-note-save'); if (btn) btn.disabled = true;
   try {
     await vaultCall('save_note', { noteId: id, input: { title, content } });
+    _noteDirty = false;
     closeModal('modal-note');
     await loadNotes();
     showToast(id ? 'Note updated' : 'Note saved', 'success');
   } catch (e) { if (errEl) errEl.textContent = String(e).replace(/^Error: /, '').slice(0, 120); }
   finally { if (btn) btn.disabled = false; }
 }
+
+// getNoteIsDirty — allows navigation guard in ui.js to check before leaving
+export function getNoteIsDirty() { return _noteDirty; }
+
+// discardNoteChanges — called when user confirms discard on navigation away
+export function discardNoteChanges() { _noteDirty = false; }

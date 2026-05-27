@@ -3,12 +3,8 @@
 import { state } from './state.js';
 import { rawInvoke, persistVaultPath, clearPersistedVaultPath } from './bridge.js';
 import { showToast, closeModal, openModal, toggleEye, pwdStrength, makeAvatar } from './utils.js';
-import { 
-  renderVaultTable, renderDashboard, renderFavorites, 
-  loadEntries, openAddModal, saveNewEntry, saveEditEntry,
-  selectEntry
-} from './vault.js';
-import { loadNotes, renderNotes, openNoteModal, saveNote } from './notes.js';
+import { renderVaultTable, renderDashboard, renderFavorites, loadEntries, openAddModal, saveNewEntry, saveEditEntry, selectEntry, wireBulkToolbar, clearBulkSelection } from './vault.js';
+import { loadNotes, renderNotes, openNoteModal, saveNote, getNoteIsDirty, discardNoteChanges } from './notes.js';
 // (removed — loadPasswordScores called via dynamic import to avoid circular dep)
 import { generatePassword, copGenPwd } from './generator.js';
 import { 
@@ -16,6 +12,8 @@ import {
   tryUnlock, openDifferentVault, lockVaultUI 
 } from './auth.js';
 import { saveSettings, changeMasterPassword, exportVault, switchSettingsTab } from './settings.js';
+// Import picker wiring from vault module
+import { wirePickerEvents } from './vault.js';
 
 export function showLoading(msg = 'Loading…') {
   const el = document.getElementById('loading-msg');
@@ -30,6 +28,30 @@ export function hideLoading() {
 }
 
 export function navigate(page) {
+  // Guard: warn if navigating away from an open note with unsaved changes
+  const noteModal = document.getElementById('modal-note');
+  if (noteModal && noteModal.classList.contains('open') && getNoteIsDirty()) {
+    // Show inline confirmation inside the modal rather than a blocking dialog
+    const errEl = document.getElementById('note-error');
+    if (errEl) {
+      errEl.style.color = 'var(--color-amber)';
+      errEl.textContent = 'You have unsaved changes. Save or ';
+      const discard = document.createElement('span');
+      discard.textContent = 'discard and leave';
+      discard.style.cssText = 'cursor:pointer;text-decoration:underline;color:var(--color-amber);';
+      discard.onclick = () => {
+        discardNoteChanges();
+        errEl.textContent = '';
+        errEl.style.color = '';
+        noteModal.classList.remove('open');
+        navigate(page);
+      };
+      errEl.appendChild(discard);
+    }
+    return; // Abort navigation until user decides
+  }
+
+  if (page !== 'vault') clearBulkSelection();
   const res = document.getElementById('search-results');
   if (res) res.classList.remove('open');
   const input = document.getElementById('search-input');
@@ -96,6 +118,9 @@ export function startClipCountdown() {
   const s = state.clipSecs || 30;
   let rem = s;
   cnt.textContent = rem;
+  const toastContainer = document.getElementById('toast-container');
+  const toastCount = toastContainer ? toastContainer.children.length : 0;
+  ind.style.bottom = toastCount > 0 ? (20 + toastCount * 52) + 'px' : '20px';
   ind.style.display = 'block';
 
   state.clipInterval = setInterval(() => {
@@ -132,20 +157,28 @@ export function startAutolockCountdown(timeoutSecs) {
     return;
   }
   _autolockDeadline = Date.now() + timeoutSecs * 1000;
-  el.style.display = '';
+  el.style.display = 'none';
 
   function tick() {
     const remaining = Math.max(0, Math.ceil((_autolockDeadline - Date.now()) / 1000));
     const m = Math.floor(remaining / 60);
     const s = remaining % 60;
     val.textContent = `${m}:${String(s).padStart(2, '0')}`;
-    if (remaining <= 30) {
-      val.style.color = 'var(--color-red)';
-    } else if (remaining <= 60) {
-      val.style.color = 'var(--color-amber)';
+
+    // Only show the countdown widget in the final 60 seconds
+    if (remaining <= 60) {
+      el.style.display = '';
+      if (remaining <= 30) {
+        val.style.color = 'var(--color-red)';
+      } else {
+        val.style.color = 'var(--color-amber)';
+      }
     } else {
+      // Hide but keep the interval running so it appears at the right moment
+      el.style.display = 'none';
       val.style.color = 'var(--accent-light)';
     }
+
     if (remaining <= 0) {
       clearAutolockCountdown();
       import('./auth.js').then(async m => { await m.lockVaultUI(); }).catch(() => {});
@@ -360,7 +393,7 @@ document.getElementById('btn-confirm-action')?.addEventListener('click', async (
   });
 
   // Settings changes
-  ['set-startup', 'set-tray', 'set-autolock', 'set-clipboard', 'set-showpwd'].forEach(id => {
+  ['set-startup', 'set-tray', 'set-autolock', 'set-clipboard', 'set-showpwd', 'set-expiry', 'set-lock-on-blur'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', saveSettings);
   });
 
@@ -399,6 +432,53 @@ document.getElementById('btn-confirm-action')?.addEventListener('click', async (
   if (!window.__TAURI_INTERNALS__?.isTauriDevTools) {
     document.addEventListener('contextmenu', e => e.preventDefault());
   }
+  wirePickerEvents();
+  wireBulkToolbar();
+  document.addEventListener('keydown', async e => {
+    // Only active when vault page is visible and no modal is open and no input is focused
+    const vaultPage = document.getElementById('page-vault');
+    if (!vaultPage?.classList.contains('active')) return;
+    if (document.querySelector('.modal-overlay.open')) return;
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+    const rows    = [...document.querySelectorAll('#vault-tbody tr[id^="row-"]')];
+    if (!rows.length) return;
+    const current = rows.findIndex(r => r.id === 'row-' + state.selectedEntryId);
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = rows[Math.min(current + 1, rows.length - 1)];
+      if (next) { next.scrollIntoView({ block: 'nearest' }); selectEntry(next.id.replace('row-', '')); }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = rows[Math.max(current - 1, 0)];
+      if (prev) { prev.scrollIntoView({ block: 'nearest' }); selectEntry(prev.id.replace('row-', '')); }
+    } else if (e.key === 'Enter' && state.selectedEntryId) {
+      // Open edit modal for selected entry
+      const entry = state.vaultEntries.find(en => en.id === state.selectedEntryId);
+      if (entry) { const { openEditModal } = await import('./vault.js'); openEditModal(entry); }
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedEntryId && !state.selectedEntryIds.size) {
+      e.preventDefault();
+      const entry = state.vaultEntries.find(en => en.id === state.selectedEntryId);
+      if (entry) { const { confirmDelete } = await import('./vault.js'); confirmDelete('entry', entry.id, entry.name); }
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'c' && state.selectedEntryId) {
+      // Ctrl+C copies username (not password — intentional: password requires explicit action)
+      e.preventDefault();
+      const entry = state.vaultEntries.find(en => en.id === state.selectedEntryId);
+      if (entry?.username) { const { copyToClipboard } = await import('./utils.js'); copyToClipboard(entry.username, 'Username'); }
+    } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+      // Ctrl+A selects all visible entries
+      e.preventDefault();
+      rows.forEach(r => state.selectedEntryIds.add(r.id.replace('row-', '')));
+      const { updateBulkToolbar: ubt } = await import('./vault.js');
+      // updateBulkToolbar is not exported yet — use renderVaultTable to refresh classes
+      const { renderVaultTable: rvt } = await import('./vault.js');
+      rvt();
+      document.getElementById('bulk-toolbar')?.classList.add('visible');
+      document.getElementById('bulk-count-label').textContent = `${rows.length} entries selected`;
+    }
+  });
 }
 
 // Wire user-activity events to reset the autolock countdown on interaction
@@ -409,5 +489,14 @@ export function wireActivityListeners() {
   };
   ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel'].forEach(evt => {
     document.addEventListener(evt, bump, { passive: true, capture: true });
+  });
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+      const lockOnBlur = document.getElementById('set-lock-on-blur')?.checked;
+      if (lockOnBlur) {
+        const { lockVaultUI } = await import('./auth.js');
+        await lockVaultUI();
+      }
+    }
   });
 }

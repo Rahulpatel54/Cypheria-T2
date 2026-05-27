@@ -7,6 +7,8 @@ export const state = {
   currentVaultPath: null,
   currentVaultName: null,
   selectedEntryId: null,
+  selectedEntryIds: new Set(),
+  lastClickedEntryId: null,
   lockAttempts: 0,
   lockCooldown: false,
   clipSecs: 30,
@@ -18,4 +20,5 @@ export const state = {
   appUnlocked: false,
   passwordScores: {},
   auditInProgress: false,
+  expiryDays: 90,
 };

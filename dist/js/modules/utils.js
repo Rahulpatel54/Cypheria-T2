@@ -17,9 +17,23 @@ export function showToast(msg, type = '') {
   t.appendChild(is);
   t.appendChild(ms);
   c.appendChild(t);
+
+  // Push clip indicator up so it clears the new toast
+  const ind = document.getElementById('clip-indicator');
+  if (ind && ind.style.display !== 'none') {
+    ind.style.bottom = (20 + c.children.length * 52) + 'px';
+  }
+
   setTimeout(() => {
     t.style.animation = 'toastOut 0.2s ease forwards';
-    setTimeout(() => t.remove(), 200);
+    setTimeout(() => {
+      t.remove();
+      // Reposition clip indicator back down as toasts leave
+      if (ind && ind.style.display !== 'none') {
+        const remaining = c.children.length;
+        ind.style.bottom = remaining > 0 ? (20 + remaining * 52) + 'px' : '20px';
+      }
+    }, 200);
   }, 3500);
 }
 
@@ -42,11 +56,35 @@ export function fmtDate(iso) {
 
 export function makeAvatar(entry, size = 28) {
   const letter = (entry.emoji || entry.name?.charAt(0) || '?').toUpperCase().slice(0, 2);
-  const color = entry.color || '#8b5cf6';
-  const r = size <= 28 ? 7 : 10;
-  const div = document.createElement('div');
+  const color  = entry.color || '#8b5cf6';
+  const r      = size <= 28 ? 7 : 10;
+  const div    = document.createElement('div');
   div.className = 'site-avatar';
-  div.style.cssText = `width:${size}px;height:${size}px;border-radius:${r}px;background:${color}22;border:1px solid ${color}44;color:${color};font-size:${Math.floor(size * 0.42)}px;`;
+  div.style.cssText = `width:${size}px;height:${size}px;border-radius:${r}px;background:${color}22;border:1px solid ${color}44;color:${color};font-size:${Math.floor(size * 0.42)}px;overflow:hidden;`;
+
+  if (entry.website) {
+    try {
+      const url      = entry.website.startsWith('http') ? entry.website : 'https://' + entry.website;
+      const hostname = new URL(url).hostname;
+      // Use DuckDuckGo favicon service — no tracking, works offline if cached, no API key
+      const faviconUrl = `https://icons.duckduckgo.com/ip3/${hostname}.ico`;
+      const img = document.createElement('img');
+      img.width  = size;
+      img.height = size;
+      img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain;border-radius:${r - 1}px;display:block;`;
+      img.src = faviconUrl;
+      // On error, fall back to letter avatar — remove img, show text
+      img.onerror = () => {
+        img.remove();
+        div.textContent = letter;
+      };
+      div.appendChild(img);
+      return div;
+    } catch (_) {
+      // Invalid URL — fall through to letter
+    }
+  }
+
   div.textContent = letter;
   return div;
 }

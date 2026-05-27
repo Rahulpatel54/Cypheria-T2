@@ -8,6 +8,8 @@ pub struct Settings {
     pub auto_lock_secs:        u64,
     pub show_password_default: bool,
     pub clear_clipboard_secs:  u64,
+    pub lock_on_blur: bool,
+    pub expiry_days: u64,
 }
 
 impl Default for Settings {
@@ -19,6 +21,8 @@ impl Default for Settings {
             auto_lock_secs:        300,
             show_password_default: false,
             clear_clipboard_secs:  30,
+            lock_on_blur: false,
+            expiry_days: 90,
         }
     }
 }

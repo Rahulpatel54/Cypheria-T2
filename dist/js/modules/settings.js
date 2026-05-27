@@ -15,6 +15,13 @@ export async function loadSettings() {
     if (el('set-startup') && s.launch_at_startup !== undefined) el('set-startup').checked = s.launch_at_startup;
     if (el('set-tray') && s.minimize_to_tray !== undefined) el('set-tray').checked = s.minimize_to_tray;
     if (el('set-showpwd') && s.show_password_default !== undefined) el('set-showpwd').checked = s.show_password_default;
+    if (el('set-lock-on-blur') && s.lock_on_blur !== undefined) {
+      el('set-lock-on-blur').checked = s.lock_on_blur;
+    }
+    if (el('set-expiry') && s.expiry_days !== undefined) {
+      el('set-expiry').value = String(s.expiry_days);
+      import('./state.js').then(m => { m.state.expiryDays = s.expiry_days; });
+    }
     if (el('set-autolock') && s.auto_lock_secs !== undefined) {
       el('set-autolock').value = String(s.auto_lock_secs);
       // Start or restart countdown with the actual persisted timeout
@@ -35,8 +42,11 @@ export async function saveSettings() {
         auto_lock_secs: parseInt(document.getElementById('set-autolock')?.value ?? '300'),
         show_password_default: document.getElementById('set-showpwd')?.checked ?? false,
         clear_clipboard_secs: parseInt(document.getElementById('set-clipboard')?.value ?? '30'),
+        expiry_days: parseInt(document.getElementById('set-expiry')?.value ?? '90'),
+        lock_on_blur: document.getElementById('set-lock-on-blur')?.checked ?? false,
       };
       state.clipSecs = settings.clear_clipboard_secs;
+      state.expiryDays = settings.expiry_days ?? 90;
       await vaultCall('save_settings', { settings });
       // Restart countdown with new timeout value
       import('./ui.js').then(m => m.startAutolockCountdown(settings.auto_lock_secs)).catch(() => {});

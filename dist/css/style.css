@@ -869,7 +869,24 @@ textarea.form-input{resize:vertical;min-height:72px;}
 @keyframes toastOut{from{opacity:1;}to{opacity:0;transform:translateY(8px);}}
 
 /* clipboard indicator */
-#clip-indicator{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border-accent);border-radius:var(--radius-sm);padding:8px 18px;font-size:12px;color:var(--accent-light);z-index:2000;display:none;box-shadow:var(--glow-purple-sm);white-space:nowrap;}
+#clip-indicator {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  padding: 8px 18px;
+  font-size: 12px;
+  color: var(--accent-light);
+  z-index: 2000;
+  display: none;
+  box-shadow: var(--glow-purple-sm);
+  white-space: nowrap;
+  /* Shift up when toast container has children so they don't collide */
+  transition: bottom 0.2s ease;
+}
 
 /* search results */
 .search-results{position:absolute;top:calc(var(--titlebar-height) + 4px);left:50%;transform:translateX(-50%);width:400px;background:var(--bg-modal);border:1px solid var(--border-accent);border-radius:var(--radius-md);box-shadow:var(--glow-purple-md);z-index:800;display:none;max-height:320px;overflow-y:auto;}
@@ -961,3 +978,54 @@ textarea.form-input{resize:vertical;min-height:72px;}
 .sec-tip svg { stroke: var(--accent-light); flex-shrink: 0; margin-top: 1px; }
 .setup-nav{display:flex;gap:8px;margin-top:20px;}
 .setup-nav .btn:last-child{flex:1;justify-content:center;}
+
+.color-swatch {
+  width: 20px; height: 20px; border-radius: 50%;
+  cursor: pointer; border: 2px solid transparent;
+  transition: transform 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+}
+.color-swatch:hover { transform: scale(1.2); }
+.color-swatch.active { border-color: #fff; box-shadow: 0 0 0 1px rgba(255,255,255,0.4); }
+
+.emoji-opt {
+  font-size: 20px; cursor: pointer; padding: 4px;
+  border-radius: 6px; transition: background 0.1s;
+  line-height: 1; display: inline-block;
+}
+.emoji-opt:hover { background: var(--accent-dim); }
+
+#add-emoji-picker, #edit-emoji-picker { display: none; }
+#add-emoji-picker.open, #edit-emoji-picker.open { display: flex; }
+
+#bulk-toolbar {
+  display: none; align-items: center; gap: 10px;
+  padding: 8px 20px;
+  background: var(--accent-dim);
+  border-bottom: 1px solid var(--border-accent);
+  flex-shrink: 0;
+  animation: toastIn 0.15s ease;
+}
+#bulk-toolbar.visible { display: flex; }
+.bulk-count {
+  font-size: 12px; font-weight: 600; color: var(--accent-light); flex: 1;
+}
+
+/* Multi-selected row highlight */
+tbody tr.bulk-selected { background: rgba(139,92,246,0.08); }
+tbody tr.bulk-selected:hover { background: rgba(139,92,246,0.14); }
+
+/* Quick-copy username button revealed on vault row hover */
+.td-title-wrap { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.quick-copy-user {
+  opacity: 0; pointer-events: none;
+  padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600;
+  background: var(--bg-panel); border: 1px solid var(--border-mid);
+  color: var(--text-muted); cursor: pointer;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap; flex-shrink: 0;
+}
+tbody tr:hover .quick-copy-user {
+  opacity: 1; pointer-events: auto;
+}
+.quick-copy-user:hover { color: var(--accent-light); border-color: var(--border-accent); background: var(--accent-dim); }

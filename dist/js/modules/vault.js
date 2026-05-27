@@ -22,39 +22,105 @@ export async function loadEntries() {
 export function renderVaultTable() {
   const sort = document.getElementById('vault-sort')?.value || 'name';
   const sorted = [...state.vaultEntries].sort((a, b) => {
-    if (sort === 'name') return (a.name || '').localeCompare(b.name || '');
+    if (sort === 'name')     return (a.name || '').localeCompare(b.name || '');
     if (sort === 'username') return (a.username || '').localeCompare(b.username || '');
-    if (sort === 'date') return (b.updated_at || '').localeCompare(a.updated_at || '');
+    if (sort === 'date')     return (b.updated_at || '').localeCompare(a.updated_at || '');
     return 0;
   });
+
   const tbody = document.getElementById('vault-tbody');
   const empty = document.getElementById('vault-empty');
   if (!tbody) return;
-  tbody.innerHTML = '';
-  if (!sorted.length) { if (empty) empty.style.display = ''; return; }
+
+  if (!sorted.length) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = '';
+    return;
+  }
   if (empty) empty.style.display = 'none';
-  sorted.forEach(e => {
-    const tr = document.createElement('tr');
-    tr.id = 'row-' + e.id;
-    if (e.id === state.selectedEntryId) tr.classList.add('selected');
 
-    const tdT = document.createElement('td');
-    const div = document.createElement('div'); div.className = 'td-title';
-    const nm = document.createElement('span'); nm.className = 'td-name'; nm.textContent = e.name;
-    div.appendChild(makeAvatar(e, 24)); div.appendChild(nm); tdT.appendChild(div);
+  // Build a map of existing rows by entry id for O(1) lookup
+  const existingRows = new Map();
+  tbody.querySelectorAll('tr[id^="row-"]').forEach(tr => existingRows.set(tr.id.replace('row-', ''), tr));
 
-    const tdU = document.createElement('td'); tdU.className = 'td-username'; tdU.textContent = e.username || '—';
-    const tdD = document.createElement('td'); tdD.className = 'td-date'; tdD.textContent = fmtDate(e.updated_at);
-    const tdS = document.createElement('td'); tdS.className = 'td-star';
-    const sb = document.createElement('button'); sb.className = 'star-btn' + (e.is_favorite ? ' starred' : '');
-    sb.id = 'star-' + e.id;
-    sb.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
-    sb.onclick = ev => { ev.stopPropagation(); toggleFavorite(e.id); };
-    tdS.appendChild(sb);
+  // Determine which ids still exist so we can remove stale rows
+  const newIds = new Set(sorted.map(e => e.id));
+  existingRows.forEach((tr, id) => { if (!newIds.has(id)) tr.remove(); });
 
-    tr.appendChild(tdT); tr.appendChild(tdU); tr.appendChild(tdD); tr.appendChild(tdS);
-    tr.onclick = () => selectEntry(e.id);
-    tbody.appendChild(tr);
+  // Insert/update rows in correct sort order
+  sorted.forEach((e, idx) => {
+    let tr = existingRows.get(e.id);
+    const isNew = !tr;
+
+    if (isNew) {
+      tr = document.createElement('tr');
+      tr.id = 'row-' + e.id;
+    }
+
+    // Always sync selected/bulk state
+    tr.classList.toggle('selected', e.id === state.selectedEntryId);
+    tr.classList.toggle('bulk-selected', state.selectedEntryIds.has(e.id));
+
+    // Only rebuild cell content if the row is new OR key data changed
+    const dataKey = `${e.name}|${e.username}|${e.updated_at}|${e.is_favorite}|${e.color}|${e.emoji}`;
+    if (isNew || tr.dataset.key !== dataKey) {
+      tr.dataset.key = dataKey;
+      tr.innerHTML = '';
+
+      const tdT = document.createElement('td');
+      const div = document.createElement('div'); div.className = 'td-title';
+      const nm = document.createElement('span'); nm.className = 'td-name'; nm.textContent = e.name;
+      div.appendChild(makeAvatar(e, 24)); div.appendChild(nm);
+      if (e.username) {
+        const qc = document.createElement('button');
+        qc.className = 'quick-copy-user';
+        qc.textContent = 'copy user';
+        qc.title = `Copy username: ${e.username}`;
+        qc.onclick = ev => {
+          ev.stopPropagation();
+          copyToClipboard(e.username, 'Username');
+        };
+        div.appendChild(qc);
+      }
+      tdT.appendChild(div);
+
+      const tdU = document.createElement('td'); tdU.className = 'td-username'; tdU.textContent = e.username || '—';
+      const tdD = document.createElement('td'); tdD.className = 'td-date'; tdD.textContent = fmtDate(e.updated_at);
+
+      const tdS = document.createElement('td'); tdS.className = 'td-star';
+      const sb = document.createElement('button');
+      sb.className = 'star-btn' + (e.is_favorite ? ' starred' : '');
+      sb.id = 'star-' + e.id;
+      sb.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+      sb.onclick = ev => { ev.stopPropagation(); toggleFavorite(e.id); };
+      tdS.appendChild(sb);
+
+      tr.appendChild(tdT); tr.appendChild(tdU); tr.appendChild(tdD); tr.appendChild(tdS);
+
+      // Attach click handler for single/shift/ctrl select
+      tr.onclick = (evt) => {
+        if (evt.shiftKey && state.lastClickedEntryId) {
+          const allRows = [...document.querySelectorAll('#vault-tbody tr[id^="row-"]')].map(r => r.id.replace('row-', ''));
+          const a = allRows.indexOf(state.lastClickedEntryId);
+          const b = allRows.indexOf(e.id);
+          const [lo, hi] = a < b ? [a, b] : [b, a];
+          allRows.slice(lo, hi + 1).forEach(id => state.selectedEntryIds.add(id));
+          updateBulkToolbar();
+        } else if (evt.ctrlKey || evt.metaKey) {
+          state.selectedEntryIds.has(e.id) ? state.selectedEntryIds.delete(e.id) : state.selectedEntryIds.add(e.id);
+          state.lastClickedEntryId = e.id;
+          updateBulkToolbar();
+        } else {
+          clearBulkSelection();
+          state.lastClickedEntryId = e.id;
+          selectEntry(e.id);
+        }
+      };
+    }
+
+    // Maintain sort order: move row to correct position if needed
+    const currentAtIdx = tbody.children[idx];
+    if (currentAtIdx !== tr) tbody.insertBefore(tr, currentAtIdx || null);
   });
 }
 
@@ -84,6 +150,16 @@ export function renderDashboard() {
     row.onclick = () => { getUI().then(m => { m.navigate('vault'); setTimeout(() => selectEntry(e.id), 60); }).catch(() => {}); };
     container.appendChild(row);
   });
+  if (state.expiryDays > 0) {
+    const expiredCount = Object.values(state.passwordScores).filter(s => s?.expired).length;
+    const sub = document.querySelector('#page-dashboard .page-subtitle');
+    if (sub) {
+      sub.textContent = expiredCount > 0
+        ? `${expiredCount} password${expiredCount > 1 ? 's' : ''} may need updating`
+        : 'Welcome back — your vault is secure';
+      sub.style.color = expiredCount > 0 ? 'var(--color-amber)' : '';
+    }
+  }
 }
 
 export function renderFavorites() {
@@ -158,7 +234,10 @@ export async function loadPasswordScores() {
       await Promise.allSettled(batch.map(async e => {
         try {
           const pwd = await vaultCall('get_entry_password', { entryId: e.id });
-          scores[e.id] = { pwd, score: secPwdScore(pwd) };
+          const daysSince  = secDaysSince(e.updated_at);
+              const expiryDays = state.expiryDays || 0;
+              const isExpired  = expiryDays > 0 && daysSince > expiryDays;
+              scores[e.id] = { pwd, score: secPwdScore(pwd), expired: isExpired, daysSince };
         } catch (_) {
           scores[e.id] = { pwd: '', score: 0 };
         }
@@ -194,7 +273,11 @@ export function renderSecurityPanel() {
     const t = secTier(s.score);
     counts[t]++;
     if (t === 'weak' || t === 'empty') weakList.push({ ...e, _score: s.score, _tier: t });
-    if (secDaysSince(e.updated_at) > STALE_DAYS) staleList.push({ ...e, _days: secDaysSince(e.updated_at) });
+    const expiryDays  = state.expiryDays || 180;
+    const effectiveStale = expiryDays > 0 ? expiryDays : STALE_DAYS;
+    if (s.expired || secDaysSince(e.updated_at) > effectiveStale) {
+      staleList.push({ ...e, _days: secDaysSince(e.updated_at) });
+    }
     if (s.pwd) {
       if (!pwdMap[s.pwd]) pwdMap[s.pwd] = [];
       pwdMap[s.pwd].push(e);
@@ -494,6 +577,11 @@ export function openAddModal() {
   document.getElementById('add-error').textContent = '';
   document.getElementById('add-strength-bar').style.width = '0%';
   document.getElementById('add-strength-label').textContent = '';
+  // Reset appearance picker to defaults
+  setPickerColor('add', '#8b5cf6');
+  setPickerEmoji('add', '?');
+  document.getElementById('add-category').value = 'general';
+  document.getElementById('add-emoji-picker').classList.remove('open');
   openModal('modal-add-entry');
 }
 
@@ -507,7 +595,16 @@ export async function saveNewEntry() {
   if (!title) { document.getElementById('add-error').textContent = 'Title is required'; return; }
   const btn = document.getElementById('btn-add-save'); btn.disabled = true;
   try {
-    const input = { name: title, username, password, website, notes, is_favorite: false, category: 'general', color: '#8b5cf6', emoji: title.charAt(0).toUpperCase() };
+    const pickedColor = document.querySelector('#add-color-swatches .color-swatch.active')?.dataset.color || '#8b5cf6';
+    const pickedEmoji = document.getElementById('add-emoji-display').textContent.trim();
+    const pickedCat   = document.getElementById('add-category').value;
+    const input = {
+      name: title, username, password, website, notes,
+      is_favorite: false,
+      category: pickedCat,
+      color: pickedColor,
+      emoji: pickedEmoji === '?' ? title.charAt(0).toUpperCase() : pickedEmoji,
+    };
     await vaultCall('add_entry', { input });
     closeModal('modal-add-entry');
     await loadEntries();
@@ -525,6 +622,11 @@ export function openEditModal(entry) {
   document.getElementById('edit-website').value = entry.website || '';
   document.getElementById('edit-notes').value = entry.notes || '';
   document.getElementById('edit-error').textContent = '';
+  // Restore appearance from entry
+  setPickerColor('edit', entry.color || '#8b5cf6');
+  setPickerEmoji('edit', entry.emoji || (entry.name?.charAt(0).toUpperCase() || '?'));
+  document.getElementById('edit-category').value = entry.category || 'general';
+  document.getElementById('edit-emoji-picker').classList.remove('open');
   openModal('modal-edit-entry');
 }
 
@@ -548,6 +650,9 @@ export async function saveEditEntry() {
   if (btn) btn.disabled = true;
 
   try {
+    const pickedColor = document.querySelector('#edit-color-swatches .color-swatch.active')?.dataset.color || existing?.color || '#8b5cf6';
+    const pickedEmoji = document.getElementById('edit-emoji-display').textContent.trim();
+    const pickedCat   = document.getElementById('edit-category').value;
     await vaultCall('update_entry_keep_password', {
       entryId: id,
       name: title,
@@ -556,9 +661,9 @@ export async function saveEditEntry() {
       website,
       notes,
       isFavorite: existing?.is_favorite ?? false,
-      category: existing?.category || 'general',
-      color: existing?.color || '#8b5cf6',
-      emoji: existing?.emoji || (title.length > 0 ? title.charAt(0).toUpperCase() : '?'),
+      category: pickedCat,
+      color: pickedColor,
+      emoji: pickedEmoji === '?' ? (title.length > 0 ? title.charAt(0).toUpperCase() : '?') : pickedEmoji,
     });
     closeModal('modal-edit-entry');
     showToast('Entry updated', 'success');
@@ -604,4 +709,110 @@ export function confirmDelete(type, id, name) {
       await loadNotes();
     };
   openModal('modal-confirm');
+}
+
+// setPickerColor — activates the correct swatch and updates the emoji preview background
+export function setPickerColor(prefix, color) {
+  document.querySelectorAll(`#${prefix}-color-swatches .color-swatch`).forEach(s => {
+    s.classList.toggle('active', s.dataset.color === color);
+  });
+  const display = document.getElementById(`${prefix}-emoji-display`);
+  if (display) {
+    display.style.background = color + '22';
+    display.style.borderColor = color + '66';
+    display.style.color = color;
+  }
+}
+
+// setPickerEmoji — updates the emoji preview button text
+export function setPickerEmoji(prefix, emoji) {
+  const display = document.getElementById(`${prefix}-emoji-display`);
+  if (display) display.textContent = emoji;
+}
+
+// wirePickerEvents — attaches swatch + emoji picker interactions for add/edit modals
+export function wirePickerEvents() {
+  ['add', 'edit'].forEach(prefix => {
+    // Color swatches
+    document.getElementById(`${prefix}-color-swatches`)?.addEventListener('click', e => {
+      const swatch = e.target.closest('.color-swatch');
+      if (!swatch) return;
+      setPickerColor(prefix, swatch.dataset.color);
+    });
+
+    // Emoji display toggles picker
+    document.getElementById(`${prefix}-emoji-display`)?.addEventListener('click', () => {
+      document.getElementById(`${prefix}-emoji-picker`).classList.toggle('open');
+    });
+
+    // Emoji selection
+    document.getElementById(`${prefix}-emoji-picker`)?.addEventListener('click', e => {
+      const opt = e.target.closest('.emoji-opt');
+      if (!opt) return;
+      setPickerEmoji(prefix, opt.textContent.trim());
+      document.getElementById(`${prefix}-emoji-picker`).classList.remove('open');
+    });
+  });
+
+  // Close emoji pickers when clicking outside
+  document.addEventListener('click', e => {
+    ['add', 'edit'].forEach(prefix => {
+      const picker  = document.getElementById(`${prefix}-emoji-picker`);
+      const display = document.getElementById(`${prefix}-emoji-display`);
+      if (picker && display && !picker.contains(e.target) && e.target !== display) {
+        picker.classList.remove('open');
+      }
+    });
+  });
+}
+
+export function updateBulkToolbar() {
+  const toolbar = document.getElementById('bulk-toolbar');
+  const label   = document.getElementById('bulk-count-label');
+  const count   = state.selectedEntryIds.size;
+  if (toolbar) toolbar.classList.toggle('visible', count > 0);
+  if (label)   label.textContent = `${count} entr${count === 1 ? 'y' : 'ies'} selected`;
+  // Reflect bulk-selected class on rows
+  document.querySelectorAll('#vault-tbody tr[id^="row-"]').forEach(tr => {
+    const id = tr.id.replace('row-', '');
+    tr.classList.toggle('bulk-selected', state.selectedEntryIds.has(id));
+  });
+}
+
+// clearBulkSelection — deselects all entries and hides toolbar
+export function clearBulkSelection() {
+  state.selectedEntryIds.clear();
+  state.lastClickedEntryId = null;
+  updateBulkToolbar();
+}
+
+// wireBulkToolbar — attaches bulk action button handlers; call once from wireEvents
+export function wireBulkToolbar() {
+  document.getElementById('bulk-clear-btn')?.addEventListener('click', clearBulkSelection);
+
+  document.getElementById('bulk-favorite-btn')?.addEventListener('click', async () => {
+    const ids = [...state.selectedEntryIds];
+    await Promise.allSettled(ids.map(id => vaultCall('toggle_favorite', { entryId: id })));
+    await loadEntries();
+    clearBulkSelection();
+    showToast(`Updated ${ids.length} entr${ids.length === 1 ? 'y' : 'ies'}`, 'success');
+  });
+
+  document.getElementById('bulk-delete-btn')?.addEventListener('click', () => {
+    const ids   = [...state.selectedEntryIds];
+    const count = ids.length;
+    document.getElementById('confirm-title').textContent = `Delete ${count} Entries?`;
+    document.getElementById('confirm-msg').textContent   = `${count} entries will be permanently deleted. This cannot be undone.`;
+    state.confirmCallback = async () => {
+      await Promise.allSettled(ids.map(id => vaultCall('delete_entry', { entryId: id })));
+      await loadEntries();
+      if (ids.includes(state.selectedEntryId)) {
+        state.selectedEntryId = null;
+        const detail = document.getElementById('vault-detail');
+        if (detail) detail.innerHTML = '<div class="empty-state" style="margin-top:40px;"><p>Select an entry<br>to view details</p></div>';
+      }
+      clearBulkSelection();
+    };
+    openModal('modal-confirm');
+  });
 }

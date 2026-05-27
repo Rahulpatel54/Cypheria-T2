@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cypheria — Quantum-Resistant Offline Password Manager</title>
 <link rel="stylesheet" href="css/style.css">
+
 </head>
 <body>
 
@@ -351,6 +352,18 @@
         </div>
         <div class="vault-layout">
           <div class="vault-table-wrap">
+            <div id="bulk-toolbar">
+              <span class="bulk-count" id="bulk-count-label">0 selected</span>
+              <button class="btn btn-secondary" id="bulk-favorite-btn" style="font-size:12px;padding:5px 10px;">
+                <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Toggle Favorite
+              </button>
+              <button class="btn btn-danger" id="bulk-delete-btn" style="font-size:12px;padding:5px 10px;">
+                <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                Delete Selected
+              </button>
+              <button class="btn btn-secondary" id="bulk-clear-btn" style="font-size:12px;padding:5px 10px;">Clear</button>
+            </div>
             <div class="table-toolbar">
               <span style="font-size:12px;color:var(--text-muted)">Sort by:</span>
               <select class="sort-select" id="vault-sort">
@@ -654,6 +667,16 @@
             <div id="stab-general">
               <div class="settings-section-title">General</div>
               <div class="settings-row">
+                <div>
+                  <div class="settings-row-label">Lock on focus loss</div>
+                  <div class="settings-row-sub">Lock vault when the window is minimized or hidden</div>
+                </div>
+                <label class="toggle">
+                  <input type="checkbox" id="set-lock-on-blur">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="settings-row">
                 <div><div class="settings-row-label">Launch at startup</div></div>
                 <label class="toggle"><input type="checkbox" id="set-startup"><span class="toggle-slider"></span></label>
               </div>
@@ -684,6 +707,20 @@
               <div class="settings-row">
                 <div><div class="settings-row-label">Show password by default</div></div>
                 <label class="toggle"><input type="checkbox" id="set-showpwd"><span class="toggle-slider"></span></label>
+                  <div class="settings-row">
+                    <div>
+                      <div class="settings-row-label">Password expiry reminder</div>
+                      <div class="settings-row-sub">Warn when passwords haven't been changed</div>
+                    </div>
+                    <select class="settings-select" id="set-expiry">
+                      <option value="0">Never</option>
+                      <option value="30">30 days</option>
+                      <option value="60">60 days</option>
+                      <option value="90" selected>90 days</option>
+                      <option value="180">180 days</option>
+                      <option value="365">1 year</option>
+                    </select>
+                  </div>
               </div>
               <div class="settings-section-title" style="margin-top:24px;">Vault</div>
               <div class="settings-row">
@@ -880,6 +917,36 @@
       <label class="form-label">Notes (optional)</label>
       <textarea class="form-input" id="add-notes" rows="3" placeholder="Any notes…"></textarea>
     </div>
+    <div class="form-group" style="margin-bottom:10px;">
+  <label class="form-label">Appearance</label>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div id="add-emoji-display" style="width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;border:1px solid var(--border-mid);background:var(--bg-card);transition:border-color 0.15s;" title="Click to pick emoji">?</div>
+    <div id="add-color-swatches" style="display:flex;gap:5px;flex-wrap:wrap;">
+      <div class="color-swatch active" data-color="#8b5cf6" style="background:#8b5cf6;" title="Purple"></div>
+      <div class="color-swatch" data-color="#3b82f6" style="background:#3b82f6;" title="Blue"></div>
+      <div class="color-swatch" data-color="#22c55e" style="background:#22c55e;" title="Green"></div>
+      <div class="color-swatch" data-color="#f59e0b" style="background:#f59e0b;" title="Amber"></div>
+      <div class="color-swatch" data-color="#ef4444" style="background:#ef4444;" title="Red"></div>
+      <div class="color-swatch" data-color="#ec4899" style="background:#ec4899;" title="Pink"></div>
+      <div class="color-swatch" data-color="#06b6d4" style="background:#06b6d4;" title="Cyan"></div>
+      <div class="color-swatch" data-color="#f97316" style="background:#f97316;" title="Orange"></div>
+    </div>
+    <select class="settings-select" id="add-category" style="font-size:12px;padding:5px 8px;">
+      <option value="general">General</option>
+      <option value="social">Social</option>
+      <option value="finance">Finance</option>
+      <option value="work">Work</option>
+      <option value="email">Email</option>
+      <option value="shopping">Shopping</option>
+      <option value="gaming">Gaming</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+  <!-- Emoji picker popover -->
+  <div id="add-emoji-picker" style="display:none;margin-top:8px;background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:10px;flex-wrap:wrap;gap:4px;">
+    <span class="emoji-opt" title="Key">🔑</span><span class="emoji-opt" title="Lock">🔒</span><span class="emoji-opt" title="Shield">🛡️</span><span class="emoji-opt" title="Star">⭐</span><span class="emoji-opt" title="Globe">🌐</span><span class="emoji-opt" title="Mail">📧</span><span class="emoji-opt" title="Card">💳</span><span class="emoji-opt" title="Bank">🏦</span><span class="emoji-opt" title="Shop">🛒</span><span class="emoji-opt" title="Game">🎮</span><span class="emoji-opt" title="Work">💼</span><span class="emoji-opt" title="Code">💻</span><span class="emoji-opt" title="Phone">📱</span><span class="emoji-opt" title="Cloud">☁️</span><span class="emoji-opt" title="Server">🖥️</span><span class="emoji-opt" title="Person">👤</span><span class="emoji-opt" title="Home">🏠</span><span class="emoji-opt" title="Tool">🔧</span><span class="emoji-opt" title="Bolt">⚡</span><span class="emoji-opt" title="Fire">🔥</span><span class="emoji-opt" title="Book">📚</span><span class="emoji-opt" title="Music">🎵</span><span class="emoji-opt" title="Photo">📷</span><span class="emoji-opt" title="Health">❤️</span>
+  </div>
+</div>
     <div class="modal-error" id="add-error"></div>
     <div class="modal-btns">
       <button class="btn btn-secondary" data-close="modal-add-entry">Cancel</button>
@@ -922,6 +989,35 @@
       <label class="form-label">Notes</label>
       <textarea class="form-input" id="edit-notes" rows="3"></textarea>
     </div>
+    <div class="form-group" style="margin-bottom:10px;">
+  <label class="form-label">Appearance</label>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div id="edit-emoji-display" style="width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;cursor:pointer;border:1px solid var(--border-mid);background:var(--bg-card);transition:border-color 0.15s;" title="Click to pick emoji">?</div>
+    <div id="edit-color-swatches" style="display:flex;gap:5px;flex-wrap:wrap;">
+      <div class="color-swatch active" data-color="#8b5cf6" style="background:#8b5cf6;"></div>
+      <div class="color-swatch" data-color="#3b82f6" style="background:#3b82f6;"></div>
+      <div class="color-swatch" data-color="#22c55e" style="background:#22c55e;"></div>
+      <div class="color-swatch" data-color="#f59e0b" style="background:#f59e0b;"></div>
+      <div class="color-swatch" data-color="#ef4444" style="background:#ef4444;"></div>
+      <div class="color-swatch" data-color="#ec4899" style="background:#ec4899;"></div>
+      <div class="color-swatch" data-color="#06b6d4" style="background:#06b6d4;"></div>
+      <div class="color-swatch" data-color="#f97316" style="background:#f97316;"></div>
+    </div>
+    <select class="settings-select" id="edit-category" style="font-size:12px;padding:5px 8px;">
+      <option value="general">General</option>
+      <option value="social">Social</option>
+      <option value="finance">Finance</option>
+      <option value="work">Work</option>
+      <option value="email">Email</option>
+      <option value="shopping">Shopping</option>
+      <option value="gaming">Gaming</option>
+      <option value="other">Other</option>
+    </select>
+  </div>
+  <div id="edit-emoji-picker" style="display:none;margin-top:8px;background:var(--bg-card);border:1px solid var(--border-mid);border-radius:var(--radius-md);padding:10px;flex-wrap:wrap;gap:4px;">
+    <span class="emoji-opt" title="Key">🔑</span><span class="emoji-opt" title="Lock">🔒</span><span class="emoji-opt" title="Shield">🛡️</span><span class="emoji-opt" title="Star">⭐</span><span class="emoji-opt" title="Globe">🌐</span><span class="emoji-opt" title="Mail">📧</span><span class="emoji-opt" title="Card">💳</span><span class="emoji-opt" title="Bank">🏦</span><span class="emoji-opt" title="Shop">🛒</span><span class="emoji-opt" title="Game">🎮</span><span class="emoji-opt" title="Work">💼</span><span class="emoji-opt" title="Code">💻</span><span class="emoji-opt" title="Phone">📱</span><span class="emoji-opt" title="Cloud">☁️</span><span class="emoji-opt" title="Server">🖥️</span><span class="emoji-opt" title="Person">👤</span><span class="emoji-opt" title="Home">🏠</span><span class="emoji-opt" title="Tool">🔧</span><span class="emoji-opt" title="Bolt">⚡</span><span class="emoji-opt" title="Fire">🔥</span><span class="emoji-opt" title="Book">📚</span><span class="emoji-opt" title="Music">🎵</span><span class="emoji-opt" title="Photo">📷</span><span class="emoji-opt" title="Health">❤️</span>
+  </div>
+</div>
     <div class="modal-error" id="edit-error"></div>
     <div class="modal-btns">
       <button class="btn btn-secondary" data-close="modal-edit-entry">Cancel</button>
