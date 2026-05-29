@@ -2,7 +2,6 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 use uuid::Uuid;
-use zeroize::Zeroize;
 
 pub struct RevealStore(pub Mutex<HashMap<String, String>>);
 
