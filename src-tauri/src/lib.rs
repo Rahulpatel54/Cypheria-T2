@@ -23,6 +23,7 @@ pub fn run() {
     let clipboard_timer = Arc::new(crate::commands::clipboard::ClipboardTimer(
         Arc::new(tokio::sync::Mutex::new(None)),
 ));
+let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
 
     tauri::Builder::default()
         // ── Plugins ────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ pub fn run() {
         .manage(session.clone())
         .manage(autolock.clone())
         .manage(clipboard_timer.clone())
+        .manage(reveal_store.clone())
         .invoke_handler(tauri::generate_handler![
             // Auth & vault lifecycle
             commands::auth::unlock_vault,
@@ -68,6 +70,8 @@ pub fn run() {
             commands::clipboard::copy_entry_password_to_clipboard,
             commands::clipboard::clear_clipboard,
             commands::clipboard::copy_text_to_clipboard,
+            commands::entries::request_reveal_token,
+            commands::entries::consume_reveal_token,
         ])
         .setup(move |app| {
             // Start auto-lock background task
