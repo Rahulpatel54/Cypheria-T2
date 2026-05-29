@@ -150,15 +150,108 @@ export function renderDashboard() {
     row.onclick = () => { getUI().then(m => { m.navigate('vault'); setTimeout(() => selectEntry(e.id), 60); }).catch(() => {}); };
     container.appendChild(row);
   });
-  if (state.expiryDays > 0) {
-    const expiredCount = Object.values(state.passwordScores).filter(s => s?.expired).length;
-    const sub = document.querySelector('#page-dashboard .page-subtitle');
-    if (sub) {
-      sub.textContent = expiredCount > 0
-        ? `${expiredCount} password${expiredCount > 1 ? 's' : ''} may need updating`
-        : 'Welcome back — your vault is secure';
-      sub.style.color = expiredCount > 0 ? 'var(--color-amber)' : '';
-    }
+  const expiredCount = Object.values(state.passwordScores).filter(s => s?.expired).length;
+  const sub = document.querySelector('#page-dashboard .page-subtitle');
+  if (sub) {
+    sub.textContent = expiredCount > 0
+      ? `${expiredCount} password${expiredCount > 1 ? 's' : ''} may need updating`
+      : 'Welcome back — your vault is secure';
+    sub.style.color = expiredCount > 0 ? 'var(--color-amber)' : '';
+  }
+  renderStaleAlerts();
+  if (Object.keys(state.passwordScores).length > 0) {
+    renderStaleAlerts();
+  }
+}
+
+export function renderStaleAlerts() {
+  const alertsWrap = document.getElementById('dash-stale-alerts');
+  const list       = document.getElementById('dash-stale-list');
+  const countEl    = document.getElementById('dash-stale-count');
+  if (!alertsWrap || !list || !countEl) return;
+
+  const expiryDays = state.expiryDays || 0;
+  if (expiryDays === 0) {
+    // Expiry reminders disabled in settings — hide section entirely
+    alertsWrap.style.display = 'none';
+    return;
+  }
+
+  // Build stale list from metadata only — days_since_update from backend score view,
+  // no password bytes are present in state.passwordScores entries.
+  const staleEntries = state.vaultEntries
+    .filter(e => {
+      const s = state.passwordScores[e.id];
+      // Only flag entries that have a password and exceed the threshold
+      return s && s.has_password !== false && s.daysSince > expiryDays;
+    })
+    .sort((a, b) => {
+      const da = state.passwordScores[a.id]?.daysSince || 0;
+      const db = state.passwordScores[b.id]?.daysSince || 0;
+      return db - da; // Most overdue first
+    });
+
+  if (!staleEntries.length) {
+    alertsWrap.style.display = 'none';
+    return;
+  }
+
+  alertsWrap.style.display = '';
+  countEl.textContent = staleEntries.length + ' entr' + (staleEntries.length === 1 ? 'y' : 'ies');
+  list.innerHTML = '';
+
+  // Show up to 5 entries; user can navigate to vault for full list
+  staleEntries.slice(0, 5).forEach(e => {
+    const days = state.passwordScores[e.id]?.daysSince || 0;
+    const months = Math.floor(days / 30);
+    const ageText = months >= 1
+      ? months + ' month' + (months !== 1 ? 's' : '') + ' ago'
+      : days + ' day' + (days !== 1 ? 's' : '') + ' ago';
+
+    const row = document.createElement('div');
+    row.className = 'stale-alert-row';
+
+    // Avatar uses makeAvatar which only uses entry.name/color/emoji — no secrets
+    row.appendChild(makeAvatar(e, 28));
+
+    const info = document.createElement('div');
+    info.className = 'stale-alert-info';
+
+    const name = document.createElement('div');
+    name.className = 'stale-alert-name';
+    name.textContent = e.name || '';
+
+    const sub = document.createElement('div');
+    sub.className = 'stale-alert-sub';
+    sub.textContent = 'Last changed ' + ageText + (e.username ? ' · ' + e.username : '');
+
+    info.appendChild(name);
+    info.appendChild(sub);
+
+    const badge = document.createElement('span');
+    badge.className = 'stale-alert-badge';
+    badge.textContent = 'Change password';
+
+    row.appendChild(info);
+    row.appendChild(badge);
+
+    // Clicking navigates to vault and opens edit modal for that entry
+    row.addEventListener('click', () => {
+      getUI().then(m => {
+        m.navigate('vault');
+        setTimeout(() => openEditModal(e), 80);
+      }).catch(() => {});
+    });
+
+    list.appendChild(row);
+  });
+
+  // If more than 5, show a "view all" hint
+  if (staleEntries.length > 5) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size:11px;color:var(--text-muted);text-align:center;padding:6px 0;';
+    more.textContent = '+ ' + (staleEntries.length - 5) + ' more — go to Vault to see all';
+    list.appendChild(more);
   }
 }
 
@@ -233,14 +326,16 @@ export async function loadPasswordScores() {
       const expiryDays  = state.expiryDays || 0;
       const isExpired   = expiryDays > 0 && s.days_since_update > expiryDays;
       scores[s.id] = {
-        score:    s.score,
-        pwdHash:  s.dup_tag,   // truncated HMAC tag — safe for duplicate detection
-        expired:  isExpired,
-        daysSince: s.days_since_update,
+        score:       s.score,
+        pwdHash:     s.dup_tag,
+        expired:     isExpired,
+        daysSince:   s.days_since_update,
+        hasPassword: s.has_password,
       };
     });
     state.passwordScores = scores;
     renderSecurityPanel();
+    renderStaleAlerts();
   } catch (e) {
     if (!String(e).includes('locked')) console.warn('[Cypheria] loadPasswordScores failed:', e);
   } finally {
@@ -283,6 +378,7 @@ function makeSecRow_dom(e, badgeText, badgeType, subText) {
 export function renderSecurityPanel() {
   const container = document.getElementById('security-panel-body');
   if (!container) return;
+  container.innerHTML = ''; // Always clear before rebuilding
   const entries = state.vaultEntries;
   const scores  = state.passwordScores;
   const total   = entries.length;
@@ -514,6 +610,96 @@ export function renderSecurityPanel() {
 });
 }
 
+export function renderStaleAlerts() {
+  const wrap = document.getElementById('dash-stale-alerts');
+  if (!wrap) return;
+
+  const expiryDays = state.expiryDays || 0;
+  if (expiryDays === 0) { wrap.style.display = 'none'; return; }
+
+  const staleEntries = state.vaultEntries
+    .filter(e => {
+      const s = state.passwordScores[e.id];
+      return s && s.hasPassword === true && s.daysSince > expiryDays;
+    })
+    .sort((a, b) => {
+      const da = state.passwordScores[a.id]?.daysSince || 0;
+      const db = state.passwordScores[b.id]?.daysSince || 0;
+      return db - da;
+    });
+
+  if (!staleEntries.length) { wrap.style.display = 'none'; return; }
+
+  wrap.style.display = '';
+  wrap.innerHTML = '';
+
+  // Header row
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:13px;font-weight:600;color:var(--color-amber);display:flex;align-items:center;gap:6px;';
+  const icon = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  icon.setAttribute('viewBox','0 0 24 24');
+  icon.setAttribute('width','14'); icon.setAttribute('height','14');
+  icon.style.cssText = 'stroke:var(--color-amber);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;';
+  const tri = document.createElementNS('http://www.w3.org/2000/svg','path');
+  tri.setAttribute('d','M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z');
+  const l1 = document.createElementNS('http://www.w3.org/2000/svg','line');
+  l1.setAttribute('x1','12'); l1.setAttribute('y1','9'); l1.setAttribute('x2','12'); l1.setAttribute('y2','13');
+  const l2 = document.createElementNS('http://www.w3.org/2000/svg','line');
+  l2.setAttribute('x1','12'); l2.setAttribute('y1','17'); l2.setAttribute('x2','12.01'); l2.setAttribute('y2','17');
+  icon.appendChild(tri); icon.appendChild(l1); icon.appendChild(l2);
+  title.appendChild(icon);
+  const titleText = document.createTextNode(
+    `${staleEntries.length} password${staleEntries.length > 1 ? 's' : ''} not updated in ${expiryDays}+ days`
+  );
+  title.appendChild(titleText);
+  header.appendChild(title);
+  wrap.appendChild(header);
+
+  // Entry rows (max 5)
+  const list = document.createElement('div');
+  list.style.cssText = 'display:flex;flex-direction:column;gap:5px;';
+  staleEntries.slice(0, 5).forEach(e => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:9px;padding:7px 10px;background:var(--bg-surface);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius-sm);cursor:pointer;transition:border-color 0.15s;';
+    row.onmouseenter = () => { row.style.borderColor = 'rgba(245,158,11,0.5)'; };
+    row.onmouseleave = () => { row.style.borderColor = 'rgba(245,158,11,0.2)'; };
+    row.appendChild(makeAvatar(e, 28));
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+    const nm = document.createElement('div');
+    nm.style.cssText = 'font-size:12px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    nm.textContent = e.name;
+    const days = state.passwordScores[e.id]?.daysSince || 0;
+    const mo = Math.floor(days / 30);
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:11px;color:var(--text-muted);margin-top:1px;';
+    sub.textContent = mo > 0 ? `Not updated in ~${mo} month${mo > 1 ? 's' : ''}` : `${days} days since last update`;
+    info.appendChild(nm); info.appendChild(sub);
+    const badge = document.createElement('span');
+    badge.style.cssText = 'font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--color-amber-dim);color:var(--color-amber);border:1px solid rgba(245,158,11,0.3);white-space:nowrap;flex-shrink:0;';
+    badge.textContent = mo + 'mo old';
+    row.appendChild(info); row.appendChild(badge);
+    row.onclick = () => {
+      getUI().then(m => {
+        m.navigate('vault');
+        setTimeout(() => openEditModal(e), 80);
+      }).catch(() => {});
+    };
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+
+  // "View all" link if more than 5
+  if (staleEntries.length > 5) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size:11px;color:var(--accent-light);margin-top:8px;cursor:pointer;text-align:right;';
+    more.textContent = `+${staleEntries.length - 5} more — view in Vault`;
+    more.onclick = () => getUI().then(m => m.navigate('vault')).catch(() => {});
+    wrap.appendChild(more);
+  }
+}
 
 export async function selectEntry(id) {
   state.passwordRevealTimers.forEach((tid) => clearTimeout(tid));

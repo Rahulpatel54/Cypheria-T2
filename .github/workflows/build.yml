@@ -1,0 +1,103 @@
+name: Build Cypheria
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            libwebkit2gtk-4.1-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libxdo-dev \
+            libdbus-1-dev \
+            pkg-config \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Build Cypheria for Linux
+        run: cargo tauri build
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Upload Linux .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypheria-linux-deb
+          path: src-tauri/target/release/bundle/deb/*.deb
+          if-no-files-found: warn
+
+      - name: Upload Linux .AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypheria-linux-appimage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable with macOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2" --locked
+
+      - name: Build Cypheria for macOS (universal binary)
+        run: cargo tauri build --target universal-apple-darwin
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Upload macOS .dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypheria-macos-dmg
+          path: src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+      - name: Upload macOS .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypheria-macos-app
+          path: src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+          if-no-files-found: warn

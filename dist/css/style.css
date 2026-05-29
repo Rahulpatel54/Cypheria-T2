@@ -986,7 +986,43 @@ textarea.form-input{resize:vertical;min-height:72px;}
 .sec-badge-gray  { background: var(--border-subtle); color: var(--text-muted); border: 1px solid var(--border-subtle); }
 
 .sec-divider { border: none; border-top: 1px solid var(--border-subtle); margin: 10px 0; }
-
+/* Stale password alert row on dashboard — no password data, metadata only */
+.stale-alert-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: var(--bg-surface);
+  border: 1px solid rgba(245,158,11,0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.stale-alert-row:hover {
+  border-color: rgba(245,158,11,0.5);
+  background: var(--color-amber-dim);
+}
+.stale-alert-info { flex: 1; min-width: 0; }
+.stale-alert-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stale-alert-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.stale-alert-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--color-amber-dim);
+  color: var(--color-amber);
+  border: 1px solid rgba(245,158,11,0.3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .sec-tip {
   display: flex; align-items: flex-start; gap: 8px;
   background: var(--bg-surface);

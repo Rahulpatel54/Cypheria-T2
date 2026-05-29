@@ -335,6 +335,18 @@
               </div>
             </div>
           </div>
+          <div id="dash-stale-alerts" style="display:none;margin-top:16px;">
+            <div class="panel" style="padding:0;overflow:hidden;">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;">
+                <span class="panel-title" style="display:flex;align-items:center;gap:8px;">
+                  <svg viewBox="0 0 24 24" width="15" height="15" style="stroke:var(--color-amber);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Passwords Needing Attention
+                </span>
+                <span id="dash-stale-count" style="font-size:11px;color:var(--color-amber);font-weight:600;"></span>
+              </div>
+              <div id="dash-stale-list" style="padding:0 16px 14px;display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+          </div>
         </div>
         </div>
 
