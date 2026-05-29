@@ -31,30 +31,58 @@ async function setupTauriEvents() {
 }
 
 async function checkInitialState() {
- if (!state._invoke) { showSetupScreen(); return; }
+  console.log('[DEBUG] checkInitialState: start');
 
-  const stored = await Promise.race([
-    getPersistedVaultPath(),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
-  ]).catch(() => null);
-  if (!stored) { showSetupScreen(); return; }
+  if (!state._invoke) {
+    console.log('[DEBUG] checkInitialState: no invoke, showing setup');
+    showSetupScreen();
+    return;
+  }
+
+  console.log('[DEBUG] checkInitialState: calling getPersistedVaultPath');
+  let stored = null;
+  try {
+    stored = await Promise.race([
+      getPersistedVaultPath(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('vault path timeout')), 3000))
+    ]);
+    console.log('[DEBUG] checkInitialState: stored path =', stored);
+  } catch(e) {
+    console.error('[DEBUG] checkInitialState: getPersistedVaultPath failed:', e);
+    showSetupScreen();
+    return;
+  }
+
+  if (!stored) {
+    console.log('[DEBUG] checkInitialState: no stored path, showing setup');
+    showSetupScreen();
+    return;
+  }
 
   const canonical = stored;
   state.currentVaultPath = canonical;
+  console.log('[DEBUG] checkInitialState: getting vault meta for', canonical);
 
- try {
-  const meta = await rawInvoke('get_vault_meta', { vaultPath: canonical });
-  const name = meta?.vault_name
-    || canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
-  state.currentVaultName = name;
-  document.getElementById('lock-vault-name').textContent = name;
-} catch (_) {
-  const name = canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
-  state.currentVaultName = name;
-  document.getElementById('lock-vault-name').textContent = name;
-}
+  try {
+    const meta = await Promise.race([
+      rawInvoke('get_vault_meta', { vaultPath: canonical }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('meta timeout')), 3000))
+    ]);
+    const name = meta?.vault_name
+      || canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+    state.currentVaultName = name;
+    document.getElementById('lock-vault-name').textContent = name;
+    console.log('[DEBUG] checkInitialState: vault meta ok, name =', name);
+  } catch(e) {
+    console.warn('[DEBUG] checkInitialState: get_vault_meta failed:', e);
+    const name = canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+    state.currentVaultName = name;
+    document.getElementById('lock-vault-name').textContent = name;
+  }
 
+  console.log('[DEBUG] checkInitialState: showing lock screen');
   showLockScreen();
+  console.log('[DEBUG] checkInitialState: done');
 }
 
 async function boot() {
@@ -73,8 +101,9 @@ async function boot() {
 
     if (hasTauri) {
       console.log('[DEBUG] setting up tauri events...');
-      await setupTauriEvents();
-      console.log('[DEBUG] tauri events done');
+      // Fire-and-forget — don't let event registration block the boot sequence
+      setupTauriEvents().catch(e => console.warn('[Cypheria] setupTauriEvents failed:', e));
+      console.log('[DEBUG] tauri events scheduled');
     }
 
     console.log('[DEBUG] hiding loading...');
@@ -85,6 +114,10 @@ async function boot() {
       showToast('Running without Tauri backend (preview mode)', 'warning');
       return;
     }
+
+    // Small defer to let Tauri backend finish registering all commands
+    // before we attempt IPC calls during initial state check
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     console.log('[DEBUG] checking initial state...');
     await checkInitialState();
@@ -98,12 +131,23 @@ async function boot() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Safety net: if boot hangs for 10 seconds, force show setup screen
+  // Immediately hide loader after a max of 10s no matter what
   const bootTimeout = setTimeout(() => {
-    console.error('[Cypheria] Boot timed out');
-    hideLoading();
+    console.error('[Cypheria] Boot timed out — forcing setup screen');
+    document.getElementById('loading-overlay').classList.add('hidden');
     showSetupScreen();
   }, 10000);
+
+  // Force-hide loading after 500ms minimum so spinner is visible briefly
+  // but never blocks indefinitely if JS errors occur before hideLoading()
+  const forceHideTimer = setTimeout(() => {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay && !overlay.classList.contains('hidden')) {
+      console.warn('[Cypheria] forceHide triggered — boot may have hung');
+      overlay.classList.add('hidden');
+      showSetupScreen();
+    }
+  }, 5000);
 
   initSmartPanel();
   try {
@@ -114,11 +158,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }).catch(() => {});
     }
   } catch (_) {}
+
   boot().catch(err => {
     console.error('[Cypheria] Boot failed:', err);
-    hideLoading();
+    document.getElementById('loading-overlay').classList.add('hidden');
     showSetupScreen();
   }).finally(() => {
     clearTimeout(bootTimeout);
+    clearTimeout(forceHideTimer);
   });
 });

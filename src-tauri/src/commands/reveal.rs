@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 const TOKEN_TTL: Duration = Duration::from_secs(10);
 
-pub(crate) struct RevealEntry {
+pub struct RevealEntry {
     password:   String,
     created_at: Instant,
 }
