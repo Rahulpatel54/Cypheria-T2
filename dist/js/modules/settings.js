@@ -22,6 +22,11 @@ export async function loadSettings() {
     if (el('set-expiry') && s.expiry_days !== undefined) {
       el('set-expiry').value = String(s.expiry_days);
       import('./state.js').then(m => { m.state.expiryDays = s.expiry_days; });
+      setTimeout(() => {
+        import('./vault.js').then(m => {
+          if (typeof m.renderStaleAlerts === 'function') m.renderStaleAlerts();
+        }).catch(() => {});
+      }, 0);
     }
     if (el('set-autolock') && s.auto_lock_secs !== undefined) {
       el('set-autolock').value = String(s.auto_lock_secs);

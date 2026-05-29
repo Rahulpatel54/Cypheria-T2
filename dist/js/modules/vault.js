@@ -159,9 +159,6 @@ export function renderDashboard() {
     sub.style.color = expiredCount > 0 ? 'var(--color-amber)' : '';
   }
   renderStaleAlerts();
-  if (Object.keys(state.passwordScores).length > 0) {
-    renderStaleAlerts();
-  }
 }
 
 export function renderStaleAlerts() {
