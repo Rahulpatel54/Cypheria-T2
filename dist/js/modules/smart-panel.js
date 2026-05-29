@@ -55,14 +55,11 @@ function _entropyMeta(bits) {
   return           { cls: 'sp-entropy-excel',  label: `~${bits} bits · Excellent` };
 }
 
-function _makeActBtn(action, idx, pwd, svgEl) {
+function _makeActBtn(action, idx, svgEl) {
   const btn = document.createElement('button');
   btn.className = 'sp-act-btn';
   btn.dataset.action = action;
-
   if (idx !== null) btn.dataset.idx = String(idx);
-  if (pwd !== null) btn.dataset.pwd = pwd;
-
   btn.title = action === 'copy' ? 'Copy' : action === 'use' ? 'Use this' : 'Regenerate';
 
   btn.appendChild(svgEl);
@@ -210,9 +207,9 @@ function buildPpRow(idx, data) {
   body.appendChild(pwdEl); body.appendChild(entEl); body.appendChild(patEl);
 
   const actions = document.createElement('div'); actions.className = 'sp-row-actions';
-  actions.appendChild(_makeActBtn('regen-pp', idx, null, _svgRefresh()));
-  actions.appendChild(_makeActBtn('copy', null, pwd, _svgCopy()));
-  actions.appendChild(_makeActBtn('use', null, pwd, _svgCheck()));
+  actions.appendChild(_makeActBtn('regen-pp', idx, _svgRefresh()));
+  actions.appendChild(_makeActBtn('copy', null, _svgCopy()));
+  actions.appendChild(_makeActBtn('use', null, _svgCheck()));
   row.appendChild(body); row.appendChild(actions);
   return row;
 }
@@ -321,9 +318,9 @@ function buildPrRow(idx, data) {
   body.appendChild(pwdEl); body.appendChild(entEl); body.appendChild(pronDiv); body.appendChild(patEl);
 
   const actions = document.createElement('div'); actions.className = 'sp-row-actions';
-  actions.appendChild(_makeActBtn('regen-pr', idx, null, _svgRefresh()));
-  actions.appendChild(_makeActBtn('copy', null, pwd, _svgCopy()));
-  actions.appendChild(_makeActBtn('use', null, pwd, _svgCheck()));
+  actions.appendChild(_makeActBtn('regen-pr', idx, _svgRefresh()));
+  actions.appendChild(_makeActBtn('copy', null, _svgCopy()));
+  actions.appendChild(_makeActBtn('use', null, _svgCheck()));
   row.appendChild(body); row.appendChild(actions);
   return row;
 }
@@ -449,8 +446,8 @@ function buildMnRow(idx, pwd, name) {
   body.appendChild(pwdEl); body.appendChild(entEl); body.appendChild(patEl);
 
   const actions = document.createElement('div'); actions.className = 'sp-row-actions';
-  actions.appendChild(_makeActBtn('copy', null, pwd, _svgCopy()));
-  actions.appendChild(_makeActBtn('use', null, pwd, _svgCheck()));
+  actions.appendChild(_makeActBtn('copy', null, _svgCopy()));
+  actions.appendChild(_makeActBtn('use', null, _svgCheck()));
   row.appendChild(body); row.appendChild(actions);
   return row;
 }
