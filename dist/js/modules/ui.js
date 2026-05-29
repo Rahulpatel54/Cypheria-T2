@@ -3,7 +3,7 @@
 import { state } from './state.js';
 import { rawInvoke, persistVaultPath, clearPersistedVaultPath } from './bridge.js';
 import { showToast, closeModal, openModal, toggleEye, pwdStrength, makeAvatar } from './utils.js';
-import { renderVaultTable, renderDashboard, renderFavorites, loadEntries, openAddModal, saveNewEntry, saveEditEntry, selectEntry, wireBulkToolbar, clearBulkSelection } from './vault.js';
+import { renderVaultTable, renderDashboard, renderFavorites, loadEntries, openAddModal, saveNewEntry, saveEditEntry, selectEntry, clearBulkSelection } from './vault.js';
 import { loadNotes, renderNotes, openNoteModal, saveNote, getNoteIsDirty, discardNoteChanges } from './notes.js';
 // (removed — loadPasswordScores called via dynamic import to avoid circular dep)
 import { generatePassword, copGenPwd } from './generator.js';
@@ -13,7 +13,6 @@ import {
 } from './auth.js';
 import { saveSettings, changeMasterPassword, exportVault, switchSettingsTab } from './settings.js';
 // Import picker wiring from vault module
-import { wirePickerEvents } from './vault.js';
 
 export function showLoading(msg = 'Loading…') {
   const el = document.getElementById('loading-msg');
@@ -435,8 +434,12 @@ document.getElementById('btn-confirm-action')?.addEventListener('click', async (
   if (!window.__TAURI_INTERNALS__?.isTauriDevTools) {
     document.addEventListener('contextmenu', e => e.preventDefault());
   }
-  wirePickerEvents();
-  wireBulkToolbar();
+  import('./vault.js')
+  .then(m => {
+    m.wirePickerEvents();
+    m.wireBulkToolbar();
+  })
+  .catch(() => {});
   document.addEventListener('keydown', async e => {
     // Only active when vault page is visible and no modal is open and no input is focused
     const vaultPage = document.getElementById('page-vault');

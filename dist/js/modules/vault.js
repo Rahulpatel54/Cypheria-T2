@@ -5,7 +5,6 @@ const getUI = () => _uiMod ? Promise.resolve(_uiMod) : import('./ui.js').then(m 
 import { state } from './state.js';
 import { vaultCall } from './bridge.js';
 import { showToast, fmtDate, makeAvatar, copyToClipboard, openModal, closeModal } from './utils.js';
-import { navigate, startClipCountdown } from './ui.js';
 // (removed — navigate called via dynamic import inside click handlers only)
 
 export async function loadEntries() {
@@ -790,7 +789,7 @@ export async function selectEntry(id) {
             entryId: f.entryId,
           });
           showToast(`Password copied — clears in ${state.clipSecs || 30}s`, 'success');
-          startClipCountdown();
+          getUI().then(m => m.startClipCountdown()).catch(() => {})
         }
         catch (e) { showToast('Failed to copy password', 'error'); }
       };
