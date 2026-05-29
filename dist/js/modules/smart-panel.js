@@ -635,7 +635,14 @@ export function wireSmartPanel() {
         setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
       }
     }
-    if (speakBtn) { speak(speakBtn.dataset.guide); }
+    if (speakBtn) {
+      if (!window._spSpeakWarned) {
+        const ok = window.confirm('⚠️ This will read the password aloud.\nOnly use in a private space. Continue?');
+        if (!ok) return;
+        window._spSpeakWarned = true;
+      }
+      speak(speakBtn.dataset.guide);
+    }
     if (chip) {
       const inputIdx = parseInt(chip.dataset.inputIdx, 10);
       const inputs = ['mn-word1', 'mn-word2', 'mn-word3'];

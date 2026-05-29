@@ -23,6 +23,7 @@ pub fn run() {
     let clipboard_timer = Arc::new(crate::commands::clipboard::ClipboardTimer(
         Arc::new(tokio::sync::Mutex::new(None)),
 ));
+
 let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
 
     tauri::Builder::default()
@@ -48,6 +49,8 @@ let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
             commands::entries::update_entry,
             commands::entries::delete_entry,
             commands::entries::toggle_favorite,
+            commands::entries::request_reveal_token,
+            commands::entries::consume_reveal_token,
             commands::entries::update_entry_keep_password,
             // Notes CRUD
             commands::notes::get_all_notes,

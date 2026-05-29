@@ -56,7 +56,10 @@ macro_rules! catch_sync_panic {
             } else {
                 "unknown panic payload".to_string()
             };
+            #[cfg(debug_assertions)]
             eprintln!("[Cypheria] caught sync panic in vault closure: {msg}");
+            #[cfg(not(debug_assertions))]
+            eprintln!("[Cypheria] caught sync panic in vault closure");
             Err(CypheriaError::InternalError(
                 "An unexpected internal error occurred".to_string(),
             ))
@@ -75,8 +78,6 @@ pub mod clipboard;
 pub mod reveal;
 
 
-/// Validate that `id` is a well-formed UUID string.
-/// Returns `Err(InvalidInput)` if parsing fails.
 #[must_use = "UUID validation result must be checked with ?"]
 pub(crate) fn validate_uuid(id: &str) -> Result<(), crate::error::CypheriaError> {
     uuid::Uuid::parse_str(id)

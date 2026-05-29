@@ -337,31 +337,6 @@ export function renderSecurityPanel() {
     return `<div class="sec-avatar" style="background:${color}22;color:${color};border:1px solid ${color}44">${letter}</div>`;
   }
 
-
-  // Action list (weak + missing, up to 5)
-  const actionRows = weakList.slice(0, 5).map(e => {
-    const isEmpty = e._tier === 'empty';
-    return makeSecRow(e,
-      isEmpty ? 'Missing' : 'Weak',
-      isEmpty ? 'gray'   : 'red',
-      isEmpty ? 'No password set' : 'Strength: ' + e._score + '/100'
-    );
-  }).join('');
-
-  // Duplicates
-  const dupRows = dupGroups.slice(0, 4).flatMap(g =>
-    g.map(e => makeSecRow(e, 'Reused', 'amber',
-      'Shared with ' + (g.length - 1) + ' other entr' + (g.length > 2 ? 'ies' : 'y')
-    ))
-  ).join('');
-
-  // Stale
-  const staleRows = staleList.slice(0, 4).map(e => {
-    const mo = Math.floor(e._days / 30);
-    return makeSecRow(e, mo + 'mo old', 'amber', 'Not updated in ' + mo + ' months');
-  }).join('');
-  // Issue 2 fix: build security panel via DOM API — eliminates innerHTML XSS surface
-
   // Score row
   const scoreRow = document.createElement('div');
   scoreRow.className = 'sec-score-row';
@@ -425,23 +400,6 @@ export function renderSecurityPanel() {
   });
   container.appendChild(barGrid);
 
-  // Helper: build a sec-item-row via DOM
-  function makeSecRow_dom(e, badgeTxt, badgeCls, sub) {
-    const row = document.createElement('div');
-    row.className = 'sec-item-row'; row.dataset.entryId = e.id;
-    const av = document.createElement('div');
-    av.className = 'sec-avatar';
-    av.style.cssText = `background:${e.color||'#8b5cf6'}22;color:${e.color||'#8b5cf6'};border:1px solid ${e.color||'#8b5cf6'}44`;
-    av.textContent = (e.emoji || e.name?.charAt(0) || '?').toUpperCase().slice(0,2);
-    const info = document.createElement('div'); info.className = 'sec-item-info';
-    const nm = document.createElement('div'); nm.className = 'sec-item-name'; nm.textContent = e.name || 'Untitled';
-    const sb2 = document.createElement('div'); sb2.className = 'sec-item-sub'; sb2.textContent = sub;
-    info.appendChild(nm); info.appendChild(sb2);
-    const badge = document.createElement('span');
-    badge.className = `sec-badge sec-badge-${badgeCls}`; badge.textContent = badgeTxt;
-    row.appendChild(av); row.appendChild(info); row.appendChild(badge);
-    return row;
-  }
 
   // Needs-attention section
   const attnSection = document.createElement('div'); attnSection.className = 'sec-section';
@@ -582,34 +540,32 @@ export async function selectEntry(id) {
         if (visible) {
           val.textContent = '••••••••••••••••';
           visible = false;
-          cachedPwd = null;
           if (state.passwordRevealTimers.has(entry.id)) {
             clearTimeout(state.passwordRevealTimers.get(entry.id));
             state.passwordRevealTimers.delete(entry.id);
           }
         } else {
           eyeB.style.opacity = '0.5';
-          if (!cachedPwd) {
-            try {
-              cachedPwd = await vaultCall('get_entry_password', { entryId: f.entryId });
-            } catch (e) {
-              eyeB.style.opacity = '';
-              showToast('Failed to reveal password', 'error');
-              return;
-            }
+          try {
+            const token = await vaultCall('request_reveal_token', { entryId: f.entryId });
+            const pwd = await vaultCall('consume_reveal_token', { token });
+            val.textContent = pwd;
+          } catch (e) {
+            eyeB.style.opacity = '';
+            showToast('Failed to reveal password', 'error');
+            return;
           }
-          val.textContent = cachedPwd;
           visible = true;
           eyeB.style.opacity = '';
           if (state.passwordRevealTimers.has(entry.id)) {
             clearTimeout(state.passwordRevealTimers.get(entry.id));
           }
+          // 5s auto-hide reduces exposure window
           const tid = setTimeout(() => {
             val.textContent = '••••••••••••••••';
             visible = false;
-            cachedPwd = null;
             state.passwordRevealTimers.delete(entry.id);
-          }, 10000);
+          }, 5000);
           state.passwordRevealTimers.set(entry.id, tid);
         }
       };
