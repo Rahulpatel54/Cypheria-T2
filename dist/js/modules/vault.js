@@ -226,35 +226,58 @@ function secDaysSince(iso) {
 export async function loadPasswordScores() {
   if (!state.vaultEntries.length || state.auditInProgress) { state.passwordScores = {}; return; }
   state.auditInProgress = true;
-  const scores = {};
-  const entries = [...state.vaultEntries];
   try {
-    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
-      const batch = entries.slice(i, i + BATCH_SIZE);
-      await Promise.allSettled(batch.map(async e => {
-        try {
-          const pwd = await vaultCall('get_entry_password', { entryId: e.id });
-          const score = secPwdScore(pwd);
-          const daysSince  = secDaysSince(e.updated_at);
-          const expiryDays = state.expiryDays || 0;
-          const isExpired  = expiryDays > 0 && daysSince > expiryDays;
-          // Hash password for duplicate detection — never store plaintext in state
-          const enc = new TextEncoder().encode(pwd);
-          const hashBuf = await crypto.subtle.digest('SHA-256', enc);
-          const pwdHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
-          // pwd goes out of scope here; only hash and score are retained
-          scores[e.id] = { score, pwdHash, expired: isExpired, daysSince };
-        } catch (_) {
-          scores[e.id] = { score: 0, pwdHash: null, expired: false, daysSince: 0 };
-        }
-      }));
-      if (i + BATCH_SIZE < entries.length) await new Promise(r => setTimeout(r, 20));
-    }
+    const scoreList = await vaultCall('get_password_scores');
+    const scores = {};
+    scoreList.forEach(s => {
+      const expiryDays  = state.expiryDays || 0;
+      const isExpired   = expiryDays > 0 && s.days_since_update > expiryDays;
+      scores[s.id] = {
+        score:    s.score,
+        pwdHash:  s.dup_tag,   // truncated HMAC tag — safe for duplicate detection
+        expired:  isExpired,
+        daysSince: s.days_since_update,
+      };
+    });
     state.passwordScores = scores;
     renderSecurityPanel();
+  } catch (e) {
+    if (!String(e).includes('locked')) console.warn('[Cypheria] loadPasswordScores failed:', e);
   } finally {
     state.auditInProgress = false;
   }
+}
+
+// Build a security panel row as DOM (no innerHTML, CSP safe)
+function makeSecRow_dom(e, badgeText, badgeType, subText) {
+  const row = document.createElement('div');
+  row.className = 'sec-item-row';
+  row.dataset.entryId = e.id;
+
+  row.appendChild(makeAvatar(e, 28));
+
+  const info = document.createElement('div');
+  info.className = 'sec-item-info';
+
+  const name = document.createElement('div');
+  name.className = 'sec-item-name';
+  name.textContent = e.name || '';
+
+  const sub = document.createElement('div');
+  sub.className = 'sec-item-sub';
+  sub.textContent = subText || '';
+
+  info.appendChild(name);
+  info.appendChild(sub);
+
+  const badge = document.createElement('span');
+  badge.className = `sec-badge sec-badge-${badgeType}`;
+  badge.textContent = badgeText;
+
+  row.appendChild(info);
+  row.appendChild(badge);
+
+  return row;
 }
 
 export function renderSecurityPanel() {
@@ -334,7 +357,12 @@ export function renderSecurityPanel() {
   function makeSecAvatar(e) {
     const letter = (e.emoji || e.name?.charAt(0) || '?').toUpperCase().slice(0, 2);
     const color  = e.color || '#8b5cf6';
-    return `<div class="sec-avatar" style="background:${color}22;color:${color};border:1px solid ${color}44">${letter}</div>`;
+    const d = document.createElement('div');
+    d.className = 'sec-avatar';
+    d.style.setProperty('--entry-color', color);
+    d.dataset.color = color;
+    d.textContent = letter;
+    return d;
   }
 
   // Score row
@@ -503,7 +531,9 @@ export async function selectEntry(id) {
 
   const head = document.createElement('div'); head.className = 'detail-head';
   const icon = document.createElement('div'); icon.className = 'detail-icon';
-  icon.style.cssText = `background:${entry.color || '#8b5cf6'}22;border-color:${entry.color || '#8b5cf6'}44;color:${entry.color || '#8b5cf6'};`;
+  const ec = entry.color || '#8b5cf6';
+  icon.style.setProperty('--entry-color', ec);
+  icon.dataset.color = ec;
   icon.textContent = (entry.emoji || entry.name?.charAt(0) || '?').toUpperCase().slice(0, 2);
   const nameEl = document.createElement('div'); nameEl.className = 'detail-name'; nameEl.textContent = entry.name;
   const acts = document.createElement('div'); acts.className = 'detail-actions';
@@ -748,12 +778,14 @@ export function confirmDelete(type, id, name) {
 export function setPickerColor(prefix, color) {
   document.querySelectorAll(`#${prefix}-color-swatches .color-swatch`).forEach(s => {
     s.classList.toggle('active', s.dataset.color === color);
+    s.style.setProperty('--swatch-color', s.dataset.color);
   });
+
   const display = document.getElementById(`${prefix}-emoji-display`);
+
   if (display) {
-    display.style.background = color + '22';
-    display.style.borderColor = color + '66';
-    display.style.color = color;
+    display.style.setProperty('--entry-color', color);
+    display.dataset.color = color;
   }
 }
 

@@ -1,6 +1,7 @@
 //! Entry commands — CRUD operations exposed to the frontend via Tauri IPC.
 
 use std::sync::Arc;
+use zeroize::Zeroize;
 use tauri::State;
 use crate::{
     error::CypheriaError,
@@ -235,4 +236,96 @@ pub async fn update_entry_keep_password(
             })
             .await
     })
+}
+
+#[tauri::command]
+pub async fn get_password_scores(
+    session: State<'_, Arc<SessionManager>>,
+    autolock: State<'_, Arc<AutoLockTimer>>,
+) -> Result<Vec<crate::models::entry::EntryScoreView>, CypheriaError> {
+    safe_command!({
+        autolock.bump_activity();
+        session
+            .with_session(|key_store, vault_store| {
+                catch_sync_panic!({
+                    use hmac::{Hmac, Mac};
+                    use sha2::Sha256;
+
+                    // Domain key for duplicate detection — separate from vault HMAC key
+                    let mut dup_key = [0u8; 32];
+                    crate::crypto::kdf::derive_subkey(
+                        key_store.vault_key_bytes(),
+                        b"PWD_DUP_DETECTION",
+                        &mut dup_key,
+                    );
+
+                    let mut scores = Vec::with_capacity(vault_store.data.entries.len());
+                    for enc_entry in &vault_store.data.entries {
+                        let pwd = match entry::get_entry_password(
+                            key_store.vault_key_bytes(),
+                            &vault_store.data,
+                            &enc_entry.id,
+                        ) {
+                            Ok(p) => p,
+                            Err(_) => {
+                                scores.push(crate::models::entry::EntryScoreView {
+                                    id: enc_entry.id.clone(),
+                                    score: 0,
+                                    has_password: false,
+                                    dup_tag: String::new(),
+                                    days_since_update: 0,
+                                });
+                                continue;
+                            }
+                        };
+
+                        let score = compute_pwd_score(&pwd);
+                        let has_password = !pwd.is_empty();
+
+                        // Truncated HMAC tag (first 8 hex chars = 32 bits) for duplicate
+                        // detection — enough to find duplicates, not enough to brute-force
+                        let mut mac = <Hmac<Sha256>>::new_from_slice(&dup_key)
+                            .map_err(|_| CypheriaError::CryptoError)?;
+                        mac.update(pwd.as_bytes());
+                        let tag_bytes = mac.finalize().into_bytes();
+                        let dup_tag: String = tag_bytes[..4]
+                            .iter()
+                            .map(|b| format!("{:02x}", b))
+                            .collect();
+
+                        let days = chrono::Utc::now()
+                            .signed_duration_since(enc_entry.updated_at)
+                            .num_days()
+                            .max(0) as u64;
+
+                        // pwd is dropped here — not stored in EntryScoreView
+                        scores.push(crate::models::entry::EntryScoreView {
+                            id: enc_entry.id.clone(),
+                            score,
+                            has_password,
+                            dup_tag,
+                            days_since_update: days,
+                        });
+                    }
+                    dup_key.zeroize();
+                    Ok(scores)
+                })
+            })
+            .await
+    })
+}
+
+/// Score a password 0–100 without external dependencies.
+fn compute_pwd_score(pwd: &str) -> u8 {
+    if pwd.is_empty() { return 0; }
+    let mut s: u32 = 0;
+    if pwd.len() >= 8  { s += 20; }
+    if pwd.len() >= 12 { s += 10; }
+    if pwd.len() >= 16 { s += 10; }
+    if pwd.len() >= 24 { s += 10; }
+    if pwd.chars().any(|c| c.is_ascii_uppercase()) { s += 15; }
+    if pwd.chars().any(|c| c.is_ascii_lowercase()) { s += 15; }
+    if pwd.chars().any(|c| c.is_ascii_digit())     { s += 10; }
+    if pwd.chars().any(|c| !c.is_alphanumeric())   { s += 10; }
+    s.min(100) as u8
 }

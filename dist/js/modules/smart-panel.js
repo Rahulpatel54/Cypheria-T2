@@ -130,6 +130,8 @@ const hasSpeech = (function () {
 
 function speak(text) {
   if (!hasSpeech) return;
+  // Require explicit per-session consent; _spSpeakEnabled resets on page reload
+  if (!window._spSpeakEnabled) return;
   try {
     window.speechSynthesis.cancel();
     const utt = new window.SpeechSynthesisUtterance(text);
@@ -636,13 +638,21 @@ export function wireSmartPanel() {
       }
     }
     if (speakBtn) {
-      if (!window._spSpeakWarned) {
-        const ok = window.confirm('⚠️ This will read the password aloud.\nOnly use in a private space. Continue?');
+      // Require explicit opt-in with clear warning each session; disabled by default
+      if (!window._spSpeakEnabled) {
+        const ok = window.confirm(
+          '⚠️ PRIVACY WARNING\n\n' +
+          'This feature will read the password aloud using your device speakers.\n\n' +
+          'Anyone nearby can hear it. Screen recording and voice assistants may capture it.\n\n' +
+          'Only enable this in a completely private space.\n\n' +
+          'Enable speech for this session?'
+        );
         if (!ok) return;
-        window._spSpeakWarned = true;
+        window._spSpeakEnabled = true; // only set on explicit confirmation
       }
       speak(speakBtn.dataset.guide);
     }
+    
     if (chip) {
       const inputIdx = parseInt(chip.dataset.inputIdx, 10);
       const inputs = ['mn-word1', 'mn-word2', 'mn-word3'];

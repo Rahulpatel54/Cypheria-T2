@@ -50,6 +50,7 @@ let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
             commands::entries::delete_entry,
             commands::entries::toggle_favorite,
             commands::entries::update_entry_keep_password,
+            commands::entries::get_password_scores,
             // Notes CRUD
             commands::notes::get_all_notes,
             commands::notes::save_note,

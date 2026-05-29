@@ -60,7 +60,13 @@ export function makeAvatar(entry, size = 28) {
   const r      = size <= 28 ? 7 : 10;
   const div    = document.createElement('div');
   div.className = 'site-avatar';
-  div.style.cssText = `width:${size}px;height:${size}px;border-radius:${r}px;background:${color}22;border:1px solid ${color}44;color:${color};font-size:${Math.floor(size * 0.42)}px;overflow:hidden;`;
+  div.style.setProperty('--entry-color', color);
+  div.dataset.color = color;
+  div.style.width  = size + 'px';
+  div.style.height = size + 'px';
+  div.style.borderRadius = r + 'px';
+  div.style.fontSize = Math.floor(size * 0.42) + 'px';
+  div.style.overflow = 'hidden';
   div.textContent = letter;
   return div;
 }

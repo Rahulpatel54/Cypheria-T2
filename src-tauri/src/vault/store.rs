@@ -94,7 +94,7 @@ pub async fn load_and_unlock(
 
     match version {
         1 => {
-            // Version 1: HMAC(32) is after HEADER. Covers: MAGIC + VERSION + HEADER_LEN + HEADER
+            // V1 HMAC covers only header — data section is unsigned. Auto-migrate to V2 on success.
             let hmac_start = header_end;
             let hmac_end   = hmac_start + 32;
             if file_bytes.len() < hmac_end + 4 {
@@ -103,11 +103,14 @@ pub async fn load_and_unlock(
             }
             let covered_region = &file_bytes[..header_end];
             let expected_hmac  = &file_bytes[hmac_start..hmac_end];
-            verify_vault_hmac(covered_region, expected_hmac, &hmac_key)?;
-            
-             let data_len_offset = hmac_end;
-            if file_bytes.len() < data_len_offset + 4 {
+            if let Err(e) = verify_vault_hmac(covered_region, expected_hmac, &hmac_key) {
                 hmac_key.zeroize();
+                return Err(e);
+            }
+            hmac_key.zeroize();
+
+            let data_len_offset = hmac_end;
+            if file_bytes.len() < data_len_offset + 4 {
                 return Err(CypheriaError::VaultCorrupted);
             }
             let data_len = u32::from_le_bytes(
@@ -118,20 +121,37 @@ pub async fn load_and_unlock(
             let data_start = data_len_offset + 4;
             let data_end = data_start + data_len;
             if file_bytes.len() < data_end {
-                hmac_key.zeroize();
                 return Err(CypheriaError::VaultCorrupted);
             }
-            let vk_bytes = aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?;
-            let vault_data = decrypt_vault_data(&vk_bytes, &file_bytes[data_start..data_end])?;
-            hmac_key.zeroize();
+
+            // Unwrap VK; zeroize mk_bytes on failure
+            let vk_bytes = match aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical) {
+                Ok(vk) => vk,
+                Err(e) => {
+                    let mut mk_mut = mk_bytes;
+                    mk_mut.zeroize();
+                    return Err(e);
+                }
+            };
+
+            let vault_data = match decrypt_vault_data(&vk_bytes, &file_bytes[data_start..data_end]) {
+                Ok(d) => d,
+                Err(e) => {
+                    let mut vk_mut = vk_bytes;
+                    vk_mut.zeroize();
+                    let mut mk_mut = mk_bytes;
+                    mk_mut.zeroize();
+                    return Err(e);
+                }
+            };
+
             let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
             let vault_store = VaultStore { data: vault_data, header };
 
-            // Re-persist immediately as V2 so future loads get full-file HMAC coverage
+            // Migrate to V2 immediately so future opens get full-file HMAC coverage
             if let Err(e) = persist_vault(&key_store, &vault_store.data, &vault_store.header, path).await {
                 eprintln!(
-                    "[Cypheria] V1→V2 migration persist failed (non-fatal): {:?}",
-                    e
+                    "[Cypheria] V1→V2 migration persist failed (non-fatal): {:?}", e
                 );
             }
 

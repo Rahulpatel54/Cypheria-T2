@@ -45,3 +45,13 @@ pub struct GenOptions {
     pub numbers: bool,
     pub symbols: bool,
 }
+
+#[derive(Debug, Serialize)]
+pub struct EntryScoreView {
+    pub id:                String,
+    pub score:             u8,
+    pub has_password:      bool,
+    /// Truncated HMAC tag for duplicate detection (32-bit, not reversible to password).
+    pub dup_tag:           String,
+    pub days_since_update: u64,
+}
