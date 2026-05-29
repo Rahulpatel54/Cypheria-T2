@@ -1,5 +1,12 @@
 'use strict';
 
+function escHTML(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escAttrFull(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'&#10;').replace(/\r/g,'&#13;');
+}
+
 import { updateGenStrength } from './generator.js';
 
 // ── Embedded wordlist (~500 common, memorable English words) ──
@@ -52,9 +59,12 @@ function _makeActBtn(action, idx, pwd, svgEl) {
   const btn = document.createElement('button');
   btn.className = 'sp-act-btn';
   btn.dataset.action = action;
+
   if (idx !== null) btn.dataset.idx = String(idx);
   if (pwd !== null) btn.dataset.pwd = pwd;
+
   btn.title = action === 'copy' ? 'Copy' : action === 'use' ? 'Use this' : 'Regenerate';
+
   btn.appendChild(svgEl);
   return btn;
 }
@@ -189,7 +199,7 @@ function genPassphrase() {
 function buildPpRow(idx, data) {
   const { pwd, bits, pattern } = data;
   const row = document.createElement('div');
-  row.className = 'sp-row'; row.id = `pp-row-${idx}`; row.dataset.idx = String(idx); row.dataset.pwd = pwd;
+  row.className = 'sp-row'; row.id = `pp-row-${idx}`; row.dataset.idx = String(idx);
 
   const body = document.createElement('div'); body.className = 'sp-row-body';
   const pwdEl = document.createElement('div'); pwdEl.className = 'sp-pwd-text'; pwdEl.textContent = pwd;
@@ -287,7 +297,7 @@ function genPronounce() {
 function buildPrRow(idx, data) {
   const { pwd, guide, bits, pattern } = data;
   const row = document.createElement('div');
-  row.className = 'sp-row'; row.id = `pr-row-${idx}`; row.dataset.idx = String(idx); row.dataset.pwd = pwd;
+  row.className = 'sp-row'; row.id = `pr-row-${idx}`; row.dataset.idx = String(idx);
 
   const body = document.createElement('div'); body.className = 'sp-row-body';
   const pwdEl = document.createElement('div'); pwdEl.className = 'sp-pwd-text'; pwdEl.textContent = pwd;
@@ -299,7 +309,7 @@ function buildPrRow(idx, data) {
   pronDiv.className = 'sp-pronun'; pronDiv.style.cssText = 'display:flex;align-items:center;gap:4px;';
   if (hasSpeech) {
     const speakBtn = document.createElement('button');
-    speakBtn.className = 'sp-speak-btn'; speakBtn.dataset.guide = guide; speakBtn.dataset.action = 'speak';
+    speakBtn.className = 'sp-speak-btn'; speakBtn._guide = guide; speakBtn.dataset.action = 'speak';
     speakBtn.title = '⚠ Reads password aloud — use only in private';
     speakBtn.appendChild(_svgSpeak());
     pronDiv.appendChild(speakBtn);
@@ -319,6 +329,8 @@ function buildPrRow(idx, data) {
 }
 
 const prData = [null, null, null, null, null];
+
+const _mnPwdMap = new Map();
 
 function renderPrList() {
   const list = document.getElementById('pr-list');
@@ -425,7 +437,8 @@ function buildMnRow(idx, pwd, name) {
   while (pwd.length < 12) pwd += randInt(10);
   const bits = calcEntropy(pwd, 0);
   const row = document.createElement('div');
-  row.className = 'sp-row'; row.id = `mn-row-${idx}`; row.dataset.idx = String(idx); row.dataset.pwd = pwd;
+  row.className = 'sp-row'; row.id = `mn-row-${idx}`; row.dataset.idx = String(idx);
+  _mnPwdMap.set(String(idx), pwd);
 
   const body = document.createElement('div'); body.className = 'sp-row-body';
   const pwdEl = document.createElement('div'); pwdEl.className = 'sp-pwd-text'; pwdEl.textContent = pwd;
@@ -453,12 +466,17 @@ function getMnWords() {
 function renderMnList() {
   const list = document.getElementById('mn-list');
   if (!list) return;
+
+  // Purge stale password references before rebuilding the list
+  list.innerHTML = '';
+  _mnPwdMap.clear();
+
   const words = getMnWords();
   if (!words.length) {
     list.innerHTML = '';
     const empty = document.createElement('div'); empty.className = 'sp-empty-state';
     empty.textContent = '✏️ Enter 1–3 hint words above to generate memorable passwords';
-    list.appendChild(empty);
+   list.innerHTML = ''; list.appendChild(empty);
     return;
   }
   list.innerHTML = '';
@@ -623,9 +641,24 @@ export function wireSmartPanel() {
         rowEl.parentNode && rowEl.parentNode.replaceChild(newRow, rowEl);
       }, 150);
     }
-    if (copyBtn) { doCopy(copyBtn, copyBtn.dataset.pwd); }
+    if (copyBtn) {
+      // Resolve password from data array/map by row — never from DOM attribute
+      const _cr = copyBtn.closest('.sp-row');
+      const _ci = _cr?.dataset.idx;
+      let _cp = null;
+      if (_cr?.id?.startsWith('pp-row-')) _cp = ppData[parseInt(_ci)]?.pwd ?? null;
+      else if (_cr?.id?.startsWith('pr-row-')) _cp = prData[parseInt(_ci)]?.pwd ?? null;
+      else if (_cr?.id?.startsWith('mn-row-')) _cp = _mnPwdMap.get(_ci) ?? null;
+      if (_cp) doCopy(copyBtn, _cp);
+    }
     if (useBtn) {
-      usePassword(useBtn.dataset.pwd);
+      const _ur = useBtn.closest('.sp-row');
+      const _ui = _ur?.dataset.idx;
+      let _up = null;
+      if (_ur?.id?.startsWith('pp-row-')) _up = ppData[parseInt(_ui)]?.pwd ?? null;
+      else if (_ur?.id?.startsWith('pr-row-')) _up = prData[parseInt(_ui)]?.pwd ?? null;
+      else if (_ur?.id?.startsWith('mn-row-')) _up = _mnPwdMap.get(_ui) ?? null;
+      usePassword(_up || '');
       const row = useBtn.closest('.sp-row');
       if (row) {
         const existing = row.querySelector('.sp-sent-label');
@@ -650,7 +683,7 @@ export function wireSmartPanel() {
         if (!ok) return;
         window._spSpeakEnabled = true; // only set on explicit confirmation
       }
-      speak(speakBtn.dataset.guide);
+      speak(speakBtn._guide || '');
     }
     
     if (chip) {
