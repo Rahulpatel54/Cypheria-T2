@@ -303,9 +303,12 @@ export function wireEvents() {
   document.getElementById('vault-add-entry')?.addEventListener('click', openAddModal);
   document.getElementById('vault-refresh')?.addEventListener('click', loadEntries);
   document.getElementById('security-refresh-btn')?.addEventListener('click', () => {
+    if (state.auditInProgress) return;
+    const container = document.getElementById('security-panel-body');
+    if (container) container.innerHTML = '<div class="sec-empty" style="padding:24px 0;text-align:center;">Refreshing…</div>';
     state.passwordScores = {};
     import('./vault.js').then(m => m.loadPasswordScores()).catch(() => {});
-  });
+});
   document.getElementById('vault-sort')?.addEventListener('change', renderVaultTable);
 
   // Favorites

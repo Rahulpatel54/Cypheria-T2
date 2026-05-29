@@ -314,7 +314,7 @@ function secDaysSince(iso) {
 }
 
 export async function loadPasswordScores() {
-  if (!state.vaultEntries.length || state.auditInProgress) { state.passwordScores = {}; return; }
+  if (!state.vaultEntries.length || state.auditInProgress) { return; }
   state.auditInProgress = true;
   try {
     const scoreList = await vaultCall('get_password_scores');
