@@ -125,7 +125,7 @@ pub async fn change_master_password(
                 &crate::vault::store::decrypt_vault_name(
                     key_store.master_key_bytes(),
                     &vault_store.header.vault_name_encrypted,
-                ).unwrap_or_else(|| vault_store.header.vault_name.clone()),
+                ).unwrap_or_default(),
             ) {
                 vault_store.header.vault_name_encrypted = new_name_enc;
             }
@@ -229,7 +229,6 @@ pub async fn create_vault(
         vk_wrapped_pq,
         created_at:           Utc::now(),
         vault_name_encrypted,
-        vault_name:           "Cypheria Vault".to_string(),
         format_version:       FORMAT_VERSION,
     };
 

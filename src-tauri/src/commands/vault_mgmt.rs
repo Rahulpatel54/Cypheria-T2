@@ -118,7 +118,7 @@ pub struct VaultMetaView {
 /// Used to display the vault name on the lock screen before the user enters a password.
 ///
 /// SECURITY NOTE: This reads the plaintext header only. No secret material is accessed.
-/// vault_name and created_at are stored in plaintext in VaultHeader by design.
+/// Only created_at is stored in plaintext; the vault name is decrypted if the session is unlocked.
 #[tauri::command]
 pub async fn get_vault_meta(
     vault_path: String,
@@ -166,9 +166,9 @@ pub async fn get_vault_meta(
                     &header.vault_name_encrypted,
                 ))
             }).await.ok().flatten();
-            decrypted.unwrap_or_else(|| header.vault_name.clone())
+            decrypted.unwrap_or_default()
         } else {
-            header.vault_name.clone()
+            String::new()
         };
 
         Ok(VaultMetaView {

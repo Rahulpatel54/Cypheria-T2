@@ -1,6 +1,6 @@
-//! .qvault binary file format — version 2.
+//! .qvault binary file format.
 //!
-//! File layout (Version 2):
+//! File layout:
 //! ┌─────────────────────────────────────────────────┐
 //! │ MAGIC        "CYPHERIA\x01"   (9 bytes)         │
 //! │ VERSION      u16 little-endian (2 bytes)        │
@@ -12,26 +12,14 @@
 //! │               (32 bytes)                        │
 //! └─────────────────────────────────────────────────┘
 //!
-//! File layout (Version 1 — legacy support):
-//! ┌─────────────────────────────────────────────────┐
-//! │ MAGIC        "CYPHERIA\x01"   (9 bytes)         │
-//! │ VERSION      u16 little-endian (2 bytes)        │
-//! │ HEADER_LEN   u32 little-endian (4 bytes)        │
-//! │ HEADER       bincode(VaultHeader) bytes         │
-//! │ HMAC         HMAC-SHA256 of first 4 sections    │
-//! │ DATA_LEN     u32 little-endian (4 bytes)        │
-//! │ DATA         AES-256-GCM encrypted VaultData    │
-//! └─────────────────────────────────────────────────┘
-//!
 //! The HMAC covers everything from MAGIC through the last byte of DATA.
 //! It is verified with a subkey derived from the Master Key.
-//! Version 2 improves integrity by signing the encrypted payload as well.
 
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 
 pub const MAGIC: &[u8] = b"CYPHERIA\x01";
-pub const FORMAT_VERSION: u16 = 2;
+pub const FORMAT_VERSION: u16 = 1;
 
 /// Stored in plaintext in the header section.
 /// Contains everything needed to re-derive keys and verify integrity.
@@ -69,18 +57,13 @@ pub struct VaultHeader {
     #[serde(default)]
     pub vault_name_encrypted: Vec<u8>,
 
-    /// Plaintext display name shown on lock screen before unlock (low-entropy, acceptable leak).
-    /// Set to a generic value like "Cypheria Vault" — real name stored in vault_name_encrypted.
-    pub vault_name: String,
-
-    /// Format version that wrote this file (for future migration).
+    /// Format version written into every vault file. Always 1.
     pub format_version: u16,
 }
 
 impl std::fmt::Debug for VaultHeader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VaultHeader")
-            .field("vault_name", &self.vault_name)
             .field("format_version", &self.format_version)
             .field("created_at", &self.created_at)
             .field("kdf_memory_kb", &self.kdf_memory_kb)
