@@ -3,13 +3,13 @@
 // during which a stolen token could be replayed.
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 const TOKEN_TTL: Duration = Duration::from_secs(10);
 
 pub struct RevealEntry {
-    password:   String,
+    password: String,
     created_at: Instant,
 }
 
@@ -26,10 +26,13 @@ impl RevealStore {
         if let Ok(mut map) = self.0.lock() {
             // Evict any expired entries to avoid unbounded growth
             map.retain(|_, v| v.created_at.elapsed() < TOKEN_TTL);
-            map.insert(token.clone(), RevealEntry {
-                password,
-                created_at: Instant::now(),
-            });
+            map.insert(
+                token.clone(),
+                RevealEntry {
+                    password,
+                    created_at: Instant::now(),
+                },
+            );
         }
         token
     }
@@ -50,5 +53,7 @@ impl RevealStore {
 }
 
 impl Default for RevealStore {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

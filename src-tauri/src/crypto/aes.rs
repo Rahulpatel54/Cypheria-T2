@@ -5,18 +5,17 @@
 //! AES-GCM's authentication tag provides built-in tamper detection — any byte flip
 //! in the ciphertext or tag will cause decryption to fail with CryptoError.
 
-use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
-use aes_gcm::aead::Aead;
-use zeroize::Zeroize;
 use crate::{crypto::rng::aes_nonce, error::CypheriaError};
+use aes_gcm::aead::Aead;
+use aes_gcm::{Aes256Gcm, KeyInit, Nonce};
+use zeroize::Zeroize;
 
 /// Encrypts plaintext using AES-256-GCM.
 ///
 /// Returns: nonce(12) || ciphertext+tag(plaintext.len()+16)
 /// The output is always 28 bytes longer than the input.
 pub fn encrypt(key: &[u8; 32], plaintext: &[u8]) -> Result<Vec<u8>, CypheriaError> {
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|_| CypheriaError::CryptoError)?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| CypheriaError::CryptoError)?;
 
     let nonce_bytes = aes_nonce();
     let nonce = Nonce::from_slice(&nonce_bytes);
@@ -43,8 +42,7 @@ pub fn decrypt(key: &[u8; 32], blob: &[u8]) -> Result<Vec<u8>, CypheriaError> {
         return Err(CypheriaError::VaultCorrupted);
     }
 
-    let cipher = Aes256Gcm::new_from_slice(key)
-        .map_err(|_| CypheriaError::CryptoError)?;
+    let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| CypheriaError::CryptoError)?;
 
     let (nonce_bytes, ciphertext) = blob.split_at(12);
     let nonce = Nonce::from_slice(nonce_bytes);
@@ -78,7 +76,9 @@ pub fn unwrap_key(wrapping_key: &[u8; 32], wrapped_blob: &[u8]) -> Result<[u8; 3
 mod tests {
     use super::*;
 
-    fn test_key() -> [u8; 32] { [0x42_u8; 32] }
+    fn test_key() -> [u8; 32] {
+        [0x42_u8; 32]
+    }
 
     #[test]
     fn test_encrypt_decrypt_roundtrip() {
@@ -104,7 +104,10 @@ mod tests {
         let mut ciphertext = encrypt(&key, plaintext).unwrap();
         // Flip a byte in the ciphertext portion (after nonce)
         ciphertext[15] ^= 0xFF;
-        assert!(decrypt(&key, &ciphertext).is_err(), "Tampered ciphertext must fail");
+        assert!(
+            decrypt(&key, &ciphertext).is_err(),
+            "Tampered ciphertext must fail"
+        );
     }
 
     #[test]
@@ -118,7 +121,7 @@ mod tests {
     #[test]
     fn test_wrap_unwrap_key() {
         let wrapping_key = [0xAA_u8; 32];
-        let key_to_wrap  = [0xBB_u8; 32];
+        let key_to_wrap = [0xBB_u8; 32];
         let wrapped = wrap_key(&wrapping_key, &key_to_wrap).unwrap();
         let unwrapped = unwrap_key(&wrapping_key, &wrapped).unwrap();
         assert_eq!(unwrapped, key_to_wrap);
@@ -130,7 +133,11 @@ mod tests {
         let ct1 = encrypt(&key, b"same plaintext").unwrap();
         let ct2 = encrypt(&key, b"same plaintext").unwrap();
         // Nonces (first 12 bytes) should differ with overwhelming probability
-        assert_ne!(&ct1[..12], &ct2[..12], "Each encryption must use a unique nonce");
+        assert_ne!(
+            &ct1[..12],
+            &ct2[..12],
+            "Each encryption must use a unique nonce"
+        );
     }
 
     #[test]

@@ -1,14 +1,14 @@
 //! Clipboard commands — passwords never cross IPC.
 
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use tauri::State;
 use crate::{
     error::CypheriaError,
-    session::{manager::SessionManager, autolock::AutoLockTimer},
+    session::{autolock::AutoLockTimer, manager::SessionManager},
     vault::entry,
 };
+use std::sync::Arc;
+use tauri::State;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
 pub struct ClipboardTimer(pub Arc<Mutex<Option<JoinHandle<()>>>>);
 fn write_password_to_clipboard(text: &str) -> Result<(), CypheriaError> {
@@ -55,21 +55,22 @@ pub async fn copy_entry_password_to_clipboard(
         crate::commands::validate_uuid(&entry_id)?;
 
         let (password, timeout_secs) = session
-    .with_session(|key_store, vault_store| {
-        catch_sync_panic!({
-            let pwd = entry::get_entry_password(
-                key_store.vault_key_bytes(),
-                &vault_store.data,
-                &entry_id,
-            )?;
-            let secs = crate::vault::store::read_settings(
-                key_store.vault_key_bytes(),
-                &vault_store.data,
-            ).clear_clipboard_secs;
-            Ok((pwd, secs))
-        })
-    })
-    .await?;
+            .with_session(|key_store, vault_store| {
+                catch_sync_panic!({
+                    let pwd = entry::get_entry_password(
+                        key_store.vault_key_bytes(),
+                        &vault_store.data,
+                        &entry_id,
+                    )?;
+                    let secs = crate::vault::store::read_settings(
+                        key_store.vault_key_bytes(),
+                        &vault_store.data,
+                    )
+                    .clear_clipboard_secs;
+                    Ok((pwd, secs))
+                })
+            })
+            .await?;
 
         // Write password to clipboard
         write_password_to_clipboard(&password)?;
@@ -137,16 +138,26 @@ pub async fn copy_text_to_clipboard(
         write_password_to_clipboard(&text)?;
 
         // Read clipboard timeout from settings
-        let timeout_secs = session.with_session(|ks, vs| {
-            Ok(crate::vault::store::read_settings(ks.vault_key_bytes(), &vs.data)
-                .clear_clipboard_secs)
-        }).await.unwrap_or(30);
+        let timeout_secs = session
+            .with_session(|ks, vs| {
+                Ok(
+                    crate::vault::store::read_settings(ks.vault_key_bytes(), &vs.data)
+                        .clear_clipboard_secs,
+                )
+            })
+            .await
+            .unwrap_or(30);
         let secs = if timeout_secs == 0 { 30 } else { timeout_secs };
 
         let timer_arc = clip_timer.0.clone();
         let timer_arc_for_task = clip_timer.0.clone();
         let mut guard = timer_arc.lock().await;
-        if let Some(old_handle) = guard.take() { old_handle.abort(); }
+        if let Some(old_handle) = guard.take() {
+            old_handle.abort();
+            drop(guard);
+            tokio::task::yield_now().await;
+            guard = timer_arc.lock().await;
+        }
         let new_handle = tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
             overwrite_and_clear_clipboard().await;

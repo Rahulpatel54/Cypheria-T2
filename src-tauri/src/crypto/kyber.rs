@@ -11,10 +11,10 @@
 //!
 //! Kyber-1024 is used (highest security level, ~AES-256 equivalent quantum security).
 
-use pqcrypto_kyber::kyber1024;
-use pqcrypto_traits::kem::{PublicKey, SecretKey, SharedSecret, Ciphertext};
-use zeroize::Zeroize;
 use crate::{crypto::aes, error::CypheriaError};
+use pqcrypto_kyber::kyber1024;
+use pqcrypto_traits::kem::{Ciphertext, PublicKey, SecretKey, SharedSecret};
+use zeroize::Zeroize;
 
 /// A freshly generated Kyber-1024 keypair.
 /// The secret key must be encrypted before being stored in the vault header.
@@ -50,8 +50,8 @@ pub fn encapsulate_vault_key(
     kyber_pk_bytes: &[u8],
     vault_key: &[u8; 32],
 ) -> Result<(Vec<u8>, Vec<u8>), CypheriaError> {
-    let pk = kyber1024::PublicKey::from_bytes(kyber_pk_bytes)
-        .map_err(|_| CypheriaError::CryptoError)?;
+    let pk =
+        kyber1024::PublicKey::from_bytes(kyber_pk_bytes).map_err(|_| CypheriaError::CryptoError)?;
 
     let (shared_secret, ciphertext) = kyber1024::encapsulate(&pk);
 
@@ -64,10 +64,9 @@ pub fn encapsulate_vault_key(
             std::ptr::write_bytes(ss_bytes.as_ptr() as *mut u8, 0u8, ss_bytes.len());
         }
     }
-    drop(shared_secret);
+    let _ = shared_secret;
 
-    let wrapped_vk = aes::wrap_key(&aes_key, vault_key)
-        .map_err(|_| CypheriaError::CryptoError)?;
+    let wrapped_vk = aes::wrap_key(&aes_key, vault_key).map_err(|_| CypheriaError::CryptoError)?;
 
     aes_key.zeroize();
 
@@ -86,8 +85,8 @@ pub fn decapsulate_vault_key(
     kyber_ciphertext: &[u8],
     wrapped_vk: &[u8],
 ) -> Result<[u8; 32], CypheriaError> {
-    let sk = kyber1024::SecretKey::from_bytes(kyber_sk_bytes)
-        .map_err(|_| CypheriaError::CryptoError)?;
+    let sk =
+        kyber1024::SecretKey::from_bytes(kyber_sk_bytes).map_err(|_| CypheriaError::CryptoError)?;
     let ct = kyber1024::Ciphertext::from_bytes(kyber_ciphertext)
         .map_err(|_| CypheriaError::CryptoError)?;
 
@@ -102,7 +101,7 @@ pub fn decapsulate_vault_key(
             std::ptr::write_bytes(ss_bytes.as_ptr() as *mut u8, 0u8, ss_bytes.len());
         }
     }
-    drop(shared_secret);
+    let _ = shared_secret;
 
     let vault_key = aes::unwrap_key(&aes_key, wrapped_vk)?;
     aes_key.zeroize();
@@ -120,8 +119,7 @@ mod tests {
         let kp = generate_keypair();
         let vault_key = [0xDE_u8; 32];
 
-        let (ciphertext, wrapped_vk) =
-            encapsulate_vault_key(&kp.public_key, &vault_key).unwrap();
+        let (ciphertext, wrapped_vk) = encapsulate_vault_key(&kp.public_key, &vault_key).unwrap();
 
         let recovered = decapsulate_vault_key(&kp.secret_key, &ciphertext, &wrapped_vk).unwrap();
         assert_eq!(recovered, vault_key, "Decapsulated VK must match original");
@@ -133,13 +131,15 @@ mod tests {
         let kp2 = generate_keypair();
         let vault_key = [0xAB_u8; 32];
 
-        let (ciphertext, wrapped_vk) =
-            encapsulate_vault_key(&kp1.public_key, &vault_key).unwrap();
+        let (ciphertext, wrapped_vk) = encapsulate_vault_key(&kp1.public_key, &vault_key).unwrap();
 
         // Using kp2's secret key to decapsulate kp1's ciphertext should fail or return garbage
         // (Kyber decapsulation always succeeds but produces a wrong shared secret)
         let result = decapsulate_vault_key(&kp2.secret_key, &ciphertext, &wrapped_vk);
         // The AES unwrap will fail because the shared secret is different
-        assert!(result.is_err(), "Wrong secret key must not recover the vault key");
+        assert!(
+            result.is_err(),
+            "Wrong secret key must not recover the vault key"
+        );
     }
 }

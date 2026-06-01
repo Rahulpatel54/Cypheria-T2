@@ -6,7 +6,7 @@
 //!   entry   — Entry CRUD: add, decrypt, get_password, update (with key rotation), delete
 //!   notes   — Notes CRUD: add, decrypt, update (with key rotation), delete
 
-pub mod format;
-pub mod store;
 pub mod entry;
+pub mod format;
 pub mod notes;
+pub mod store;

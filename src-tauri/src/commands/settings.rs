@@ -1,11 +1,11 @@
-use std::sync::Arc;
-use tauri::State;
-use zeroize::Zeroize;
 use crate::{
     error::CypheriaError,
     models::settings::Settings,
-    session::{manager::SessionManager, autolock::AutoLockTimer},
+    session::{autolock::AutoLockTimer, manager::SessionManager},
 };
+use std::sync::Arc;
+use tauri::State;
+use zeroize::Zeroize;
 
 #[tauri::command]
 pub async fn get_settings(

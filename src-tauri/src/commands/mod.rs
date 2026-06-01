@@ -31,7 +31,10 @@ macro_rules! safe_command {
         let result = { $body };
 
         #[cfg(debug_assertions)]
-        eprintln!("[Cypheria] command completed in {:.2}ms", _cmd_start.elapsed().as_secs_f64() * 1000.0);
+        eprintln!(
+            "[Cypheria] command completed in {:.2}ms",
+            _cmd_start.elapsed().as_secs_f64() * 1000.0
+        );
 
         result
     }};
@@ -68,15 +71,14 @@ macro_rules! catch_sync_panic {
 }
 
 pub mod auth;
+pub mod clipboard;
 pub mod entries;
-pub mod notes;
 pub mod generator;
+pub mod notes;
+pub mod reveal;
 pub mod settings;
 pub mod vault_mgmt;
 pub mod vault_path;
-pub mod clipboard;
-pub mod reveal;
-
 
 #[must_use = "UUID validation result must be checked with ?"]
 pub(crate) fn validate_uuid(id: &str) -> Result<(), crate::error::CypheriaError> {

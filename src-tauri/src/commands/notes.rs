@@ -1,12 +1,12 @@
-use std::sync::Arc;
-use tauri::State;
-use crate::models::note::{NoteInput, NoteView, NoteContentView};
 use crate::commands::validate_uuid;
+use crate::models::note::{NoteContentView, NoteInput, NoteView};
 use crate::{
     error::CypheriaError,
-    session::{manager::SessionManager, autolock::AutoLockTimer},
+    session::{autolock::AutoLockTimer, manager::SessionManager},
     vault::notes,
 };
+use std::sync::Arc;
+use tauri::State;
 
 #[tauri::command]
 pub async fn get_all_notes(
@@ -75,11 +75,7 @@ pub async fn save_note(
                         Ok(id.clone())
                     } else {
                         // ADD new note
-                        notes::add_note(
-                            key_store.vault_key_bytes(),
-                            &mut vault_store.data,
-                            input,
-                        )
+                        notes::add_note(key_store.vault_key_bytes(), &mut vault_store.data, input)
                     }
                 })
             })

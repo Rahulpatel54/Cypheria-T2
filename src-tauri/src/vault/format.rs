@@ -15,8 +15,8 @@
 //! The HMAC covers everything from MAGIC through the last byte of DATA.
 //! It is verified with a subkey derived from the Master Key.
 
-use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 pub const MAGIC: &[u8] = b"CYPHERIA\x01";
 pub const FORMAT_VERSION: u16 = 1;
@@ -29,8 +29,8 @@ pub struct VaultHeader {
     pub argon2_salt: [u8; 32],
 
     /// KDF parameters snapshot — allows future clients to use the correct params.
-    pub kdf_memory_kb:   u32,
-    pub kdf_iterations:  u32,
+    pub kdf_memory_kb: u32,
+    pub kdf_iterations: u32,
     pub kdf_parallelism: u32,
 
     /// Vault Key wrapped with Master Key (AES-256-GCM).
@@ -75,9 +75,9 @@ impl std::fmt::Debug for VaultHeader {
 /// It never appears on disk in plaintext.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VaultData {
-    pub entries:    Vec<EncryptedEntry>,
-    pub notes:      Vec<EncryptedNote>,
-    pub settings:   EncryptedSettings,
+    pub entries: Vec<EncryptedEntry>,
+    pub notes: Vec<EncryptedNote>,
+    pub settings: EncryptedSettings,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -94,14 +94,14 @@ pub struct EncryptedEntry {
     /// UUID v4 — non-sensitive, used for lookups.
     pub id: String,
 
-    pub created_at:  DateTime<Utc>,
-    pub updated_at:  DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub is_favorite: bool,
 
     /// UI metadata — plaintext for fast rendering without decryption.
     pub category: String,
-    pub color:    String,
-    pub emoji:    String,
+    pub color: String,
+    pub emoji: String,
 
     /// Entry Key wrapped with Vault Key.
     /// Format: nonce(12) || AES-GCM(VK, ek_bytes)(32+16) = 60 bytes
@@ -115,7 +115,7 @@ pub struct EncryptedEntry {
 /// A note stored in the vault. Same encryption pattern as entries.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EncryptedNote {
-    pub id:         String,
+    pub id: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 
@@ -135,20 +135,18 @@ pub struct EncryptedSettings {
 
 /// Plaintext credential payload — NEVER written to disk.
 /// Zeroized automatically when dropped (ZeroizeOnDrop).
-#[derive(Debug, Serialize, Deserialize)]
-#[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
+#[derive(Debug, Serialize, Deserialize, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct EntryPayload {
-    pub name:     String,
+    pub name: String,
     pub username: String,
     pub password: String,
-    pub website:  String,
-    pub notes:    String,
+    pub website: String,
+    pub notes: String,
 }
 
 /// Plaintext note payload — NEVER written to disk.
-#[derive(Debug, Serialize, Deserialize)]
-#[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
+#[derive(Debug, Serialize, Deserialize, zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
 pub struct NotePayload {
-    pub title:   String,
+    pub title: String,
     pub content: String,
 }

@@ -1,8 +1,8 @@
 //! All random bytes in Cypheria flow through this module.
 //! Never call rand or getrandom directly elsewhere.
 
-use rand::RngCore;
 use rand::rngs::OsRng;
+use rand::RngCore;
 
 /// Generate cryptographically secure random bytes via OS entropy (getrandom).
 pub fn secure_random_bytes<const N: usize>() -> [u8; N] {

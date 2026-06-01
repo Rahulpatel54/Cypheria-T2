@@ -6,15 +6,15 @@
 //!   - `update_entry()` rotates the Entry Key on every call (forward secrecy within vault).
 //!   - All Entry Keys are zeroized immediately after use (not held in memory).
 
-use uuid::Uuid;
-use chrono::Utc;
-use zeroize::Zeroize;
 use crate::{
     crypto::{aes, rng},
     error::CypheriaError,
-    vault::format::*,
     models::entry::{EntryInput, EntryView},
+    vault::format::*,
 };
+use chrono::Utc;
+use uuid::Uuid;
+use zeroize::Zeroize;
 
 /// Encrypt a new entry and append it to vault data.
 ///
@@ -35,11 +35,11 @@ pub fn add_entry(
     let mut ek_bytes = rng::entry_key();
 
     let payload = EntryPayload {
-        name:     input.name.clone(),
+        name: input.name.clone(),
         username: input.username.clone(),
         password: input.password.clone(),
-        website:  input.website.clone(),
-        notes:    input.notes.clone(),
+        website: input.website.clone(),
+        notes: input.notes.clone(),
     };
 
     let payload_json = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
@@ -50,17 +50,17 @@ pub fn add_entry(
     let ek_wrapped = aes::wrap_key(vault_key, &ek_bytes)?;
     ek_bytes.zeroize();
 
-    let id  = Uuid::new_v4().to_string();
+    let id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
     vault_data.entries.push(EncryptedEntry {
         id: id.clone(),
-        created_at:  now,
-        updated_at:  now,
+        created_at: now,
+        updated_at: now,
         is_favorite: input.is_favorite.unwrap_or(false),
-        category:    input.category.unwrap_or_default(),
-        color:       input.color.unwrap_or_default(),
-        emoji:       input.emoji.unwrap_or_default(),
+        category: input.category.unwrap_or_default(),
+        color: input.color.unwrap_or_default(),
+        emoji: input.emoji.unwrap_or_default(),
         ek_wrapped,
         payload_encrypted,
     });
@@ -89,22 +89,22 @@ pub fn decrypt_entry(
     let decrypt_result = aes::decrypt(&ek_bytes, &encrypted_entry.payload_encrypted);
     ek_bytes.zeroize(); // always runs, even on error
     let mut plaintext = decrypt_result?;
-        let payload: EntryPayload =
-            serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;
-        plaintext.zeroize();
+    let payload: EntryPayload =
+        serde_json::from_slice(&plaintext).map_err(|_| CypheriaError::VaultCorrupted)?;
+    plaintext.zeroize();
 
     Ok(EntryView {
-        id:              encrypted_entry.id.clone(),
-        created_at:      encrypted_entry.created_at.to_rfc3339(),
-        updated_at:      encrypted_entry.updated_at.to_rfc3339(),
-        is_favorite:     encrypted_entry.is_favorite,
-        category:        encrypted_entry.category.clone(),
-        color:           encrypted_entry.color.clone(),
-        emoji:           encrypted_entry.emoji.clone(),
-        name:            payload.name.clone(),
-        username:        payload.username.clone(),
-        website:         payload.website.clone(),
-        notes:           payload.notes.clone(),
+        id: encrypted_entry.id.clone(),
+        created_at: encrypted_entry.created_at.to_rfc3339(),
+        updated_at: encrypted_entry.updated_at.to_rfc3339(),
+        is_favorite: encrypted_entry.is_favorite,
+        category: encrypted_entry.category.clone(),
+        color: encrypted_entry.color.clone(),
+        emoji: encrypted_entry.emoji.clone(),
+        name: payload.name.clone(),
+        username: payload.username.clone(),
+        website: payload.website.clone(),
+        notes: payload.notes.clone(),
         password_masked: true, // password intentionally withheld
     })
     // payload.zeroize() fires on drop (ZeroizeOnDrop)
@@ -167,27 +167,27 @@ pub fn update_entry(
     let mut new_ek = rng::entry_key();
 
     let payload = EntryPayload {
-        name:     input.name,
+        name: input.name,
         username: input.username,
         password: input.password,
-        website:  input.website,
-        notes:    input.notes,
+        website: input.website,
+        notes: input.notes,
     };
 
-    let payload_json      = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
+    let payload_json = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
     let payload_encrypted = aes::encrypt(&new_ek, &payload_json)?;
-    let mut payload_json  = payload_json;
+    let mut payload_json = payload_json;
     payload_json.zeroize();
-    let ek_wrapped        = aes::wrap_key(vault_key, &new_ek)?;
+    let ek_wrapped = aes::wrap_key(vault_key, &new_ek)?;
     new_ek.zeroize();
 
     encrypted_entry.payload_encrypted = payload_encrypted;
-    encrypted_entry.ek_wrapped        = ek_wrapped;
-    encrypted_entry.updated_at        = Utc::now();
-    encrypted_entry.is_favorite       = input.is_favorite.unwrap_or(encrypted_entry.is_favorite);
-    encrypted_entry.category          = input.category.unwrap_or(encrypted_entry.category.clone());
-    encrypted_entry.color             = input.color.unwrap_or(encrypted_entry.color.clone());
-    encrypted_entry.emoji             = input.emoji.unwrap_or(encrypted_entry.emoji.clone());
+    encrypted_entry.ek_wrapped = ek_wrapped;
+    encrypted_entry.updated_at = Utc::now();
+    encrypted_entry.is_favorite = input.is_favorite.unwrap_or(encrypted_entry.is_favorite);
+    encrypted_entry.category = input.category.unwrap_or(encrypted_entry.category.clone());
+    encrypted_entry.color = input.color.unwrap_or(encrypted_entry.color.clone());
+    encrypted_entry.emoji = input.emoji.unwrap_or(encrypted_entry.emoji.clone());
 
     // ERR-007 fix: stamp the vault-level updated_at on every mutation.
     vault_data.updated_at = Utc::now();
@@ -197,22 +197,34 @@ pub fn update_entry(
 
 fn validate_entry_input(input: &EntryInput) -> Result<(), CypheriaError> {
     if input.name.trim().is_empty() {
-        return Err(CypheriaError::InvalidInput("Entry name cannot be empty".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Entry name cannot be empty".into(),
+        ));
     }
     if input.name.len() > 256 {
-        return Err(CypheriaError::InvalidInput("Entry name too long (max 256 chars)".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Entry name too long (max 256 chars)".into(),
+        ));
     }
     if input.username.len() > 512 {
-        return Err(CypheriaError::InvalidInput("Username too long (max 512 chars)".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Username too long (max 512 chars)".into(),
+        ));
     }
     if input.password.len() > 4096 {
-        return Err(CypheriaError::InvalidInput("Password too long (max 4096 chars)".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Password too long (max 4096 chars)".into(),
+        ));
     }
     if input.website.len() > 2048 {
-        return Err(CypheriaError::InvalidInput("Website URL too long (max 2048 chars)".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Website URL too long (max 2048 chars)".into(),
+        ));
     }
     if input.notes.len() > 65536 {
-        return Err(CypheriaError::InvalidInput("Notes too long (max 64 KB)".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Notes too long (max 64 KB)".into(),
+        ));
     }
     Ok(())
 }
@@ -220,7 +232,7 @@ fn validate_entry_input(input: &EntryInput) -> Result<(), CypheriaError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vault::format::{VaultData, EncryptedSettings};
+    use crate::vault::format::{EncryptedSettings, VaultData};
     use chrono::Utc;
 
     // Helper: empty in-memory vault
@@ -228,13 +240,17 @@ mod tests {
         VaultData {
             entries: vec![],
             notes: vec![],
-            settings: EncryptedSettings { payload_encrypted: vec![] },
+            settings: EncryptedSettings {
+                payload_encrypted: vec![],
+            },
             updated_at: Utc::now(),
         }
     }
 
     // Fixed test vault key
-    fn test_vk() -> [u8; 32] { [0xAB_u8; 32] }
+    fn test_vk() -> [u8; 32] {
+        [0xAB_u8; 32]
+    }
 
     // Helper: minimal valid EntryInput
     fn sample_input(name: &str) -> EntryInput {

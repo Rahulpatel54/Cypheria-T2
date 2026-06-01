@@ -10,8 +10,8 @@
 //!   kyber  — CRYSTALS-Kyber-1024 post-quantum key encapsulation
 //!   keys   — In-memory key hierarchy types (all ZeroizeOnDrop)
 
-pub mod rng;
-pub mod kdf;
 pub mod aes;
-pub mod kyber;
+pub mod kdf;
 pub mod keys;
+pub mod kyber;
+pub mod rng;

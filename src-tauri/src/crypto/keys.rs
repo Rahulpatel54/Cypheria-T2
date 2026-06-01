@@ -5,8 +5,8 @@
 // This prevents accidental Debug-printing of key material and ensures
 // the memory is zeroized when Secret is dropped.
 
+use secrecy::{ExposeSecret, Secret};
 use zeroize::ZeroizeOnDrop;
-use secrecy::{Secret, ExposeSecret};
 
 /// Key hierarchy types — the nerve center of Cypheria's security model.
 /// Every type that holds key material implements ZeroizeOnDrop.
@@ -62,14 +62,14 @@ pub struct EntryKey(pub(crate) [u8; 32]);
 /// variant, which drops this struct and triggers both cleanup paths.
 pub struct ActiveKeyStore {
     pub master_key: MasterKey,
-    pub vault_key:  VaultKey,
+    pub vault_key: VaultKey,
 }
 
 impl ActiveKeyStore {
     pub fn new(mk: [u8; 32], vk: [u8; 32]) -> Self {
         Self {
             master_key: MasterKey::new(mk),
-            vault_key:  VaultKey(vk),
+            vault_key: VaultKey(vk),
         }
     }
 

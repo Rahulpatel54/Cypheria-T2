@@ -4,13 +4,13 @@
 //! variant is replaced with Locked (EntryPayload and NotePayload inside
 //! VaultData implement ZeroizeOnDrop).
 
-use std::path::Path;
-use zeroize::Zeroize;
 use crate::{
-    crypto::{kdf, aes, keys::ActiveKeyStore},
+    crypto::{aes, kdf, keys::ActiveKeyStore},
     error::CypheriaError,
     vault::format::*,
 };
+use std::path::Path;
+use zeroize::Zeroize;
 
 /// Encrypt the vault name with a master-key-derived subkey.
 pub fn encrypt_vault_name(master_key: &[u8; 32], name: &str) -> Result<Vec<u8>, CypheriaError> {
@@ -23,10 +23,13 @@ pub fn encrypt_vault_name(master_key: &[u8; 32], name: &str) -> Result<Vec<u8>, 
 
 /// Decrypt the vault name. Returns None if blob is empty or decryption fails.
 pub fn decrypt_vault_name(master_key: &[u8; 32], blob: &[u8]) -> Option<String> {
-    if blob.is_empty() { return None; }
+    if blob.is_empty() {
+        return None;
+    }
     let mut subkey = [0u8; 32];
     crate::crypto::kdf::derive_subkey(master_key, b"VAULT_NAME_ENCRYPTION_MK", &mut subkey);
-    let result = crate::crypto::aes::decrypt(&subkey, blob).ok()
+    let result = crate::crypto::aes::decrypt(&subkey, blob)
+        .ok()
         .and_then(|bytes| String::from_utf8(bytes).ok());
     subkey.zeroize();
     result
@@ -34,7 +37,7 @@ pub fn decrypt_vault_name(master_key: &[u8; 32], blob: &[u8]) -> Option<String> 
 
 /// In-memory vault state (decrypted).
 pub struct VaultStore {
-    pub data:   VaultData,
+    pub data: VaultData,
     pub header: VaultHeader,
 }
 
@@ -81,7 +84,7 @@ pub async fn load_and_unlock(
     ) as usize;
 
     let header_start = header_len_offset + 4;
-    let header_end   = header_start + header_len;
+    let header_end = header_start + header_len;
 
     if file_bytes.len() < header_end {
         return Err(CypheriaError::VaultCorrupted);
@@ -127,7 +130,7 @@ pub async fn load_and_unlock(
     }
     let hmac_start = file_bytes.len() - 32;
     let covered_region = &file_bytes[..hmac_start];
-    let expected_hmac  = &file_bytes[hmac_start..];
+    let expected_hmac = &file_bytes[hmac_start..];
     verify_vault_hmac(covered_region, expected_hmac, &hmac_key)?;
     hmac_key.zeroize();
 
@@ -139,7 +142,13 @@ pub async fn load_and_unlock(
     let vk_bytes = aes::unwrap_key(&mk_bytes, &header.vk_wrapped_classical)?;
     let vault_data = decrypt_vault_data(&vk_bytes, &file_bytes[data_start..hmac_start])?;
     let key_store = ActiveKeyStore::new(mk_bytes, vk_bytes);
-    Ok((key_store, VaultStore { data: vault_data, header }))
+    Ok((
+        key_store,
+        VaultStore {
+            data: vault_data,
+            header,
+        },
+    ))
 }
 
 /// Constant-time HMAC verification.
@@ -155,8 +164,7 @@ fn verify_vault_hmac(
     use sha2::Sha256;
     use subtle::ConstantTimeEq;
 
-    let mut mac = <Hmac<Sha256>>::new_from_slice(key)
-        .map_err(|_| CypheriaError::CryptoError)?;
+    let mut mac = <Hmac<Sha256>>::new_from_slice(key).map_err(|_| CypheriaError::CryptoError)?;
     mac.update(covered_data);
     let computed = mac.finalize().into_bytes();
 
@@ -183,8 +191,9 @@ pub fn read_settings(
     let result = crate::crypto::aes::decrypt(&settings_key, &vault_data.settings.payload_encrypted);
     settings_key.zeroize();
     match result {
-        Ok(json) => serde_json::from_slice::<crate::models::settings::Settings>(&json)
-            .unwrap_or_default(),
+        Ok(json) => {
+            serde_json::from_slice::<crate::models::settings::Settings>(&json).unwrap_or_default()
+        }
         Err(_) => crate::models::settings::Settings::default(),
     }
 }
@@ -207,8 +216,8 @@ pub async fn persist_vault(
 
     // Serialize VaultHeader
     let header_bytes = bincode::serialize(header).map_err(|_| CypheriaError::SerdeError)?;
-    let header_len   = (header_bytes.len() as u32).to_le_bytes();
-    let data_len     = (encrypted_data.len() as u32).to_le_bytes();
+    let header_len = (header_bytes.len() as u32).to_le_bytes();
+    let data_len = (encrypted_data.len() as u32).to_le_bytes();
 
     // Assemble the region to be HMAC-signed (Version 2 layout):
     // MAGIC + VERSION + HEADER_LEN + HEADER + DATA_LEN + DATA
@@ -222,12 +231,16 @@ pub async fn persist_vault(
 
     // Derive HMAC subkey and sign the entire region
     let mut hmac_key = [0u8; 32];
-    kdf::derive_subkey(key_store.master_key_bytes(), b"HMAC_VAULT_INTEGRITY", &mut hmac_key);
+    kdf::derive_subkey(
+        key_store.master_key_bytes(),
+        b"HMAC_VAULT_INTEGRITY",
+        &mut hmac_key,
+    );
 
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
-    let mut mac = <Hmac<Sha256>>::new_from_slice(&hmac_key)
-        .map_err(|_| CypheriaError::CryptoError)?;
+    let mut mac =
+        <Hmac<Sha256>>::new_from_slice(&hmac_key).map_err(|_| CypheriaError::CryptoError)?;
     mac.update(&file);
     let hmac_bytes = mac.finalize().into_bytes();
     hmac_key.zeroize();

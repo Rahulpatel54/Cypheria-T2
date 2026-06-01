@@ -6,25 +6,25 @@
 //! Registers all Tauri commands and initializes shared application state:
 //!   - SessionManager: vault lock/unlock state machine
 //!   - AutoLockTimer: inactivity timer background task
-use tauri::Manager;
 use std::sync::Arc;
+use tauri::Manager;
 
-pub mod error;
-pub mod crypto;
-pub mod vault;
-pub mod session;
 pub mod commands;
+pub mod crypto;
+pub mod error;
 pub mod models;
+pub mod session;
+pub mod vault;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let session  = Arc::new(session::manager::SessionManager::new());
+    let session = Arc::new(session::manager::SessionManager::new());
     let autolock = Arc::new(session::autolock::AutoLockTimer::new(300)); // 5-minute default
-    let clipboard_timer = Arc::new(crate::commands::clipboard::ClipboardTimer(
-        Arc::new(tokio::sync::Mutex::new(None)),
-));
+    let clipboard_timer = Arc::new(crate::commands::clipboard::ClipboardTimer(Arc::new(
+        tokio::sync::Mutex::new(None),
+    )));
 
-let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
+    let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
 
     tauri::Builder::default()
         // ── Plugins ────────────────────────────────────────────────────────
@@ -77,27 +77,31 @@ let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
         ])
         .setup(move |app| {
             // Start auto-lock background task
-            let autolock_clone  = autolock.clone();
-            let session_clone   = session.clone();
-            let app_handle      = app.handle().clone();
+            let autolock_clone = autolock.clone();
+            let session_clone = session.clone();
+            let app_handle = app.handle().clone();
             autolock_clone.start(session_clone.clone(), app_handle.clone());
 
             // Lock-on-blur: watch for window focus loss in the Tauri backend,
             // not the webview, so it cannot be bypassed by frontend JS crashes.
             let session_blur = session_clone.clone();
-            let app_blur     = app_handle.clone();
-            app.get_webview_window("main").map(|win| {
+            let app_blur = app_handle.clone();
+            if let Some(win) = app.get_webview_window("main") {
                 win.on_window_event(move |event| {
                     if let tauri::WindowEvent::Focused(false) = event {
-                        // Read the lock-on-blur setting from the session if unlocked
                         let session_ref = session_blur.clone();
-                        let app_ref     = app_blur.clone();
+                        let app_ref = app_blur.clone();
                         tauri::async_runtime::spawn(async move {
-                            let should_lock = session_ref.with_session(|ks, vs| {
-                                Ok(crate::vault::store::read_settings(
-                                    ks.vault_key_bytes(), &vs.data,
-                                ).lock_on_blur)
-                            }).await.unwrap_or(false);
+                            let should_lock = session_ref
+                                .with_session(|ks, vs| {
+                                    Ok(crate::vault::store::read_settings(
+                                        ks.vault_key_bytes(),
+                                        &vs.data,
+                                    )
+                                    .lock_on_blur)
+                                })
+                                .await
+                                .unwrap_or(false);
 
                             if should_lock {
                                 session_ref.lock().await;
@@ -107,7 +111,7 @@ let reveal_store = Arc::new(crate::commands::reveal::RevealStore::new());
                         });
                     }
                 });
-            });
+            }
 
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Regular);

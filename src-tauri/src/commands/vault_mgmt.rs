@@ -1,11 +1,11 @@
 //! Vault management commands — open, export, meta.
-use std::sync::Arc;
-use tauri::State;
 use crate::{
     error::CypheriaError,
-    session::{manager::SessionManager, autolock::AutoLockTimer},
+    session::{autolock::AutoLockTimer, manager::SessionManager},
     vault::format::VaultHeader,
 };
+use std::sync::Arc;
+use tauri::State;
 
 /// Open an existing vault by validating the file and returning its canonical path.
 /// The actual unlock (key derivation) is done via unlock_vault().
@@ -59,21 +59,25 @@ pub async fn export_vault(
         autolock.bump_activity();
 
         let pwd_bytes = password.into_bytes();
-        let verified = session.with_session(|key_store, vault_store| {
-            use zeroize::Zeroize;
-            let derived = crate::crypto::kdf::derive_master_key_with_params(
-                &pwd_bytes,
-                &vault_store.header.argon2_salt,
-                vault_store.header.kdf_memory_kb,
-                vault_store.header.kdf_iterations,
-                vault_store.header.kdf_parallelism,
-            )?;
-            let mut derived_mut = derived;
-            let matches = derived_mut == *key_store.master_key_bytes();
-            derived_mut.zeroize();
-            if !matches { return Err(CypheriaError::AuthFailed); }
-            Ok(())
-        }).await;
+        let verified = session
+            .with_session(|key_store, vault_store| {
+                use zeroize::Zeroize;
+                let derived = crate::crypto::kdf::derive_master_key_with_params(
+                    &pwd_bytes,
+                    &vault_store.header.argon2_salt,
+                    vault_store.header.kdf_memory_kb,
+                    vault_store.header.kdf_iterations,
+                    vault_store.header.kdf_parallelism,
+                )?;
+                let mut derived_mut = derived;
+                let matches = derived_mut == *key_store.master_key_bytes();
+                derived_mut.zeroize();
+                if !matches {
+                    return Err(CypheriaError::AuthFailed);
+                }
+                Ok(())
+            })
+            .await;
         drop(pwd_bytes);
         verified?;
 
@@ -94,7 +98,7 @@ pub async fn export_vault(
 
         let tmp_dest = dest.with_extension("qvault.tmp");
         match tokio::fs::copy(&vault_path, &tmp_dest).await {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => return Err(CypheriaError::IoError(e)),
         }
         let rename_result = tokio::fs::rename(&tmp_dest, &dest).await;
@@ -109,8 +113,8 @@ pub async fn export_vault(
 /// View model returned to the frontend — only non-sensitive header metadata.
 #[derive(serde::Serialize)]
 pub struct VaultMetaView {
-    pub vault_name:     String,
-    pub created_at:     String,
+    pub vault_name: String,
+    pub created_at: String,
     pub format_version: u16,
 }
 
@@ -136,10 +140,12 @@ pub async fn get_vault_meta(
         }
 
         let mut file = tokio::fs::File::open(&path).await?;
-        
+
         // Step 1: Verify Magic
         let mut magic_buf = [0u8; 9];
-        file.read_exact(&mut magic_buf).await.map_err(|_| CypheriaError::VaultCorrupted)?;
+        file.read_exact(&mut magic_buf)
+            .await
+            .map_err(|_| CypheriaError::VaultCorrupted)?;
         if magic_buf != MAGIC {
             return Err(CypheriaError::VaultCorrupted);
         }
@@ -149,31 +155,39 @@ pub async fn get_vault_meta(
 
         // Step 3: Read Header Len
         let mut len_buf = [0u8; 4];
-        file.read_exact(&mut len_buf).await.map_err(|_| CypheriaError::VaultCorrupted)?;
+        file.read_exact(&mut len_buf)
+            .await
+            .map_err(|_| CypheriaError::VaultCorrupted)?;
         let header_len = u32::from_le_bytes(len_buf) as usize;
 
         // Step 4: Read Header
         let mut header_bytes = vec![0u8; header_len];
-        file.read_exact(&mut header_bytes).await.map_err(|_| CypheriaError::VaultCorrupted)?;
-
-        let header: VaultHeader = bincode::deserialize(&header_bytes)
+        file.read_exact(&mut header_bytes)
+            .await
             .map_err(|_| CypheriaError::VaultCorrupted)?;
 
+        let header: VaultHeader =
+            bincode::deserialize(&header_bytes).map_err(|_| CypheriaError::VaultCorrupted)?;
+
         let display_name = if session.is_unlocked().await {
-            let decrypted = session.with_session(|key_store, _vault_store| {
-                Ok(crate::vault::store::decrypt_vault_name(
-                    key_store.master_key_bytes(),
-                    &header.vault_name_encrypted,
-                ))
-            }).await.ok().flatten();
+            let decrypted = session
+                .with_session(|key_store, _vault_store| {
+                    Ok(crate::vault::store::decrypt_vault_name(
+                        key_store.master_key_bytes(),
+                        &header.vault_name_encrypted,
+                    ))
+                })
+                .await
+                .ok()
+                .flatten();
             decrypted.unwrap_or_default()
         } else {
             String::new()
         };
 
         Ok(VaultMetaView {
-            vault_name:     display_name,
-            created_at:     header.created_at.to_rfc3339(),
+            vault_name: display_name,
+            created_at: header.created_at.to_rfc3339(),
             format_version: header.format_version,
         })
     })

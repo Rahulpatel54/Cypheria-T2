@@ -1,15 +1,15 @@
 //! Entry commands — CRUD operations exposed to the frontend via Tauri IPC.
 
-use std::sync::Arc;
-use zeroize::Zeroize;
-use tauri::State;
+use crate::commands::validate_uuid;
 use crate::{
     error::CypheriaError,
     models::entry::{EntryInput, EntryView},
-    session::{manager::SessionManager, autolock::AutoLockTimer},
+    session::{autolock::AutoLockTimer, manager::SessionManager},
     vault::entry,
 };
-use crate::commands::validate_uuid;
+use std::sync::Arc;
+use tauri::State;
+use zeroize::Zeroize;
 
 #[tauri::command]
 pub async fn get_all_entries(
@@ -46,7 +46,11 @@ pub async fn get_entry_password(
         session
             .with_session(|key_store, vault_store| {
                 catch_sync_panic!({
-                    entry::get_entry_password(key_store.vault_key_bytes(), &vault_store.data, &entry_id)
+                    entry::get_entry_password(
+                        key_store.vault_key_bytes(),
+                        &vault_store.data,
+                        &entry_id,
+                    )
                 })
             })
             .await
@@ -170,7 +174,11 @@ pub async fn request_reveal_token(
         let password = session
             .with_session(|key_store, vault_store| {
                 catch_sync_panic!({
-                    entry::get_entry_password(key_store.vault_key_bytes(), &vault_store.data, &entry_id)
+                    entry::get_entry_password(
+                        key_store.vault_key_bytes(),
+                        &vault_store.data,
+                        &entry_id,
+                    )
                 })
             })
             .await?;
@@ -186,7 +194,11 @@ pub async fn consume_reveal_token(
     reveal_store: State<'_, Arc<crate::commands::reveal::RevealStore>>,
 ) -> Result<String, CypheriaError> {
     safe_command!({
-        reveal_store.consume(&token).ok_or(CypheriaError::InvalidInput("Invalid or expired token".into()))
+        reveal_store
+            .consume(&token)
+            .ok_or(CypheriaError::InvalidInput(
+                "Invalid or expired token".into(),
+            ))
     })
 }
 
@@ -318,15 +330,33 @@ pub async fn get_password_scores(
 
 /// Score a password 0–100 without external dependencies.
 fn compute_pwd_score(pwd: &str) -> u8 {
-    if pwd.is_empty() { return 0; }
+    if pwd.is_empty() {
+        return 0;
+    }
     let mut s: u32 = 0;
-    if pwd.len() >= 8  { s += 20; }
-    if pwd.len() >= 12 { s += 10; }
-    if pwd.len() >= 16 { s += 10; }
-    if pwd.len() >= 24 { s += 10; }
-    if pwd.chars().any(|c| c.is_ascii_uppercase()) { s += 15; }
-    if pwd.chars().any(|c| c.is_ascii_lowercase()) { s += 15; }
-    if pwd.chars().any(|c| c.is_ascii_digit())     { s += 10; }
-    if pwd.chars().any(|c| !c.is_alphanumeric())   { s += 10; }
+    if pwd.len() >= 8 {
+        s += 20;
+    }
+    if pwd.len() >= 12 {
+        s += 10;
+    }
+    if pwd.len() >= 16 {
+        s += 10;
+    }
+    if pwd.len() >= 24 {
+        s += 10;
+    }
+    if pwd.chars().any(|c| c.is_ascii_uppercase()) {
+        s += 15;
+    }
+    if pwd.chars().any(|c| c.is_ascii_lowercase()) {
+        s += 15;
+    }
+    if pwd.chars().any(|c| c.is_ascii_digit()) {
+        s += 10;
+    }
+    if pwd.chars().any(|c| !c.is_alphanumeric()) {
+        s += 10;
+    }
     s.min(100) as u8
 }

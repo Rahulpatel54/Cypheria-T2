@@ -8,8 +8,8 @@
 //! These commands are intentionally NOT session-guarded (no `with_session` call) because
 //! they are called before the vault is unlocked, during startup path resolution.
 
-use tauri::{AppHandle, Manager};
 use crate::error::CypheriaError;
+use tauri::{AppHandle, Manager};
 
 /// Returns the path to the persistence file: `{app_data_dir}/cypheria/last_vault.json`
 fn persistence_path(app: &AppHandle) -> Result<std::path::PathBuf, CypheriaError> {
@@ -50,12 +50,11 @@ pub async fn get_last_vault_path(app: AppHandle) -> Result<Option<String>, Cyphe
 /// Creates the directory if it doesn't exist.
 /// The path argument must be a non-empty string.
 #[tauri::command]
-pub async fn set_last_vault_path(
-    path: String,
-    app: AppHandle,
-) -> Result<(), CypheriaError> {
+pub async fn set_last_vault_path(path: String, app: AppHandle) -> Result<(), CypheriaError> {
     if path.trim().is_empty() {
-        return Err(CypheriaError::InvalidInput("Vault path cannot be empty".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Vault path cannot be empty".into(),
+        ));
     }
 
     let file_path = persistence_path(&app)?;
@@ -64,8 +63,7 @@ pub async fn set_last_vault_path(
         tokio::fs::create_dir_all(parent).await?;
     }
 
-    let json = serde_json::to_string(&Some(path.trim()))
-        .map_err(|_| CypheriaError::SerdeError)?;
+    let json = serde_json::to_string(&Some(path.trim())).map_err(|_| CypheriaError::SerdeError)?;
 
     tokio::fs::write(&file_path, json.as_bytes()).await?;
     Ok(())

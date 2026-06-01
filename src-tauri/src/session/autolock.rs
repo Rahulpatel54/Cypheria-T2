@@ -5,16 +5,16 @@
 //! When inactivity exceeds the configured timeout, the vault is locked
 //! and a "vault-auto-locked" Tauri event is emitted to the frontend.
 
-use std::sync::Arc;
+use crate::session::manager::SessionManager;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::time::{sleep, Duration};
-use crate::session::manager::SessionManager;
 
 pub struct AutoLockTimer {
     last_activity_unix_secs: Arc<AtomicU64>,
-    timeout_secs:            Arc<AtomicU64>,
-    running:                 Arc<AtomicBool>,
+    timeout_secs: Arc<AtomicU64>,
+    running: Arc<AtomicBool>,
 }
 
 impl AutoLockTimer {
@@ -22,14 +22,15 @@ impl AutoLockTimer {
         let now = now_secs();
         Self {
             last_activity_unix_secs: Arc::new(AtomicU64::new(now)),
-            timeout_secs:            Arc::new(AtomicU64::new(timeout_secs)),
-            running:                 Arc::new(AtomicBool::new(false)),
+            timeout_secs: Arc::new(AtomicU64::new(timeout_secs)),
+            running: Arc::new(AtomicBool::new(false)),
         }
     }
 
     /// Reset the inactivity timer. Call on every vault command.
     pub fn bump_activity(&self) {
-        self.last_activity_unix_secs.store(now_secs(), Ordering::Relaxed);
+        self.last_activity_unix_secs
+            .store(now_secs(), Ordering::Relaxed);
     }
 
     /// Update the timeout (called from save_settings).
@@ -70,7 +71,7 @@ impl AutoLockTimer {
                     continue;
                 }
 
-                let now  = now_secs();
+                let now = now_secs();
                 let last = timer_ref.last_activity_unix_secs.load(Ordering::Relaxed);
 
                 if now.saturating_sub(last) >= timeout && session.is_unlocked().await {
@@ -81,7 +82,6 @@ impl AutoLockTimer {
             }
         });
     }
-
 }
 
 fn now_secs() -> u64 {

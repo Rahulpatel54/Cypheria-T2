@@ -8,5 +8,5 @@
 //!               after a configurable period of inactivity and emits the
 //!               `vault-auto-locked` Tauri event to the frontend.
 
-pub mod manager;
 pub mod autolock;
+pub mod manager;

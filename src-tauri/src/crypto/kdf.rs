@@ -1,13 +1,13 @@
 //! Key derivation using Argon2id (OWASP-compliant parameters).
 
-use argon2::{Argon2, Algorithm, Version, Params};
 use crate::error::CypheriaError;
+use argon2::{Algorithm, Argon2, Params, Version};
 
 /// Argon2id parameters — OWASP recommended minimum for high-security use.
-pub const ARGON2_MEMORY_KB:   u32   = 65536; // 64 MB — defeats GPU brute force
-pub const ARGON2_ITERATIONS:  u32   = 3;
-pub const ARGON2_PARALLELISM: u32   = 4;
-pub const ARGON2_OUTPUT_LEN:  usize = 32;    // 256-bit master key
+pub const ARGON2_MEMORY_KB: u32 = 65536; // 64 MB — defeats GPU brute force
+pub const ARGON2_ITERATIONS: u32 = 3;
+pub const ARGON2_PARALLELISM: u32 = 4;
+pub const ARGON2_OUTPUT_LEN: usize = 32; // 256-bit master key
 
 /// Derives a 32-byte Master Key from the user's master password + salt.
 ///
@@ -51,13 +51,8 @@ pub fn derive_master_key_with_params(
     iterations: u32,
     parallelism: u32,
 ) -> Result<[u8; ARGON2_OUTPUT_LEN], CypheriaError> {
-    let params = Params::new(
-        memory_kb,
-        iterations,
-        parallelism,
-        Some(ARGON2_OUTPUT_LEN),
-    )
-    .map_err(|_| CypheriaError::KdfError)?;
+    let params = Params::new(memory_kb, iterations, parallelism, Some(ARGON2_OUTPUT_LEN))
+        .map_err(|_| CypheriaError::KdfError)?;
 
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut output_key = [0u8; ARGON2_OUTPUT_LEN];
@@ -89,8 +84,7 @@ pub fn derive_subkey(master_key: &[u8; 32], domain: &[u8], out: &mut [u8; 32]) {
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
 
-    let mut mac = <Hmac<Sha256>>::new_from_slice(master_key)
-        .expect("HMAC accepts any key length");
+    let mut mac = <Hmac<Sha256>>::new_from_slice(master_key).expect("HMAC accepts any key length");
     mac.update(b"CYPHERIA_SUBKEY_v1|");
     mac.update(domain);
     let result = mac.finalize().into_bytes();
@@ -135,7 +129,10 @@ mod tests {
             ARGON2_PARALLELISM,
         )
         .unwrap();
-        assert_eq!(key1, key2, "With-params must match default when constants are equal");
+        assert_eq!(
+            key1, key2,
+            "With-params must match default when constants are equal"
+        );
     }
 
     #[test]
@@ -145,7 +142,10 @@ mod tests {
         let salt = [0x01_u8; 32];
         let key1 = derive_master_key_with_params(password, &salt, 65536, 3, 4).unwrap();
         let key2 = derive_master_key_with_params(password, &salt, 32768, 3, 4).unwrap();
-        assert_ne!(key1, key2, "Different memory param must produce different key");
+        assert_ne!(
+            key1, key2,
+            "Different memory param must produce different key"
+        );
     }
 
     #[test]
@@ -155,7 +155,10 @@ mod tests {
         let mut out2 = [0u8; 32];
         derive_subkey(&mk, b"DOMAIN_A", &mut out1);
         derive_subkey(&mk, b"DOMAIN_B", &mut out2);
-        assert_ne!(out1, out2, "Different domains must produce different subkeys");
+        assert_ne!(
+            out1, out2,
+            "Different domains must produce different subkeys"
+        );
     }
 
     #[test]

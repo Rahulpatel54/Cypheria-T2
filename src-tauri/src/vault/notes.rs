@@ -1,15 +1,15 @@
 //! Notes CRUD operations.
 //! Same encryption pattern as entries — unique Note Key per note, wrapped with VK.
 
-use uuid::Uuid;
-use chrono::Utc;
-use zeroize::Zeroize;
 use crate::{
     crypto::{aes, rng},
     error::CypheriaError,
-    vault::format::*,
     models::note::{NoteInput, NoteView},
+    vault::format::*,
 };
+use chrono::Utc;
+use uuid::Uuid;
+use zeroize::Zeroize;
 
 /// Encrypt and add a new note to the vault.
 pub fn add_note(
@@ -22,7 +22,7 @@ pub fn add_note(
     let nk_bytes = rng::entry_key(); // Note Key
 
     let payload = NotePayload {
-        title:   input.title.clone(),
+        title: input.title.clone(),
         content: input.content.clone(),
     };
 
@@ -33,7 +33,7 @@ pub fn add_note(
     payload_json.zeroize();
     let ek_wrapped = aes::wrap_key(vault_key, &nk_bytes)?;
 
-    let id  = Uuid::new_v4().to_string();
+    let id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
     vault_data.notes.push(EncryptedNote {
@@ -70,10 +70,10 @@ pub fn decrypt_note(
     plaintext.zeroize();
 
     Ok(NoteView {
-        id:             encrypted_note.id.clone(),
-        created_at:     encrypted_note.created_at.to_rfc3339(),
-        updated_at:     encrypted_note.updated_at.to_rfc3339(),
-        title:          payload.title.clone(),
+        id: encrypted_note.id.clone(),
+        created_at: encrypted_note.created_at.to_rfc3339(),
+        updated_at: encrypted_note.updated_at.to_rfc3339(),
+        title: payload.title.clone(),
         content_masked: true,
     })
 }
@@ -102,8 +102,8 @@ pub fn get_note_content(
     plaintext.zeroize();
 
     let result = crate::models::note::NoteContentView {
-        id:      encrypted_note.id.clone(),
-        title:   payload.title.clone(),
+        id: encrypted_note.id.clone(),
+        title: payload.title.clone(),
         content: payload.content.clone(),
     };
     Ok(result)
@@ -124,23 +124,23 @@ pub fn update_note(
         .find(|n| n.id == note_id)
         .ok_or_else(|| CypheriaError::NoteNotFound(note_id.to_string()))?;
 
-    let mut new_nk = rng::entry_key();  
+    let mut new_nk = rng::entry_key();
 
     let payload = NotePayload {
-        title:   input.title,
+        title: input.title,
         content: input.content,
     };
 
-    let payload_json      = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
+    let payload_json = serde_json::to_vec(&payload).map_err(|_| CypheriaError::SerdeError)?;
     let payload_encrypted = aes::encrypt(&new_nk, &payload_json)?;
     let mut payload_json = payload_json;
     payload_json.zeroize();
-    let ek_wrapped        = aes::wrap_key(vault_key, &new_nk)?;
+    let ek_wrapped = aes::wrap_key(vault_key, &new_nk)?;
     new_nk.zeroize();
 
     encrypted_note.payload_encrypted = payload_encrypted;
-    encrypted_note.ek_wrapped        = ek_wrapped;
-    encrypted_note.updated_at        = Utc::now();
+    encrypted_note.ek_wrapped = ek_wrapped;
+    encrypted_note.updated_at = Utc::now();
 
     // ERR-007 fix: stamp the vault-level updated_at on every mutation.
     vault_data.updated_at = Utc::now();
@@ -151,13 +151,19 @@ pub fn update_note(
 fn validate_note_input(input: &NoteInput) -> Result<(), CypheriaError> {
     let trimmed_title = input.title.trim();
     if trimmed_title.is_empty() {
-        return Err(CypheriaError::InvalidInput("Note title cannot be empty".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Note title cannot be empty".into(),
+        ));
     }
     if trimmed_title.len() > 256 {
-        return Err(CypheriaError::InvalidInput("Note title too long (max 256 chars)".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Note title too long (max 256 chars)".into(),
+        ));
     }
     if input.content.len() > 1_048_576 {
-        return Err(CypheriaError::InvalidInput("Note content too long (max 1 MB)".into()));
+        return Err(CypheriaError::InvalidInput(
+            "Note content too long (max 1 MB)".into(),
+        ));
     }
     Ok(())
 }
@@ -165,23 +171,27 @@ fn validate_note_input(input: &NoteInput) -> Result<(), CypheriaError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vault::format::{VaultData, EncryptedSettings};
+    use crate::vault::format::{EncryptedSettings, VaultData};
     use chrono::Utc;
 
     fn empty_vault_data() -> VaultData {
         VaultData {
             entries: vec![],
             notes: vec![],
-            settings: EncryptedSettings { payload_encrypted: vec![] },
+            settings: EncryptedSettings {
+                payload_encrypted: vec![],
+            },
             updated_at: Utc::now(),
         }
     }
 
-    fn test_vk() -> [u8; 32] { [0xAB_u8; 32] }
+    fn test_vk() -> [u8; 32] {
+        [0xAB_u8; 32]
+    }
 
     fn sample_note_input(title: &str) -> NoteInput {
         NoteInput {
-            title:   title.to_string(),
+            title: title.to_string(),
             content: "This is the note body.".to_string(),
         }
     }
@@ -208,7 +218,7 @@ mod tests {
         let mut data = empty_vault_data();
         let id = add_note(&vk, &mut data, sample_note_input("Title")).unwrap();
         let full = get_note_content(&vk, &data, &id).unwrap();
-        assert_eq!(full.title,   "Title");
+        assert_eq!(full.title, "Title");
         assert_eq!(full.content, "This is the note body.");
     }
 
@@ -220,10 +230,16 @@ mod tests {
         let mut data = empty_vault_data();
         let id = add_note(&vk, &mut data, sample_note_input("Old Title")).unwrap();
         let old_ek = data.notes[0].ek_wrapped.clone();
-        update_note(&vk, &mut data, &id, NoteInput {
-            title:   "New Title".to_string(),
-            content: "Updated body.".to_string(),
-        }).unwrap();
+        update_note(
+            &vk,
+            &mut data,
+            &id,
+            NoteInput {
+                title: "New Title".to_string(),
+                content: "Updated body.".to_string(),
+            },
+        )
+        .unwrap();
         assert_ne!(
             data.notes[0].ek_wrapped, old_ek,
             "ek_wrapped must differ after update (key rotation)"
@@ -236,7 +252,7 @@ mod tests {
     #[test]
     fn test_decrypt_note_wrong_key_fails() {
         // Decryption with a wrong vault key must return an error
-        let vk       = test_vk();
+        let vk = test_vk();
         let wrong_vk = [0x00_u8; 32];
         let mut data = empty_vault_data();
         add_note(&vk, &mut data, sample_note_input("Secret")).unwrap();
@@ -250,8 +266,11 @@ mod tests {
     #[test]
     fn test_add_note_empty_title_rejected() {
         // Validation must reject an empty note title
-        let mut data  = empty_vault_data();
-        let bad_input = NoteInput { title: "".to_string(), content: "body".to_string() };
+        let mut data = empty_vault_data();
+        let bad_input = NoteInput {
+            title: "".to_string(),
+            content: "body".to_string(),
+        };
         assert!(add_note(&test_vk(), &mut data, bad_input).is_err());
     }
 
@@ -259,8 +278,11 @@ mod tests {
     #[test]
     fn test_add_note_whitespace_only_title_rejected() {
         // A title of only whitespace must be rejected (trim check)
-        let mut data  = empty_vault_data();
-        let bad_input = NoteInput { title: "   ".to_string(), content: "body".to_string() };
+        let mut data = empty_vault_data();
+        let bad_input = NoteInput {
+            title: "   ".to_string(),
+            content: "body".to_string(),
+        };
         assert!(add_note(&test_vk(), &mut data, bad_input).is_err());
     }
 
@@ -269,8 +291,11 @@ mod tests {
     fn test_add_note_title_too_long_rejected() {
         // Validation must reject titles over 256 characters
         let long_title = "a".repeat(257);
-        let mut data   = empty_vault_data();
-        let bad_input  = NoteInput { title: long_title, content: "body".to_string() };
+        let mut data = empty_vault_data();
+        let bad_input = NoteInput {
+            title: long_title,
+            content: "body".to_string(),
+        };
         assert!(add_note(&test_vk(), &mut data, bad_input).is_err());
     }
 
@@ -278,7 +303,7 @@ mod tests {
     #[test]
     fn test_get_note_content_nonexistent_id_fails() {
         // Requesting content for unknown ID must return NoteNotFound
-        let vk   = test_vk();
+        let vk = test_vk();
         let data = empty_vault_data();
         let result = get_note_content(&vk, &data, "00000000-0000-0000-0000-000000000000");
         assert!(result.is_err());
@@ -288,9 +313,9 @@ mod tests {
     #[test]
     fn test_vault_updated_at_stamped_on_add_note() {
         // vault_data.updated_at must be refreshed after add_note
-        let vk       = test_vk();
+        let vk = test_vk();
         let mut data = empty_vault_data();
-        let before   = data.updated_at;
+        let before = data.updated_at;
         std::thread::sleep(std::time::Duration::from_millis(10));
         add_note(&vk, &mut data, sample_note_input("TS")).unwrap();
         assert!(data.updated_at >= before);

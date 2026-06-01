@@ -1,22 +1,22 @@
 //! Session state machine.
 
-use std::sync::Arc;
-use std::time::{Instant, Duration};
+use crate::{crypto::keys::ActiveKeyStore, error::CypheriaError, vault::store::VaultStore};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use crate::{
-    crypto::keys::ActiveKeyStore,
-    vault::store::VaultStore,
-    error::CypheriaError,
-};
 
 fn attempts_hmac_key() -> [u8; 32] {
     let mut buf = String::new();
-    if let Ok(u) = std::env::var("USER").or_else(|_| std::env::var("USERNAME")) { buf.push_str(&u); }
+    if let Ok(u) = std::env::var("USER").or_else(|_| std::env::var("USERNAME")) {
+        buf.push_str(&u);
+    }
     buf.push_str("cypheria.attempts.v1");
     let mut key = [0u8; 32];
     let bytes = buf.as_bytes();
-    for (i, b) in bytes.iter().enumerate() { key[i % 32] ^= *b; }
+    for (i, b) in bytes.iter().enumerate() {
+        key[i % 32] ^= *b;
+    }
     key
 }
 
@@ -39,25 +39,36 @@ fn attempts_file_path() -> Option<std::path::PathBuf> {
 }
 
 fn read_persisted_attempts() -> (u32, u64) {
-    let path = match attempts_file_path() { Some(p) => p, None => return (0, 0) };
-    let Ok(bytes) = std::fs::read(&path) else { return (0, 0) };
-    let Ok(s)     = std::str::from_utf8(&bytes) else { return (0, 0) };
+    let path = match attempts_file_path() {
+        Some(p) => p,
+        None => return (0, 0),
+    };
+    let Ok(bytes) = std::fs::read(&path) else {
+        return (0, 0);
+    };
+    let Ok(s) = std::str::from_utf8(&bytes) else {
+        return (0, 0);
+    };
     let mut outer = s.trim().splitn(2, '|');
     let payload = outer.next().unwrap_or("");
-    let tag     = outer.next().unwrap_or("");
+    let tag = outer.next().unwrap_or("");
     if tag.is_empty() || !verify_attempts(payload, tag) {
         eprintln!("[Cypheria] attempts file failed HMAC verification — resetting to max");
         return (MAX_UNLOCK_ATTEMPTS, 0);
     }
     let parts: Vec<&str> = payload.splitn(2, ':').collect();
-    if parts.len() != 2 { return (0, 0); }
+    if parts.len() != 2 {
+        return (0, 0);
+    }
     let count = parts[0].parse::<u32>().unwrap_or(0);
     let until = parts[1].parse::<u64>().unwrap_or(0);
     (count, until)
 }
 
 fn write_persisted_attempts(count: u32, lockout_until_unix_secs: u64) {
-    let Some(path) = attempts_file_path() else { return };
+    let Some(path) = attempts_file_path() else {
+        return;
+    };
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
@@ -79,28 +90,28 @@ fn now_unix_secs() -> u64 {
         .as_secs()
 }
 
-pub const MAX_UNLOCK_ATTEMPTS:  u32 = 5;
+pub const MAX_UNLOCK_ATTEMPTS: u32 = 5;
 pub const LOCKOUT_DURATION_SECS: u64 = 30;
 
 pub enum SessionState {
     Locked,
     Unlocked {
-        key_store:   ActiveKeyStore,
+        key_store: ActiveKeyStore,
         vault_store: Box<VaultStore>,
-        vault_path:  std::path::PathBuf,
+        vault_path: std::path::PathBuf,
         unlocked_at: Instant,
     },
     RateLimited {
         locked_until: Instant,
-        attempts:     u32,
+        attempts: u32,
     },
 }
 
 pub struct SessionManager {
-    state:    Arc<RwLock<SessionState>>,
+    state: Arc<RwLock<SessionState>>,
     attempts: Arc<AtomicU32>,
     /// Tracks password reveal calls in the current window for rate limiting
-    reveal_count:        Arc<AtomicU32>,
+    reveal_count: Arc<AtomicU32>,
     /// Unix timestamp of when the current reveal window started
     reveal_window_start: Arc<AtomicU64>,
 }
@@ -108,9 +119,9 @@ pub struct SessionManager {
 impl SessionManager {
     pub fn new() -> Self {
         Self {
-            state:               Arc::new(RwLock::new(SessionState::Locked)),
-            attempts:            Arc::new(AtomicU32::new(0)),
-            reveal_count:        Arc::new(AtomicU32::new(0)),
+            state: Arc::new(RwLock::new(SessionState::Locked)),
+            attempts: Arc::new(AtomicU32::new(0)),
+            reveal_count: Arc::new(AtomicU32::new(0)),
             reveal_window_start: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -142,72 +153,72 @@ impl SessionManager {
         self.reveal_window_start.store(0, Ordering::SeqCst);
     }
 
-pub async fn unlock(
-    &self,
-    password: &[u8],
-    vault_path: &std::path::Path,
-) -> Result<(), CypheriaError> {
-    // Check in-memory rate-limit state first
-    {
-        let state = self.state.read().await;
-        if let SessionState::RateLimited { locked_until, .. } = &*state {
-            if Instant::now() < *locked_until {
-                let remaining = locked_until.duration_since(Instant::now()).as_secs();
+    pub async fn unlock(
+        &self,
+        password: &[u8],
+        vault_path: &std::path::Path,
+    ) -> Result<(), CypheriaError> {
+        // Check in-memory rate-limit state first
+        {
+            let state = self.state.read().await;
+            if let SessionState::RateLimited { locked_until, .. } = &*state {
+                if Instant::now() < *locked_until {
+                    let remaining = locked_until.duration_since(Instant::now()).as_secs();
+                    return Err(CypheriaError::RateLimited(remaining));
+                }
+            }
+        }
+
+        // Also check persisted lockout — this catches restarts mid-lockout
+        {
+            let (_, lockout_until) = read_persisted_attempts();
+            let now = now_unix_secs();
+            if lockout_until > now {
+                let remaining = lockout_until - now;
+                // Re-apply in-memory state so the rest of the session is consistent
+                let mut state = self.state.write().await;
+                *state = SessionState::RateLimited {
+                    locked_until: Instant::now() + Duration::from_secs(remaining),
+                    attempts: MAX_UNLOCK_ATTEMPTS,
+                };
                 return Err(CypheriaError::RateLimited(remaining));
             }
         }
-    }
 
-    // Also check persisted lockout — this catches restarts mid-lockout
-    {
-        let (_, lockout_until) = read_persisted_attempts();
-        let now = now_unix_secs();
-        if lockout_until > now {
-            let remaining = lockout_until - now;
-            // Re-apply in-memory state so the rest of the session is consistent
-            let mut state = self.state.write().await;
-            *state = SessionState::RateLimited {
-                locked_until: Instant::now() + Duration::from_secs(remaining),
-                attempts: MAX_UNLOCK_ATTEMPTS,
-            };
-            return Err(CypheriaError::RateLimited(remaining));
-        }
-    }
-
-    match crate::vault::store::load_and_unlock(password, vault_path).await {
-        Ok((key_store, vault_store)) => {
-            // Success — clear both in-memory and persisted attempt counters
-            self.attempts.store(0, Ordering::SeqCst);
-            clear_persisted_attempts();
-            let mut state = self.state.write().await;
-            *state = SessionState::Unlocked {
-                key_store,
-                vault_store: Box::new(vault_store),
-                vault_path: vault_path.to_path_buf(),
-                unlocked_at: Instant::now(),
-            };
-            Ok(())
-        }
-        Err(e) => {
-            let attempts = self.attempts.fetch_add(1, Ordering::SeqCst) + 1;
-            if attempts >= MAX_UNLOCK_ATTEMPTS {
+        match crate::vault::store::load_and_unlock(password, vault_path).await {
+            Ok((key_store, vault_store)) => {
+                // Success — clear both in-memory and persisted attempt counters
                 self.attempts.store(0, Ordering::SeqCst);
-                let lockout_until = now_unix_secs() + LOCKOUT_DURATION_SECS;
-                // Persist lockout timestamp so restart doesn't reset it
-                write_persisted_attempts(0, lockout_until);
+                clear_persisted_attempts();
                 let mut state = self.state.write().await;
-                *state = SessionState::RateLimited {
-                    locked_until: Instant::now() + Duration::from_secs(LOCKOUT_DURATION_SECS),
-                    attempts,
+                *state = SessionState::Unlocked {
+                    key_store,
+                    vault_store: Box::new(vault_store),
+                    vault_path: vault_path.to_path_buf(),
+                    unlocked_at: Instant::now(),
                 };
-                return Err(CypheriaError::RateLimited(LOCKOUT_DURATION_SECS));
+                Ok(())
             }
-            // Persist partial attempt count so restarts don't reset the counter
-            write_persisted_attempts(attempts, 0);
-            Err(e)
+            Err(e) => {
+                let attempts = self.attempts.fetch_add(1, Ordering::SeqCst) + 1;
+                if attempts >= MAX_UNLOCK_ATTEMPTS {
+                    self.attempts.store(0, Ordering::SeqCst);
+                    let lockout_until = now_unix_secs() + LOCKOUT_DURATION_SECS;
+                    // Persist lockout timestamp so restart doesn't reset it
+                    write_persisted_attempts(0, lockout_until);
+                    let mut state = self.state.write().await;
+                    *state = SessionState::RateLimited {
+                        locked_until: Instant::now() + Duration::from_secs(LOCKOUT_DURATION_SECS),
+                        attempts,
+                    };
+                    return Err(CypheriaError::RateLimited(LOCKOUT_DURATION_SECS));
+                }
+                // Persist partial attempt count so restarts don't reset the counter
+                write_persisted_attempts(attempts, 0);
+                Err(e)
+            }
         }
     }
-}
 
     pub async fn lock(&self) {
         let mut state = self.state.write().await;
@@ -229,7 +240,11 @@ pub async fn unlock(
         {
             let state = self.state.read().await;
             match &*state {
-                SessionState::Unlocked { key_store, vault_store, .. } => return f(key_store, vault_store),
+                SessionState::Unlocked {
+                    key_store,
+                    vault_store,
+                    ..
+                } => return f(key_store, vault_store),
                 SessionState::RateLimited { locked_until, .. } => {
                     if Instant::now() < *locked_until {
                         let remaining = locked_until.duration_since(Instant::now()).as_secs();
@@ -257,7 +272,12 @@ pub async fn unlock(
     {
         let mut state = self.state.write().await;
         match &mut *state {
-            SessionState::Unlocked { ref mut key_store, vault_store, vault_path, .. } => {
+            SessionState::Unlocked {
+                ref mut key_store,
+                vault_store,
+                vault_path,
+                ..
+            } => {
                 let result = f(key_store, vault_store)?;
                 // Persist AFTER successful mutation. If persist fails, surface a clear error.
                 if let Err(persist_err) = crate::vault::store::persist_vault(
@@ -265,13 +285,19 @@ pub async fn unlock(
                     &vault_store.data,
                     &vault_store.header,
                     vault_path,
-                ).await {
-                    eprintln!("[Cypheria] CRITICAL: persist_vault failed: {:?}", persist_err);
-                    return Err(CypheriaError::PersistFailed(
-                        format!("Changes were applied in memory but could not be saved to disk. \
+                )
+                .await
+                {
+                    eprintln!(
+                        "[Cypheria] CRITICAL: persist_vault failed: {:?}",
+                        persist_err
+                    );
+                    return Err(CypheriaError::PersistFailed(format!(
+                        "Changes were applied in memory but could not be saved to disk. \
                             WARNING: locking the vault will discard these in-memory changes. \
-                            Error: {}", persist_err)
-                    ));
+                            Error: {}",
+                        persist_err
+                    )));
                 }
                 Ok(result)
             }
@@ -300,5 +326,7 @@ pub async fn unlock(
 }
 
 impl Default for SessionManager {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
