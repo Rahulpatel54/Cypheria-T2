@@ -79,15 +79,16 @@ pub async fn copy_entry_password_to_clipboard(
         let timer_arc = clip_timer.0.clone();
         let timer_arc_for_task = clip_timer.0.clone();
 
-        // Cancel any existing timer before spawning a new one
         let mut guard = timer_arc.lock().await;
         if let Some(old_handle) = guard.take() {
             old_handle.abort();
+            drop(guard);
+            tokio::task::yield_now().await;
+            guard = timer_arc.lock().await;
         }
 
         let new_handle = tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(secs)).await;
-            // Push password out of clipboard history with noise, then clear
             overwrite_and_clear_clipboard().await;
             let mut g = timer_arc_for_task.lock().await;
             *g = None;

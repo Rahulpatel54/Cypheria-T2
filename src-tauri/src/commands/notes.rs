@@ -37,6 +37,7 @@ pub async fn get_note_content(
     safe_command!({
         autolock.bump_activity();
         validate_uuid(&note_id)?;
+        session.check_reveal_rate_limit()?;
         session
             .with_session(|key_store, vault_store| {
                 notes::get_note_content(key_store.vault_key_bytes(), &vault_store.data, &note_id)

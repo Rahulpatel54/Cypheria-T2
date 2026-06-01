@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use std::time::{Instant, Duration};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use tokio::sync::RwLock;
 use crate::{
     crypto::keys::ActiveKeyStore,
@@ -99,14 +99,47 @@ pub enum SessionState {
 pub struct SessionManager {
     state:    Arc<RwLock<SessionState>>,
     attempts: Arc<AtomicU32>,
+    /// Tracks password reveal calls in the current window for rate limiting
+    reveal_count:        Arc<AtomicU32>,
+    /// Unix timestamp of when the current reveal window started
+    reveal_window_start: Arc<AtomicU64>,
 }
 
 impl SessionManager {
     pub fn new() -> Self {
         Self {
-            state:    Arc::new(RwLock::new(SessionState::Locked)),
-            attempts: Arc::new(AtomicU32::new(0)),
+            state:               Arc::new(RwLock::new(SessionState::Locked)),
+            attempts:            Arc::new(AtomicU32::new(0)),
+            reveal_count:        Arc::new(AtomicU32::new(0)),
+            reveal_window_start: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    pub fn check_reveal_rate_limit(&self) -> Result<(), CypheriaError> {
+        const MAX_REVEALS_PER_WINDOW: u32 = 10;
+        const WINDOW_SECS: u64 = 60;
+
+        let now = now_unix_secs();
+        let window_start = self.reveal_window_start.load(Ordering::SeqCst);
+
+        if now.saturating_sub(window_start) >= WINDOW_SECS {
+            self.reveal_count.store(1, Ordering::SeqCst);
+            self.reveal_window_start.store(now, Ordering::SeqCst);
+            return Ok(());
+        }
+
+        let count = self.reveal_count.fetch_add(1, Ordering::SeqCst) + 1;
+        if count > MAX_REVEALS_PER_WINDOW {
+            let remaining = WINDOW_SECS.saturating_sub(now.saturating_sub(window_start));
+            return Err(CypheriaError::RateLimited(remaining));
+        }
+        Ok(())
+    }
+
+    /// Reset reveal rate limit counter (called on vault lock)
+    pub fn reset_reveal_rate_limit(&self) {
+        self.reveal_count.store(0, Ordering::SeqCst);
+        self.reveal_window_start.store(0, Ordering::SeqCst);
     }
 
 pub async fn unlock(
@@ -179,6 +212,7 @@ pub async fn unlock(
     pub async fn lock(&self) {
         let mut state = self.state.write().await;
         *state = SessionState::Locked;
+        self.reset_reveal_rate_limit();
     }
 
     pub async fn is_unlocked(&self) -> bool {

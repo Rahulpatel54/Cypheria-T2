@@ -41,8 +41,8 @@ pub async fn get_entry_password(
 ) -> Result<String, CypheriaError> {
     safe_command!({
         autolock.bump_activity();
-        // BUG-008 fix: unconditional validation so all IDs are checked.
         validate_uuid(&entry_id)?;
+        session.check_reveal_rate_limit()?;
         session
             .with_session(|key_store, vault_store| {
                 catch_sync_panic!({
@@ -166,6 +166,7 @@ pub async fn request_reveal_token(
     safe_command!({
         autolock.bump_activity();
         validate_uuid(&entry_id)?;
+        session.check_reveal_rate_limit()?;
         let password = session
             .with_session(|key_store, vault_store| {
                 catch_sync_panic!({
