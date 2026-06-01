@@ -1,20 +1,20 @@
 @font-face {
     font-family: 'Syne';
-    src: url('../fonts/Syne-VariableFont_wght.woff2') format('woff2');
+    src: url('/fonts/Syne-VariableFont_wght.woff2') format('woff2');
     font-weight: 400 800;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'DM Sans';
-    src: url('../fonts/DMSans-VariableFont_opsz,wght.woff2') format('woff2');
+    src: url('/fonts/DMSans-VariableFont_opsz,wght.woff2') format('woff2');
     font-weight: 300 700;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
     font-family: 'DM Sans';
-    src: url('../fonts/DMSans-Italic-VariableFont_opsz,wght.woff2') format('woff2');
+    src: url('/fonts/DMSans-Italic-VariableFont_opsz,wght.woff2') format('woff2');
     font-weight: 300 700;
     font-style: italic;
     font-display: swap;
@@ -567,6 +567,7 @@
    RESET & BASE
 ═══════════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{background:transparent;}
 html,body{height:100%;overflow:hidden;background:var(--bg-base);}
 body{font-family:'DM Sans',sans-serif;color:var(--text-primary);font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;}
 button,input,textarea,select{font-family:'DM Sans',sans-serif;}
@@ -716,17 +717,23 @@ tbody td{padding:12px 20px;}
 .star-btn.starred svg{stroke:var(--color-amber);fill:var(--color-amber);}
 .site-avatar{width:28px;height:28px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;background:var(--bg-panel);border:1px solid var(--border-mid);}
 .site-avatar[data-color] {
+  background: rgba(139,92,246,0.13);
   background: color-mix(in srgb, var(--entry-color) 13%, transparent);
+  border-color: rgba(139,92,246,0.27);
   border-color: color-mix(in srgb, var(--entry-color) 27%, transparent);
   color: var(--entry-color);
 }
 .detail-icon[data-color] {
+  background: rgba(139,92,246,0.13);
   background: color-mix(in srgb, var(--entry-color) 13%, transparent);
+  border-color: rgba(139,92,246,0.27);
   border-color: color-mix(in srgb, var(--entry-color) 27%, transparent);
   color: var(--entry-color);
 }
 .sec-avatar[data-color] {
+  background: rgba(139,92,246,0.13);
   background: color-mix(in srgb, var(--entry-color) 13%, transparent);
+  border-color: rgba(139,92,246,0.27);
   border-color: color-mix(in srgb, var(--entry-color) 27%, transparent);
   color: var(--entry-color);
 }
@@ -865,8 +872,11 @@ textarea.form-input{resize:vertical;min-height:72px;}
 /* ═══════════════════════════════════════════════════
    MODALS
 ═══════════════════════════════════════════════════ */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:1000;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:1000;}
 .modal-overlay.open{display:flex;}
+@supports not (backdrop-filter: blur(1px)) {
+  .modal-overlay { background: rgba(0,0,0,0.88); }
+}
 .modal{background:var(--bg-modal);border:1px solid var(--border-mid);border-radius:var(--radius-lg);padding:28px;width:440px;box-shadow:var(--glow-card);position:relative;max-height:90vh;overflow-y:auto;}
 .modal-close{position:absolute;top:14px;right:14px;width:24px;height:24px;border-radius:6px;background:none;border:none;cursor:pointer;color:var(--text-muted);display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;transition:all 0.15s;}
 .modal-close:hover{background:var(--bg-card);color:var(--text-primary);}
@@ -1054,7 +1064,9 @@ textarea.form-input{resize:vertical;min-height:72px;}
 
 #add-emoji-picker, #edit-emoji-picker { display: none; }
 #add-emoji-display[data-color], #edit-emoji-display[data-color] {
+  background: rgba(139,92,246,0.13);
   background: color-mix(in srgb, var(--entry-color) 13%, transparent);
+  border-color: rgba(139,92,246,0.40);
   border-color: color-mix(in srgb, var(--entry-color) 40%, transparent);
   color: var(--entry-color);
 }

@@ -6,6 +6,10 @@ src-tauri/target/
 target/
 **/target/
 
+icons/
+src-tauri/icons/
+**/icons/
+
 # 🖥️ IDE stuff
 .vscode/
 .idea/
