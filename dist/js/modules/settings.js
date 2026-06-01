@@ -118,8 +118,12 @@ export async function exportVault() {
         filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
       }
     });
-    if (!dest) return;
-    await vaultCall('export_vault', { destinationPath: dest });
+if (!dest) return;
+
+    const pwd = window.prompt('Re-enter your master password to confirm vault export:');
+    if (!pwd) return;
+
+    await vaultCall('export_vault', { destinationPath: dest, password: pwd });
     showToast('Vault exported — ' + defaultFilename, 'success');
   } catch (e) {
     const msg = String(e).replace(/^Error: /, '').slice(0, 120);

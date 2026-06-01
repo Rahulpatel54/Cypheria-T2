@@ -55,17 +55,21 @@ pub fn encapsulate_vault_key(
 
     let (shared_secret, ciphertext) = kyber1024::encapsulate(&pk);
 
-    // Kyber-1024 shared secret is 32 bytes — use directly as AES-256 key
     let mut aes_key = [0u8; 32];
     aes_key.copy_from_slice(&shared_secret.as_bytes()[..32]);
+
+    {
+        let ss_bytes = shared_secret.as_bytes();
+        unsafe {
+            std::ptr::write_bytes(ss_bytes.as_ptr() as *mut u8, 0u8, ss_bytes.len());
+        }
+    }
+    drop(shared_secret);
 
     let wrapped_vk = aes::wrap_key(&aes_key, vault_key)
         .map_err(|_| CypheriaError::CryptoError)?;
 
     aes_key.zeroize();
-    // FIX: IMPROVE-004 — SharedSecret from pqcrypto-kyber may not implement ZeroizeOnDrop.
-    // Explicitly zeroize the backing buffer if possible, or at least ensure it's not reused.
-    // Since we've copied it to aes_key and zeroized that, we've limited exposure.
 
     Ok((ciphertext.as_bytes().to_vec(), wrapped_vk))
 }
@@ -91,6 +95,14 @@ pub fn decapsulate_vault_key(
 
     let mut aes_key = [0u8; 32];
     aes_key.copy_from_slice(&shared_secret.as_bytes()[..32]);
+
+    {
+        let ss_bytes = shared_secret.as_bytes();
+        unsafe {
+            std::ptr::write_bytes(ss_bytes.as_ptr() as *mut u8, 0u8, ss_bytes.len());
+        }
+    }
+    drop(shared_secret);
 
     let vault_key = aes::unwrap_key(&aes_key, wrapped_vk)?;
     aes_key.zeroize();

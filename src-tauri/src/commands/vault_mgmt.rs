@@ -51,11 +51,31 @@ pub async fn open_vault(vault_path: String) -> Result<String, CypheriaError> {
 #[tauri::command]
 pub async fn export_vault(
     destination_path: String,
+    password: String,
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<(), CypheriaError> {
     safe_command!({
         autolock.bump_activity();
+
+        let pwd_bytes = password.into_bytes();
+        let verified = session.with_session(|key_store, vault_store| {
+            use zeroize::Zeroize;
+            let derived = crate::crypto::kdf::derive_master_key_with_params(
+                &pwd_bytes,
+                &vault_store.header.argon2_salt,
+                vault_store.header.kdf_memory_kb,
+                vault_store.header.kdf_iterations,
+                vault_store.header.kdf_parallelism,
+            )?;
+            let mut derived_mut = derived;
+            let matches = derived_mut == *key_store.master_key_bytes();
+            derived_mut.zeroize();
+            if !matches { return Err(CypheriaError::AuthFailed); }
+            Ok(())
+        }).await;
+        drop(pwd_bytes);
+        verified?;
 
         let vault_path = session
             .vault_path()
@@ -100,7 +120,10 @@ pub struct VaultMetaView {
 /// SECURITY NOTE: This reads the plaintext header only. No secret material is accessed.
 /// vault_name and created_at are stored in plaintext in VaultHeader by design.
 #[tauri::command]
-pub async fn get_vault_meta(vault_path: String) -> Result<VaultMetaView, CypheriaError> {
+pub async fn get_vault_meta(
+    vault_path: String,
+    session: State<'_, Arc<SessionManager>>,
+) -> Result<VaultMetaView, CypheriaError> {
     safe_command!({
         use crate::vault::format::MAGIC;
         use tokio::io::AsyncReadExt;
@@ -136,8 +159,20 @@ pub async fn get_vault_meta(vault_path: String) -> Result<VaultMetaView, Cypheri
         let header: VaultHeader = bincode::deserialize(&header_bytes)
             .map_err(|_| CypheriaError::VaultCorrupted)?;
 
+        let display_name = if session.is_unlocked().await {
+            let decrypted = session.with_session(|key_store, _vault_store| {
+                Ok(crate::vault::store::decrypt_vault_name(
+                    key_store.master_key_bytes(),
+                    &header.vault_name_encrypted,
+                ))
+            }).await.ok().flatten();
+            decrypted.unwrap_or_else(|| header.vault_name.clone())
+        } else {
+            header.vault_name.clone()
+        };
+
         Ok(VaultMetaView {
-            vault_name:     header.vault_name.clone(),
+            vault_name:     display_name,
             created_at:     header.created_at.to_rfc3339(),
             format_version: header.format_version,
         })

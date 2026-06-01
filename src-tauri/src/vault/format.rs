@@ -64,7 +64,13 @@ pub struct VaultHeader {
     /// Vault creation timestamp.
     pub created_at: DateTime<Utc>,
 
-    /// Human-readable vault name (low-sensitivity metadata, plaintext).
+    /// Vault name encrypted with a master-key-derived subkey.
+    /// Empty vec for legacy vaults — falls back to vault_name plaintext field.
+    #[serde(default)]
+    pub vault_name_encrypted: Vec<u8>,
+
+    /// Plaintext display name shown on lock screen before unlock (low-entropy, acceptable leak).
+    /// Set to a generic value like "Cypheria Vault" — real name stored in vault_name_encrypted.
     pub vault_name: String,
 
     /// Format version that wrote this file (for future migration).

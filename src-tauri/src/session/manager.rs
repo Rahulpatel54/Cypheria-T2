@@ -10,16 +10,46 @@ use crate::{
     error::CypheriaError,
 };
 
+fn attempts_hmac_key() -> [u8; 32] {
+    let mut buf = String::new();
+    if let Ok(u) = std::env::var("USER").or_else(|_| std::env::var("USERNAME")) { buf.push_str(&u); }
+    buf.push_str("cypheria.attempts.v1");
+    let mut key = [0u8; 32];
+    let bytes = buf.as_bytes();
+    for (i, b) in bytes.iter().enumerate() { key[i % 32] ^= *b; }
+    key
+}
+
+fn sign_attempts(payload: &str) -> String {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let key = attempts_hmac_key();
+    let mut mac = <Hmac<Sha256>>::new_from_slice(&key).expect("hmac accepts any key");
+    mac.update(payload.as_bytes());
+    let tag = mac.finalize().into_bytes();
+    tag.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+fn verify_attempts(payload: &str, tag: &str) -> bool {
+    sign_attempts(payload) == tag
+}
+
 fn attempts_file_path() -> Option<std::path::PathBuf> {
     dirs::data_local_dir().map(|d| d.join("cypheria").join(".attempts"))
 }
 
 fn read_persisted_attempts() -> (u32, u64) {
-    // Returns (attempt_count, lockout_until_unix_secs); (0,0) means no active lockout
     let path = match attempts_file_path() { Some(p) => p, None => return (0, 0) };
     let Ok(bytes) = std::fs::read(&path) else { return (0, 0) };
     let Ok(s)     = std::str::from_utf8(&bytes) else { return (0, 0) };
-    let parts: Vec<&str> = s.trim().splitn(2, ':').collect();
+    let mut outer = s.trim().splitn(2, '|');
+    let payload = outer.next().unwrap_or("");
+    let tag     = outer.next().unwrap_or("");
+    if tag.is_empty() || !verify_attempts(payload, tag) {
+        eprintln!("[Cypheria] attempts file failed HMAC verification — resetting to max");
+        return (MAX_UNLOCK_ATTEMPTS, 0);
+    }
+    let parts: Vec<&str> = payload.splitn(2, ':').collect();
     if parts.len() != 2 { return (0, 0); }
     let count = parts[0].parse::<u32>().unwrap_or(0);
     let until = parts[1].parse::<u64>().unwrap_or(0);
@@ -31,7 +61,9 @@ fn write_persisted_attempts(count: u32, lockout_until_unix_secs: u64) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = std::fs::write(&path, format!("{}:{}", count, lockout_until_unix_secs));
+    let payload = format!("{}:{}", count, lockout_until_unix_secs);
+    let tag = sign_attempts(&payload);
+    let _ = std::fs::write(&path, format!("{}|{}", payload, tag));
 }
 
 fn clear_persisted_attempts() {

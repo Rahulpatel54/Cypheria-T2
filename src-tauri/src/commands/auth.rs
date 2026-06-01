@@ -119,6 +119,17 @@ pub async fn change_master_password(
             vault_store.header.kyber_ciphertext     = kyber_ciphertext;
             vault_store.header.vk_wrapped_pq        = vk_wrapped_pq;
 
+            // Re-encrypt vault name with new master key
+            if let Ok(new_name_enc) = crate::vault::store::encrypt_vault_name(
+                &new_mk,
+                &crate::vault::store::decrypt_vault_name(
+                    key_store.master_key_bytes(),
+                    &vault_store.header.vault_name_encrypted,
+                ).unwrap_or_else(|| vault_store.header.vault_name.clone()),
+            ) {
+                vault_store.header.vault_name_encrypted = new_name_enc;
+            }
+
             // Update in-memory MK so subsequent operations use the new key
             key_store.master_key = crate::crypto::keys::MasterKey::new(*new_mk);
 
@@ -204,19 +215,22 @@ pub async fn create_vault(
         updated_at: Utc::now(),
     };
 
+    let vault_name_encrypted = crate::vault::store::encrypt_vault_name(&mk_bytes, &vault_name)
+        .unwrap_or_default();
     let header = VaultHeader {
-        argon2_salt:         salt,
-        kdf_memory_kb:       kdf::ARGON2_MEMORY_KB,
-        kdf_iterations:      kdf::ARGON2_ITERATIONS,
-        kdf_parallelism:     kdf::ARGON2_PARALLELISM,
+        argon2_salt:          salt,
+        kdf_memory_kb:        kdf::ARGON2_MEMORY_KB,
+        kdf_iterations:       kdf::ARGON2_ITERATIONS,
+        kdf_parallelism:      kdf::ARGON2_PARALLELISM,
         vk_wrapped_classical,
-        kyber_public_key:    pub_key,
+        kyber_public_key:     pub_key,
         kyber_sk_encrypted,
         kyber_ciphertext,
         vk_wrapped_pq,
-        created_at:          Utc::now(),
-        vault_name,
-        format_version:      FORMAT_VERSION,
+        created_at:           Utc::now(),
+        vault_name_encrypted,
+        vault_name:           "Cypheria Vault".to_string(),
+        format_version:       FORMAT_VERSION,
     };
 
     {

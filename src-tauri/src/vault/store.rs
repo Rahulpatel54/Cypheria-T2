@@ -12,6 +12,26 @@ use crate::{
     vault::format::*,
 };
 
+/// Encrypt the vault name with a master-key-derived subkey.
+pub fn encrypt_vault_name(master_key: &[u8; 32], name: &str) -> Result<Vec<u8>, CypheriaError> {
+    let mut subkey = [0u8; 32];
+    crate::crypto::kdf::derive_subkey(master_key, b"VAULT_NAME_ENCRYPTION_MK", &mut subkey);
+    let result = crate::crypto::aes::encrypt(&subkey, name.as_bytes());
+    subkey.zeroize();
+    result
+}
+
+/// Decrypt the vault name. Returns None if blob is empty or decryption fails.
+pub fn decrypt_vault_name(master_key: &[u8; 32], blob: &[u8]) -> Option<String> {
+    if blob.is_empty() { return None; }
+    let mut subkey = [0u8; 32];
+    crate::crypto::kdf::derive_subkey(master_key, b"VAULT_NAME_ENCRYPTION_MK", &mut subkey);
+    let result = crate::crypto::aes::decrypt(&subkey, blob).ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok());
+    subkey.zeroize();
+    result
+}
+
 /// In-memory vault state (decrypted).
 pub struct VaultStore {
     pub data:   VaultData,

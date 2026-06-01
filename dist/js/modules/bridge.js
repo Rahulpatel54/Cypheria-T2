@@ -4,12 +4,16 @@ import { state } from './state.js';
 
 export async function initTauri() {
   try {
+    let _rawInvoke = null;
     if (window.__TAURI_INTERNALS__?.invoke) {
-      state._invoke = window.__TAURI_INTERNALS__.invoke;
+      _rawInvoke = window.__TAURI_INTERNALS__.invoke;
     } else if (window.__TAURI__?.core?.invoke) {
-      state._invoke = window.__TAURI__.core.invoke;
+      _rawInvoke = window.__TAURI__.core.invoke;
     } else if (window.__TAURI__?.tauri?.invoke) {
-      state._invoke = window.__TAURI__.tauri.invoke;
+      _rawInvoke = window.__TAURI__.tauri.invoke;
+    }
+    if (_rawInvoke) {
+      state._invoke = _rawInvoke.bind(window.__TAURI_INTERNALS__ ?? window);
     }
     return !!state._invoke;
   } catch (e) {
