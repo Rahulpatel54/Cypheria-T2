@@ -42,6 +42,17 @@ pub async fn lock_vault(
     Ok(())
 }
 
+/// Change the vault master password.
+///
+/// SECURITY NOTE (ARCH-4 — Backup Forward Secrecy Limitation):
+///   Changing the master password re-encrypts the in-memory vault under the new
+///   password and persists it. However, any exported backup (.qvault file) made
+///   BEFORE this password change remains decryptable with the OLD password forever.
+///   There is no mechanism to retroactively invalidate old backups, as they are
+///   independent encrypted files outside this application's control.
+///
+///   Users should treat old backups as sensitive and delete them after a password
+///   change if forward secrecy is required.
 #[tauri::command]
 pub async fn change_master_password(
     old_password: String,
@@ -93,7 +104,8 @@ pub async fn change_master_password(
                 )
                 .map_err(|_| CypheriaError::KdfError)?;
 
-                let keys_match = old_mk_derived == *key_store.master_key_bytes();
+                use subtle::ConstantTimeEq;
+                let keys_match: bool = old_mk_derived.ct_eq(key_store.master_key_bytes()).into();
                 let mut z = old_mk_derived;
                 z.zeroize();
 

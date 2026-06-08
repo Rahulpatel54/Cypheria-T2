@@ -58,13 +58,7 @@ pub fn encapsulate_vault_key(
     let mut aes_key = [0u8; 32];
     aes_key.copy_from_slice(&shared_secret.as_bytes()[..32]);
 
-    {
-        let ss_bytes = shared_secret.as_bytes();
-        unsafe {
-            std::ptr::write_bytes(ss_bytes.as_ptr() as *mut u8, 0u8, ss_bytes.len());
-        }
-    }
-    let _ = shared_secret;
+    drop(shared_secret);
 
     let wrapped_vk = aes::wrap_key(&aes_key, vault_key).map_err(|_| CypheriaError::CryptoError)?;
 
@@ -95,17 +89,10 @@ pub fn decapsulate_vault_key(
     let mut aes_key = [0u8; 32];
     aes_key.copy_from_slice(&shared_secret.as_bytes()[..32]);
 
-    {
-        let ss_bytes = shared_secret.as_bytes();
-        unsafe {
-            std::ptr::write_bytes(ss_bytes.as_ptr() as *mut u8, 0u8, ss_bytes.len());
-        }
-    }
-    let _ = shared_secret;
+    drop(shared_secret);
 
     let vault_key = aes::unwrap_key(&aes_key, wrapped_vk)?;
     aes_key.zeroize();
-    // FIX: IMPROVE-004 — explicit zeroization of intermediate key material.
 
     Ok(vault_key)
 }

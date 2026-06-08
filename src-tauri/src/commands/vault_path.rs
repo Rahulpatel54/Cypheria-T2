@@ -5,6 +5,12 @@
 //!   - localStorage is accessible to injected JS; app-data is OS-protected and not web-accessible.
 //!   - The file contains only the filesystem path string — no key material, no credentials.
 //!
+//! PRIVACY NOTE (ARCH-3):
+//!   - The vault file path is stored in plaintext. This reveals that the user has a vault,
+//!     and exposes the filesystem location of that vault to anyone with read access to
+//!     app-data. For most desktop threat models this is acceptable, but privacy-conscious
+//!     users should be aware. A future version may make path persistence opt-out.
+//!
 //! These commands are intentionally NOT session-guarded (no `with_session` call) because
 //! they are called before the vault is unlocked, during startup path resolution.
 

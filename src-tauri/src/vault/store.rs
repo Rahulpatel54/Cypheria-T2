@@ -261,6 +261,15 @@ pub async fn persist_vault(
         path.with_file_name(name)
     };
     tokio::fs::write(&tmp_path, &file).await?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&tmp_path) {
+            let mut perms = meta.permissions();
+            perms.set_mode(0o600);
+            let _ = std::fs::set_permissions(&tmp_path, perms);
+        }
+    }
     let rename_result = tokio::fs::rename(&tmp_path, path).await;
     if rename_result.is_err() {
         let _ = tokio::fs::remove_file(&tmp_path).await; // best-effort cleanup

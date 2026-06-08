@@ -87,7 +87,7 @@ export async function changeMasterPassword() {
   try {
     await vaultCall('change_master_password', { oldPassword: cur, newPassword: nw });
     closeModal('modal-chpwd');
-    showToast('Master password changed successfully', 'success');
+    showToast('Master password changed. Old exported backups remain decryptable with the previous password.', 'success');
   } catch (e) {
     const msg = String(e);
     err.textContent = msg.includes('AuthFailed') || msg.includes('Authentication failed')

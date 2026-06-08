@@ -6,6 +6,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
+// NOTE: This key is derived from username + static string and is intentionally
+// tamper-EVIDENT, not tamper-PROOF. A local attacker with filesystem access can
+// compute the same key and forge the attempts file. The persistent counter is
+// a defence-in-depth measure against casual restarts, not against a determined
+// local attacker. For stronger protection, store the key in the OS keychain.
 fn attempts_hmac_key() -> [u8; 32] {
     let mut buf = String::new();
     if let Ok(u) = std::env::var("USER").or_else(|_| std::env::var("USERNAME")) {
