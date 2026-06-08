@@ -1,3 +1,5 @@
+// dist/js/modules/utils.js
+
 'use strict';
 
 import { state } from './state.js';
@@ -56,7 +58,8 @@ export function fmtDate(iso) {
 
 export function makeAvatar(entry, size = 28) {
   const letter = (entry.emoji || entry.name?.charAt(0) || '?').toUpperCase().slice(0, 2);
-  const color  = entry.color || '#8b5cf6';
+  const _rawColor = entry.color || '#8b5cf6';
+  const color = /^#[0-9a-fA-F]{6}$/.test(_rawColor) ? _rawColor : '#8b5cf6';
   const r      = size <= 28 ? 7 : 10;
   const div    = document.createElement('div');
   div.className = 'site-avatar';

@@ -28,7 +28,9 @@ export async function vaultCall(cmd, args = {}) {
   try {
     const result = await state._invoke(cmd, args);
     // Reset the UI countdown on every successful vault command
-    const timeoutSecs = parseInt(document.getElementById('set-autolock')?.value || '0');
+    const _rawTimeout = parseInt(document.getElementById('set-autolock')?.value || '0', 10);
+    const timeoutSecs = Number.isFinite(_rawTimeout) && _rawTimeout >= 0 && _rawTimeout <= 86400
+      ? _rawTimeout : 0;
     if (timeoutSecs > 0) {
       import('./ui.js').then(m => m.bumpAutolockCountdown(timeoutSecs)).catch(() => {});
     }

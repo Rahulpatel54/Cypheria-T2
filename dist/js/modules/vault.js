@@ -647,7 +647,8 @@ export async function selectEntry(id) {
 
   const head = document.createElement('div'); head.className = 'detail-head';
   const icon = document.createElement('div'); icon.className = 'detail-icon';
-  const ec = entry.color || '#8b5cf6';
+  const _ec = entry.color || '#8b5cf6';
+  const ec = /^#[0-9a-fA-F]{6}$/.test(_ec) ? _ec : '#8b5cf6';
   icon.style.setProperty('--entry-color', ec);
   icon.dataset.color = ec;
   icon.textContent = (entry.emoji || entry.name?.charAt(0) || '?').toUpperCase().slice(0, 2);
@@ -905,17 +906,25 @@ export function confirmDelete(type, id, name) {
 
 // setPickerColor — activates the correct swatch and updates the emoji preview background
 export function setPickerColor(prefix, color) {
+  const safeColor = /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#8b5cf6';
   document.querySelectorAll(`#${prefix}-color-swatches .color-swatch`).forEach(s => {
-    s.classList.toggle('active', s.dataset.color === color);
+    s.classList.toggle('active', s.dataset.color === safeColor);
     s.style.setProperty('--swatch-color', s.dataset.color);
   });
 
   const display = document.getElementById(`${prefix}-emoji-display`);
 
   if (display) {
-    display.style.setProperty('--entry-color', color);
-    display.dataset.color = color;
+    display.style.setProperty('--entry-color', safeColor);
+    display.dataset.color = safeColor;
   }
+}
+
+// Sanitize color values before applying to CSS custom properties.
+// Only hex colors (#rrggbb) are accepted; anything else falls back to the accent.
+function _sanitizeColor(color) {
+  if (typeof color === 'string' && /^#[0-9a-fA-F]{6}$/.test(color)) return color;
+  return '#8b5cf6';
 }
 
 // setPickerEmoji — updates the emoji preview button text

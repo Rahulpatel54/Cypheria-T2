@@ -20,3 +20,8 @@ build/
 release/
 cypheria.exe
 app-icon.png
+
+
+
+# Dev-only Tauri capability (not for release builds)
+src-tauri/capabilities/dev.json

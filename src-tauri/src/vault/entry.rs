@@ -226,6 +226,18 @@ fn validate_entry_input(input: &EntryInput) -> Result<(), CypheriaError> {
             "Notes too long (max 64 KB)".into(),
         ));
     }
+    if let Some(ref color) = input.color {
+        if !color.is_empty() {
+            let valid = color.len() == 7
+                && color.starts_with('#')
+                && color[1..].chars().all(|c| c.is_ascii_hexdigit());
+            if !valid {
+                return Err(CypheriaError::InvalidInput(
+                    "Color must be a valid hex color (e.g. #8b5cf6)".into(),
+                ));
+            }
+        }
+    }
     Ok(())
 }
 
