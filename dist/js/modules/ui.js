@@ -295,6 +295,16 @@ export function wireEvents() {
   document.getElementById('win-max')?.addEventListener('click', () =>
     rawInvoke('plugin:window|internal_toggle_maximize', { label: 'main' }).catch(() => { }));
 
+  // Overlay window controls (lock/setup screens) — wired here, not via inline onclick
+  document.querySelectorAll('[data-win-action]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const action = btn.dataset.winAction;
+      if (action === 'close') rawInvoke('plugin:window|close', { label: 'main' }).catch(() => {});
+      else if (action === 'minimize') rawInvoke('plugin:window|minimize', { label: 'main' }).catch(() => {});
+      else if (action === 'maximize') rawInvoke('plugin:window|internal_toggle_maximize', { label: 'main' }).catch(() => {});
+    });
+  });
+
   // Sidebar nav
   document.querySelectorAll('#sidebar .nav-item[data-page]').forEach(n => {
     n.addEventListener('click', () => navigate(n.dataset.page));

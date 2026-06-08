@@ -257,7 +257,7 @@ pub async fn get_password_scores(
     autolock: State<'_, Arc<AutoLockTimer>>,
 ) -> Result<Vec<crate::models::entry::EntryScoreView>, CypheriaError> {
     safe_command!({
-        autolock.bump_activity();
+        session.check_reveal_rate_limit()?;
         session
             .with_session(|key_store, vault_store| {
                 catch_sync_panic!({

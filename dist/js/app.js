@@ -31,82 +31,60 @@ async function setupTauriEvents() {
 }
 
 async function checkInitialState() {
-  console.log('[DEBUG] checkInitialState: start');
-
   if (!state._invoke) {
-    console.log('[DEBUG] checkInitialState: no invoke, showing setup');
     showSetupScreen();
     return;
   }
 
-  console.log('[DEBUG] checkInitialState: calling getPersistedVaultPath');
   let stored = null;
   try {
     stored = await Promise.race([
       getPersistedVaultPath(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('vault path timeout')), 3000))
     ]);
-    console.log('[DEBUG] checkInitialState: stored path =', stored);
   } catch(e) {
-    console.error('[DEBUG] checkInitialState: getPersistedVaultPath failed:', e);
     showSetupScreen();
     return;
   }
 
   if (!stored) {
-    console.log('[DEBUG] checkInitialState: no stored path, showing setup');
     showSetupScreen();
     return;
   }
 
-  const canonical = stored;
-  state.currentVaultPath = canonical;
-  console.log('[DEBUG] checkInitialState: getting vault meta for', canonical);
+  state.currentVaultPath = stored;
 
   try {
     const meta = await Promise.race([
-      rawInvoke('get_vault_meta', { vaultPath: canonical }),
+      rawInvoke('get_vault_meta', { vaultPath: stored }),
       new Promise((_, reject) => setTimeout(() => reject(new Error('meta timeout')), 3000))
     ]);
     const name = meta?.vault_name
-      || canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+      || stored.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
     state.currentVaultName = name;
     document.getElementById('lock-vault-name').textContent = name;
-    console.log('[DEBUG] checkInitialState: vault meta ok, name =', name);
   } catch(e) {
-    console.warn('[DEBUG] checkInitialState: get_vault_meta failed:', e);
-    const name = canonical.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
+    const name = stored.split(/[\\/]/).pop().replace(/\.qvault$/i, '');
     state.currentVaultName = name;
     document.getElementById('lock-vault-name').textContent = name;
   }
 
-  console.log('[DEBUG] checkInitialState: showing lock screen');
   showLockScreen();
-  console.log('[DEBUG] checkInitialState: done');
 }
 
 async function boot() {
   showLoading('Starting Cypheria…');
-  console.log('[DEBUG] boot started');
 
   try {
-    console.log('[DEBUG] wiring events...');
     wireEvents();
     wireActivityListeners();
-    console.log('[DEBUG] events wired');
 
-    console.log('[DEBUG] init tauri...');
     const hasTauri = await initTauri();
-    console.log('[DEBUG] hasTauri =', hasTauri);
 
     if (hasTauri) {
-      console.log('[DEBUG] setting up tauri events...');
-      // Fire-and-forget — don't let event registration block the boot sequence
       setupTauriEvents().catch(e => console.warn('[Cypheria] setupTauriEvents failed:', e));
-      console.log('[DEBUG] tauri events scheduled');
     }
 
-    console.log('[DEBUG] hiding loading...');
     hideLoading();
 
     if (!hasTauri) {
@@ -115,16 +93,11 @@ async function boot() {
       return;
     }
 
-    // Small defer to let Tauri backend finish registering all commands
-    // before we attempt IPC calls during initial state check
     await new Promise(resolve => setTimeout(resolve, 50));
-
-    console.log('[DEBUG] checking initial state...');
     await checkInitialState();
-    console.log('[DEBUG] initial state done');
 
   } catch (err) {
-    console.error('[DEBUG] boot error:', err);
+    console.error('[Cypheria] Boot error:', err);
     hideLoading();
     showSetupScreen();
   }

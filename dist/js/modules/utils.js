@@ -82,9 +82,7 @@ export async function copyToClipboard(value, label) {
     const { startClipCountdown } = await import('./ui.js');
     startClipCountdown();
   } catch (e) {
-    // Never fall back to navigator.clipboard — that path bypasses the
-    // backend auto-clear timer and secure overwrite logic.
-    showToast('Copy failed — vault backend unavailable', 'error');
+    showToast('Copy failed — vault must be unlocked to copy', 'error');
   }
 }
 
