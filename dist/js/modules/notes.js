@@ -30,7 +30,14 @@ export function renderNotes() {
     p.style.letterSpacing = '0.15em';
     const d = document.createElement('div'); d.className = 'note-date'; d.textContent = fmtDate(n.updated_at);
     const del = document.createElement('div'); del.className = 'icon-btn note-delete'; del.title = 'Delete note';
-    del.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+    const _delSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    _delSvg.setAttribute('viewBox','0 0 24 24');
+    const _delPoly = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    _delPoly.setAttribute('points','3 6 5 6 21 6');
+    const _delPath = document.createElementNS('http://www.w3.org/2000/svg','path');
+    _delPath.setAttribute('d','M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6');
+    _delSvg.appendChild(_delPoly); _delSvg.appendChild(_delPath);
+    del.appendChild(_delSvg);
     del.onclick = ev => { ev.stopPropagation(); confirmDelete('note', n.id, n.title); };
     card.appendChild(t); card.appendChild(p); card.appendChild(d); card.appendChild(del);
     card.onclick = () => openNoteModal(n);
@@ -87,6 +94,8 @@ export async function saveNote() {
   try {
     await vaultCall('save_note', { noteId: id, input: { title, content } });
     _noteDirty = false;
+    const _nc = document.getElementById('note-content');
+    if (_nc) _nc.value = '';
     closeModal('modal-note');
     await loadNotes();
     showToast(id ? 'Note updated' : 'Note saved', 'success');

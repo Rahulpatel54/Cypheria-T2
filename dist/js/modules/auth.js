@@ -324,7 +324,9 @@ export async function lockVaultUI() {
 
   if (state._invoke) await rawInvoke('clear_clipboard').catch(() => { });
 
-  try { await rawInvoke('lock_vault'); } catch (_) { }
+  try { await rawInvoke('lock_vault'); } catch (e) {
+    console.error('[Cypheria] lock_vault failed:', e);
+  }
   state.appUnlocked = false;
   if (state.settingsDebounce) { clearTimeout(state.settingsDebounce); state.settingsDebounce = null; }
   state.passwordRevealTimers.forEach(tid => clearTimeout(tid));

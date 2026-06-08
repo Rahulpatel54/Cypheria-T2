@@ -1,4 +1,24 @@
+// dist/js/modules/vault.js
+
 'use strict';
+
+function _svgIcon(...paths) {
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 24 24');
+  paths.forEach(d => {
+    const tag = d.startsWith('cx:') ? 'circle' : 'path';
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (tag === 'circle') {
+      const [, cx, cy, r] = d.match(/cx:([\d.]+),cy:([\d.]+),r:([\d.]+)/);
+      el.setAttribute('cx', cx); el.setAttribute('cy', cy); el.setAttribute('r', r);
+    } else {
+      el.setAttribute('d', d);
+    }
+    s.appendChild(el);
+  });
+  return s;
+}
+
 let _uiMod = null;
 const getUI = () => _uiMod ? Promise.resolve(_uiMod) : import('./ui.js').then(m => { _uiMod = m; return m; });
 
@@ -90,7 +110,12 @@ export function renderVaultTable() {
       const sb = document.createElement('button');
       sb.className = 'star-btn' + (e.is_favorite ? ' starred' : '');
       sb.id = 'star-' + e.id;
-      sb.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>';
+      const _starSvg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      _starSvg.setAttribute('viewBox','0 0 24 24');
+      const _starPoly = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+      _starPoly.setAttribute('points','12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2');
+      _starSvg.appendChild(_starPoly);
+      sb.appendChild(_starSvg);
       sb.onclick = ev => { ev.stopPropagation(); toggleFavorite(e.id); };
       tdS.appendChild(sb);
 
@@ -653,10 +678,10 @@ export async function selectEntry(id) {
 
     if (f.isPassword) {
       val.textContent = '••••••••••••••••';
-      let visible = false; let cachedPwd = null;
+      let visible = false;
       const fa = document.createElement('div'); fa.className = 'field-actions';
       const eyeB = document.createElement('div'); eyeB.className = 'icon-btn'; eyeB.title = 'Show/hide';
-      eyeB.innerHTML = '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+      eyeB.appendChild(_svgIcon('M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z', 'cx:12,cy:12,r:3'));
       eyeB.onclick = async () => {
         if (visible) {
           val.textContent = '••••••••••••••••';
@@ -667,21 +692,25 @@ export async function selectEntry(id) {
           }
         } else {
           eyeB.style.opacity = '0.5';
+          let pwd = null;
           try {
             const token = await vaultCall('request_reveal_token', { entryId: f.entryId });
-            const pwd = await vaultCall('consume_reveal_token', { token });
+            pwd = await vaultCall('consume_reveal_token', { token });
             val.textContent = pwd;
           } catch (e) {
+            pwd = null;
             eyeB.style.opacity = '';
             showToast('Failed to reveal password', 'error');
             return;
+          } finally {
+            pwd = null; // clear JS reference as early as possible
           }
           visible = true;
           eyeB.style.opacity = '';
           if (state.passwordRevealTimers.has(entry.id)) {
             clearTimeout(state.passwordRevealTimers.get(entry.id));
           }
-          // 5s auto-hide reduces exposure window
+          // 5s auto-hide reduces DOM exposure window
           const tid = setTimeout(() => {
             val.textContent = '••••••••••••••••';
             visible = false;
@@ -691,7 +720,16 @@ export async function selectEntry(id) {
         }
       };
       const cpyB = document.createElement('div'); cpyB.className = 'icon-btn'; cpyB.title = 'Copy password';
-      cpyB.innerHTML = '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      const _cpySvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      _cpySvg.setAttribute('viewBox', '0 0 24 24');
+      const _cpyRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      _cpyRect.setAttribute('x','9'); _cpyRect.setAttribute('y','9');
+      _cpyRect.setAttribute('width','13'); _cpyRect.setAttribute('height','13');
+      _cpyRect.setAttribute('rx','2'); _cpyRect.setAttribute('ry','2');
+      const _cpyPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      _cpyPath.setAttribute('d','M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1');
+      _cpySvg.appendChild(_cpyRect); _cpySvg.appendChild(_cpyPath);
+      cpyB.appendChild(_cpySvg);
       cpyB.onclick = async () => {
         try {
           await vaultCall('copy_entry_password_to_clipboard', {

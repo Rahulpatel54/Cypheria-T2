@@ -1,3 +1,5 @@
+// dist/js/modules/ui.js
+
 'use strict';
 
 import { state } from './state.js';
@@ -51,6 +53,11 @@ export function navigate(page) {
   }
 
   if (page !== 'vault') clearBulkSelection();
+  // Clear mnemonic password map when navigating away from generator
+  if (page !== 'generator') {
+    import('./smart-panel.js').then(m => { if (typeof m.clearMnemonicMap === 'function') m.clearMnemonicMap(); }).catch(() => {});
+  }
+  
   const res = document.getElementById('search-results');
   if (res) res.classList.remove('open');
   const input = document.getElementById('search-input');
@@ -180,7 +187,9 @@ export function startAutolockCountdown(timeoutSecs) {
 
     if (remaining <= 0) {
       clearAutolockCountdown();
-      import('./auth.js').then(async m => { await m.lockVaultUI(); }).catch(() => {});
+      import('./auth.js').then(async m => { await m.lockVaultUI(); }).catch(e => {
+        console.error('[Cypheria] autolock lockVaultUI failed:', e);
+      });
     }
   }
   tick();
@@ -377,6 +386,13 @@ document.getElementById('btn-confirm-action')?.addEventListener('click', async (
   document.querySelectorAll('[data-close]').forEach(el => {
     el.addEventListener('click', () => {
       closeModal(el.dataset.close);
+      if (el.dataset.close === 'modal-note') {
+        // Clear sensitive note content from DOM immediately on close
+        const nc = document.getElementById('note-content');
+        if (nc) nc.value = '';
+        const nt = document.getElementById('note-title');
+        if (nt) nt.value = '';
+      }
       if (el.dataset.close === 'modal-edit-entry') {
         document.getElementById('edit-password').value = '';
         document.getElementById('edit-id').value = '';

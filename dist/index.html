@@ -1101,6 +1101,32 @@
   </div>
 </div>
 
+<!-- Export Password Confirm Modal -->
+<div class="modal-overlay" id="modal-export-pwd">
+  <div class="modal" style="width:360px;">
+    <button class="modal-close" data-close="modal-export-pwd">×</button>
+    <div class="modal-icon">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    </div>
+    <div class="modal-title">Confirm Export</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;text-align:center;">Re-enter your master password to export a vault backup.</p>
+    <div class="form-group">
+      <label class="form-label">Master Password</label>
+      <div class="lock-input-wrap">
+        <input type="password" class="form-input" id="export-pwd-input" placeholder="••••••••••••" autocomplete="off" style="background:var(--bg-panel);">
+        <button class="eye-btn" id="export-pwd-eye" type="button">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="modal-error" id="export-pwd-error"></div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" data-close="modal-export-pwd" id="btn-export-cancel">Cancel</button>
+      <button class="btn btn-primary" id="btn-export-confirm">Export</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div id="toast-container"></div>
 <!-- Clipboard indicator -->

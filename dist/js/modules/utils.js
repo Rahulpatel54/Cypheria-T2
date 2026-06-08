@@ -79,15 +79,9 @@ export async function copyToClipboard(value, label) {
     const { startClipCountdown } = await import('./ui.js');
     startClipCountdown();
   } catch (e) {
-    // Fallback only in browser preview mode (no Tauri backend)
-    if (!window.__TAURI_INTERNALS__?.invoke) {
-      try {
-        await navigator.clipboard.writeText(value);
-        showToast(`${label} copied`, 'success');
-      } catch (_) { showToast('Copy failed', 'error'); }
-    } else {
-      showToast('Copy failed', 'error');
-    }
+    // Never fall back to navigator.clipboard — that path bypasses the
+    // backend auto-clear timer and secure overwrite logic.
+    showToast('Copy failed — vault backend unavailable', 'error');
   }
 }
 

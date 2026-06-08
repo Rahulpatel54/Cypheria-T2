@@ -1,7 +1,7 @@
 'use strict';
 
 function escHTML(str) {
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/`/g,'&#96;');
 }
 function escAttrFull(str) {
   return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'&#10;').replace(/\r/g,'&#13;');
@@ -10,7 +10,7 @@ function escAttrFull(str) {
 import { updateGenStrength } from './generator.js';
 
 // ── Embedded wordlist (~500 common, memorable English words) ──
-const WORDS = ('able about above across act add age ago agree ahead aim air all allow almost alone along already also always amaze ankle apple arch arm army art ask atlas aunt away baby back bake ball band barn base bath bear beat bell bench best bird bite black blade blank blaze blend blink blue blur bold bomb bone book born brave break brew brick bridge bright bring broad brown build burn burst calm camp card care carry cast catch cave chain chalk charm chart chase check cheer chef chew chief child chill chip chop claim clam clap clash clay clean clear clerk click cliff climb clock close cloud coach coal coat code cold color cook cool copy core cost couch count court cover craft crash cream crop cross crow crowd crush cup curl curl damp dare dark dawn deal dear deck deep deer deny depth desk dig dip dirt disk dive dock dome door dot down drag draw dream dress drift drink drive drop drum dusk dust duty each earn ease east edge else emit empty end enjoy equal even ever evil exact exam face fact fade fail fair fall fame farm fast fate fear feed feel fell felt fence fiber field fight file fill find fine fire fish fist flag flair flap flat flaw flew flip flock floor flow foam fold folk fond font food foot force ford fork form fort found four free fresh front frost full fund fury gale game gape garden gaze gear gift give glad glow glue goal gold good grab grade grain grand grant graph grasp grave gray great green grew grid grin grip grow guard guide gulf gust hand hang hard harp have hawk heal heap hear heat held help here hero high hill hint hold hole home hook hope horn host hour huge hull hunt idea inch iron jack jolt jump just keep kind king knot lake lamp land lane last latch laud lead leaf lean leap left lend lens less life lift like lime line link lion live load lock loft lone long look loop lost loud love luck lung made main make many mark mask mast maze meal mean meet melt mesh mile milk mill mine mint miss mist mode moon more most move much must nail name near neck need news next nice nigh night nine noble noise none noon north nose note noun oak ocean offer often oil old once only open order other ought ounce out over owl own pack page paid pail pain paint pair pale pan pane panel pant paper part pass past path pause paw pay peace peach peak pear peck peel peep peg pen pencil penny people per pet phase phone piano pick picnic pie piece pig pile pill pin pine pink pipe pit place plain plan plane plant plate play plea please plot plow plug plum plus pocket poem poet point poke pole pond pony pool poor pop porch port post pot pouch pound pour power pray press price pride prim prime print prize proof prop proud prove prune puff pull pulp pump punch pupil puppy pure purge push put quake queen quest quick quiet quill quilt quit race rack raft rage rail rain raise rake ramp range rank rare rash rat rate raw ray reach read real rear red reed reef reel rest rice rich rid ride ridge right ring ripe rise risk river road roar rob robe rock rod rode roll roof room root rope rose rot rough round route row rub rude rug rule run rung rush rust sack sad safe sage sail sale salt same sand sash sat save saw say scale scar scene scent school scoop scoot score scorn scout scow scrap screw sea seal seam search season seat second seed seek seem seen seesaw self sell send sense sent set seven shade shadow shake shall shame shape share shark sharp shave shed sheep sheer sheet shelf shell shift shine ship shirt shock shoe shook shop shore short shot should shout show shut shy sick side sift sigh sight sign silk sill silly silo silver sin since sing sink sir sit six size skate ski skill skin skip skirt sky slack slam slap slate sleep sleet slice slide slight slim slip slit slope slow small smart smash smell smile smoke smooth snail snake snap sneak snow soak soap soar sock soft soil sold solo solve some song soon sore sorry sort soul sound soup south space spade span spare spark speak spear speed spell spend spice spike spill spin spit split spoil spoke spoon sport spot spout spray spread spring spur square squash squat stack staff stage stain stair stake stale stall stamp stand star stare start state stay steak steal steam steel steep steer stem step stew stick stiff still sting stir stock stone stood stool stoop stop store storm story stout stove strap straw stray stream street stress stretch strict strike string strip strive strong stuck study stuff stump stung style such suck sugar suit sum summer sun sung sunny super sure surf swamp swan sway sweep sweet swell swept swift swim swing switch sword swore sworn table tail take tale talk tall tame tank tap tape task taste tax tea teach team tear tease teeth tell ten tend tent term test text thank that thaw them then there these they thick thief thin thing think third this those though thread threat three threw throat throne thumb thus tide tie tier tiger tight tile tilt time tin tint tiny tip tip tip tire tired tit title toad toast today toe told toll ton tone tongue took tool tooth top torch tore torn toss total touch tough tour tower town toy trace track trade trail train tramp trap tray treasure treat tree trend trial tribe trick tried trim trip troop truck true trunk trust truth try tub tube tuck tug tube tuck tune turn tusk tutor twelve twin twist two type ugly uncle under unit until up upon upper urge use used user usual utter vain vale value valve vase vast vault veer veil vein vent verb verse very vest vet vex vice view vine visit voice void volt vote vow wade waft wag wage wagon waist wait wake walk wall wand want war warm warn wart wash wasp waste watch water wave wax way we weak wealth wear weave web weed week weep weight well welt went wept west wet whale wharf what wheat wheel when where which while whip whirl whisk white who whole whom whose why wick wide wife wild will win wind wine wing wink wipe wire wise wish wit witch with wolf woman women won wood wool word wore work world worm worn worry worse worst worth would wound wrap wren wrist write wrong wrote yard yarn yawn year yeast yell yellow yelp yes yet yield yoke you young your youth zeal zebra zero zest zone').split(' ');
+const WORDS = ('able about above across act add age ago agree ahead aim air all allow almost alone along already also always amaze ankle apple arch arm army art ask atlas aunt away baby back bake ball band barn base bath bear beat bell bench best bird bite black blade blank blaze blend blink blue blur bold bomb bone book born brave break brew brick bridge bright bring broad brown build burn burst calm camp card care carry cast catch cave chain chalk charm chart chase check cheer chef chew chief child chill chip chop claim clam clap clash clay clean clear clerk click cliff climb clock close cloud coach coal coat code cold color cook cool copy core cost couch count court cover craft crash cream crop cross crow crowd crush cup curl curl damp dare dark dawn deal dear deck deep deer deny depth desk dig dip dirt disk dive dock dome door dot down drag draw dream dress drift drink drive drop drum dusk dust duty each earn ease east edge else emit empty end enjoy equal even ever evil exact exam face fact fade fail fair fall fame farm fast fate fear feed feel fell felt fence fiber field fight file fill find fine fire fish fist flag flair flap flat flaw flew flip flock floor flow foam fold folk fond font food foot force ford fork form fort found four free fresh front frost full fund fury gale game gape garden gaze gear gift give glad glow glue goal gold good grab grade grain grand grant graph grasp grave gray great green grew grid grin grip grow guard guide gulf gust hand hang hard harp have hawk heal heap hear heat held help here hero high hill hint hold hole home hook hope horn host hour huge hull hunt idea inch iron jack jolt jump just keep kind king knot lake lamp land lane last latch laud lead leaf lean leap left lend lens less life lift like lime line link lion live load lock loft lone long look loop lost loud love luck lung made main make many mark mask mast maze meal mean meet melt mesh mile milk mill mine mint miss mist mode moon more most move much must nail name near neck need news next nice nigh night nine noble noise none noon north nose note noun oak ocean offer often oil old once only open order other ought ounce out over owl own pack page paid pail pain paint pair pale pan pane panel pant paper part pass past path pause paw pay peace peach peak pear peck peel peep peg pen pencil penny people per pet phase phone piano pick picnic pie piece pig pile pill pin pine pink pipe pit place plain plan plane plant plate play plea please plot plow plug plum plus pocket poem poet point poke pole pond pony pool poor pop porch port post pot pouch pound pour power pray press price pride prim prime print prize proof prop proud prove prune puff pull pulp pump punch pupil puppy pure purge push put quake queen quest quick quiet quill quilt quit race rack raft rage rail rain raise rake ramp range rank rare rash rat rate raw ray reach read real rear red reed reef reel rest rice rich rid ride ridge right ring ripe rise risk river road roar rob robe rock rod rode roll roof room root rope rose rot rough round route row rub rude rug rule run rung rush rust sack sad safe sage sail sale salt same sand sash sat save saw say scale scar scene scent school scoop scoot score scorn scout scow scrap screw sea seal seam search season seat second seed seek seem seen seesaw self sell send sense sent set seven shade shadow shake shall shame shape share shark sharp shave shed sheep sheer sheet shelf shell shift shine ship shirt shock shoe shook shop shore short shot should shout show shut shy sick side sift sigh sight sign silk sill silly silo silver sin since sing sink sir sit six size skate ski skill skin skip skirt sky slack slam slap slate sleep sleet slice slide slight slim slip slit slope slow small smart smash smell smile smoke smooth snail snake snap sneak snow soak soap soar sock soft soil sold solo solve some song soon sore sorry sort soul sound soup south space spade span spare spark speak spear speed spell spend spice spike spill spin spit split spoil spoke spoon sport spot spout spray spread spring spur square squash squat stack staff stage stain stair stake stale stall stamp stand star stare start state stay steak steal steam steel steep steer stem step stew stick stiff still sting stir stock stone stood stool stoop stop store storm story stout stove strap straw stray stream street stress stretch strict strike string strip strive strong stuck study stuff stump stung style such suck sugar suit sum summer sun sung sunny super sure surf swamp swan sway sweep sweet swell swept swift swim swing switch sword swore sworn table tail take tale talk tall tame tank tap tape task taste tax tea teach team tear tease teeth tell ten tend tent term test text thank that thaw them then there these they thick thief thin thing think third this those though thread threat three threw throat throne thumb thus tide tie tier tiger tight tile tilt time tin tint tiny tip tip tip tire tired tit title toad toast today toe told toll ton tone tongue took tool tooth top torch tore torn toss total touch tough tour tower town toy trace track trade trail train tramp trap tray treasure treat tree trend trial tribe trick tried trim trip troop truck true trunk trust truth try tub tube tuck tug tube tuck tune turn tusk tutor twelve twin twist two type ugly uncle under unit until up upon upper urge use used user usual utter vain vale value valve vase vast vault veer veil vein vent verb verse very vest vet vex vice view vine visit voice void volt vote vow wade waft wag wage wagon waist wait wake walk wall wand want war warm warn wart wash wasp waste watch water wave wax way we weak wealth wear weave web weed week weep weight well welt went wept west wet whale wharf what wheat wheel when where which while whip whirl whisk white who whole whom whose why wick wide wife wild will win wind wine wing wink wipe wire wise wish wit witch with wolf woman women won wood wool word wore work world world worm worn worry worse worst worth would wound wrap wren wrist write wrong wrote yard yarn yawn year yeast yell yellow yelp yes yet yield yoke you young your youth zeal zebra zero zest zone').split(' ');
 
 const CONSONANTS = 'b c d f g h j k l m n p r s t v w'.split(' ');
 const VOWELS = 'a e i o u'.split(' ');
@@ -94,17 +94,7 @@ function _svgCheck() {
   s.appendChild(p); return s;
 }
 
-function _svgSpeak() {
-  const s = document.createElementNS('http://www.w3.org/2000/svg','svg');
-  s.setAttribute('viewBox','0 0 24 24'); s.setAttribute('width','11'); s.setAttribute('height','11');
-  const pg = document.createElementNS('http://www.w3.org/2000/svg','polygon');
-  pg.setAttribute('points','11 5 6 9 2 9 2 15 6 15 11 19 11 5');
-  const p1 = document.createElementNS('http://www.w3.org/2000/svg','path');
-  p1.setAttribute('d','M19.07 4.93a10 10 0 0 1 0 14.14');
-  const p2 = document.createElementNS('http://www.w3.org/2000/svg','path');
-  p2.setAttribute('d','M15.54 8.46a5 5 0 0 1 0 7.07');
-  s.appendChild(pg); s.appendChild(p1); s.appendChild(p2); return s;
-}
+// _svgSpeak removed with speech synthesis feature
 
 function usePassword(pwd) {
   const out = document.getElementById('gen-output');
@@ -130,22 +120,9 @@ function usePassword(pwd) {
   }
 }
 
-const hasSpeech = (function () {
-  try { return 'speechSynthesis' in window && !!window.SpeechSynthesisUtterance; }
-  catch (_) { return false; }
-})();
-
-function speak(text) {
-  if (!hasSpeech) return;
-  // Require explicit per-session consent; _spSpeakEnabled resets on page reload
-  if (!window._spSpeakEnabled) return;
-  try {
-    window.speechSynthesis.cancel();
-    const utt = new window.SpeechSynthesisUtterance(text);
-    utt.rate = 0.85;
-    window.speechSynthesis.speak(utt);
-  } catch (_) { }
-}
+// Speech synthesis removed — audio side-channel risk in a password manager.
+const hasSpeech = false;
+function speak(_text) { /* intentionally disabled */ }
 
 function doCopy(btn, text) {
   navigator.clipboard.writeText(text).then(() => {
@@ -304,13 +281,7 @@ function buildPrRow(idx, data) {
 
   const pronDiv = document.createElement('div');
   pronDiv.className = 'sp-pronun'; pronDiv.style.cssText = 'display:flex;align-items:center;gap:4px;';
-  if (hasSpeech) {
-    const speakBtn = document.createElement('button');
-    speakBtn.className = 'sp-speak-btn'; speakBtn._guide = guide; speakBtn.dataset.action = 'speak';
-    speakBtn.title = '⚠ Reads password aloud — use only in private';
-    speakBtn.appendChild(_svgSpeak());
-    pronDiv.appendChild(speakBtn);
-  }
+  // speak button removed
   const guideSpan = document.createElement('span'); guideSpan.style.fontStyle = 'italic'; guideSpan.textContent = guide;
   pronDiv.appendChild(guideSpan);
 
@@ -328,6 +299,11 @@ function buildPrRow(idx, data) {
 const prData = [null, null, null, null, null];
 
 const _mnPwdMap = new Map();
+
+/** Called externally (ui.js navigate) to zeroize mnemonic password references on page leave */
+export function clearMnemonicMap() {
+  _mnPwdMap.clear();
+}
 
 function renderPrList() {
   const list = document.getElementById('pr-list');
@@ -489,9 +465,16 @@ function renderMnChips(inputIdx) {
   if (!chipRow) return;
   const pool = MN_CHIP_DATA[inputIdx] || MN_COLORS;
   const shown = [...pool].sort(() => Math.random() - 0.5).slice(0, 4);
-  chipRow.innerHTML = shown.map(w =>
-    `<button class="sp-chip" data-input-idx="${inputIdx}" data-word="${escAttrFull(w)}" data-action="chip">${escHTML(w)}</button>`
-  ).join('');
+  chipRow.innerHTML = '';
+  shown.forEach(w => {
+    const btn = document.createElement('button');
+    btn.className = 'sp-chip';
+    btn.dataset.inputIdx = String(inputIdx);
+    btn.dataset.word = w;
+    btn.dataset.action = 'chip';
+    btn.textContent = w;
+    chipRow.appendChild(btn);
+  });
 }
 
 function mnSurpriseMe() {
@@ -521,6 +504,11 @@ function debounceMn() {
 export function wireSmartPanel() {
   document.querySelectorAll('.sp-tab').forEach(tab => {
     tab.addEventListener('click', () => {
+      // Clear mnemonic password map when leaving mnemonic tab
+      const activePaneId = document.querySelector('.sp-tab-content.active')?.id;
+      if (activePaneId === 'sptab-mnemonic') {
+        _mnPwdMap.clear();
+      }
       document.querySelectorAll('.sp-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.sp-tab-content').forEach(c => c.classList.remove('active'));
       tab.classList.add('active');
@@ -605,7 +593,6 @@ export function wireSmartPanel() {
     const regenPr  = e.target.closest('[data-action="regen-pr"]');
     const copyBtn  = e.target.closest('[data-action="copy"]');
     const useBtn   = e.target.closest('[data-action="use"]');
-    const speakBtn = e.target.closest('[data-action="speak"]');
     const chip     = e.target.closest('[data-action="chip"]');
 
     if (regenPp) {
@@ -667,21 +654,7 @@ export function wireSmartPanel() {
         setTimeout(() => { if (lbl.parentNode) lbl.parentNode.removeChild(lbl); }, 2000);
       }
     }
-    if (speakBtn) {
-      // Require explicit opt-in with clear warning each session; disabled by default
-      if (!window._spSpeakEnabled) {
-        const ok = window.confirm(
-          '⚠️ PRIVACY WARNING\n\n' +
-          'This feature will read the password aloud using your device speakers.\n\n' +
-          'Anyone nearby can hear it. Screen recording and voice assistants may capture it.\n\n' +
-          'Only enable this in a completely private space.\n\n' +
-          'Enable speech for this session?'
-        );
-        if (!ok) return;
-        window._spSpeakEnabled = true; // only set on explicit confirmation
-      }
-      speak(speakBtn._guide || '');
-    }
+    // speak handler removed
     
     if (chip) {
       const inputIdx = parseInt(chip.dataset.inputIdx, 10);

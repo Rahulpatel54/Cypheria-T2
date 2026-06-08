@@ -100,7 +100,6 @@ export async function changeMasterPassword() {
 export async function exportVault() {
   if (!state._invoke) { showToast('Export requires Tauri backend', 'warning'); return; }
   try {
-    // Build a filesystem-safe dated filename from the current vault name
     const now      = new Date();
     const dateStr  = now.getFullYear() + '-' +
       String(now.getMonth() + 1).padStart(2, '0') + '-' +
@@ -118,14 +117,78 @@ export async function exportVault() {
         filters: [{ name: 'Cypheria Vault', extensions: ['qvault'] }],
       }
     });
-if (!dest) return;
+    if (!dest) return;
 
-    const pwd = window.prompt('Re-enter your master password to confirm vault export:');
-    if (!pwd) return;
+    // Show in-app modal instead of window.prompt
+    const errEl   = document.getElementById('export-pwd-error');
+    const input   = document.getElementById('export-pwd-input');
+    const eyeBtn  = document.getElementById('export-pwd-eye');
+    if (errEl) errEl.textContent = '';
+    if (input) { input.value = ''; input.type = 'password'; }
 
-    await vaultCall('export_vault', { destinationPath: dest, password: pwd });
-    showToast('Vault exported — ' + defaultFilename, 'success');
+    document.getElementById('modal-export-pwd').classList.add('open');
+
+    // Wire eye toggle once (idempotent via flag)
+    if (eyeBtn && !eyeBtn._wired) {
+      eyeBtn._wired = true;
+      eyeBtn.addEventListener('click', () => {
+        input.type = input.type === 'password' ? 'text' : 'password';
+      });
+    }
+
+    // Wait for user action via Promise
+    await new Promise((resolve, reject) => {
+      const confirmBtn = document.getElementById('btn-export-confirm');
+      const cancelBtn  = document.getElementById('btn-export-cancel');
+      const closeBtn   = document.querySelector('[data-close="modal-export-pwd"]');
+
+      function cleanup() {
+        confirmBtn.removeEventListener('click', onConfirm);
+        cancelBtn.removeEventListener('click', onCancel);
+        if (closeBtn) closeBtn.removeEventListener('click', onCancel);
+        document.getElementById('modal-export-pwd').classList.remove('open');
+        // Zeroize input value
+        if (input) { input.value = ''; input.type = 'password'; }
+      }
+
+      async function onConfirm() {
+        const pwd = input ? input.value : '';
+        if (!pwd) {
+          if (errEl) errEl.textContent = 'Password is required';
+          return;
+        }
+        if (errEl) errEl.textContent = '';
+        const btn = document.getElementById('btn-export-confirm');
+        if (btn) btn.disabled = true;
+        try {
+          await vaultCall('export_vault', { destinationPath: dest, password: pwd });
+          cleanup();
+          resolve();
+          showToast('Vault exported — ' + defaultFilename, 'success');
+        } catch (e) {
+          const msg = String(e).replace(/^Error: /, '').slice(0, 120);
+          if (errEl) errEl.textContent = msg.includes('AuthFailed') || msg.includes('Authentication failed')
+            ? 'Incorrect password'
+            : 'Export failed: ' + msg;
+        } finally {
+          if (btn) btn.disabled = false;
+          // Always clear the input after attempt
+          if (input) input.value = '';
+        }
+      }
+
+      function onCancel() {
+        cleanup();
+        reject(new Error('cancelled'));
+      }
+
+      confirmBtn.addEventListener('click', onConfirm);
+      cancelBtn.addEventListener('click', onCancel);
+      if (closeBtn) closeBtn.addEventListener('click', onCancel);
+    });
+
   } catch (e) {
+    if (String(e) === 'Error: cancelled') return;
     const msg = String(e).replace(/^Error: /, '').slice(0, 120);
     showToast('Export failed: ' + msg, 'error');
   }
