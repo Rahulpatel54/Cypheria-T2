@@ -4,7 +4,7 @@ use crate::{
     session::{autolock::AutoLockTimer, manager::SessionManager},
 };
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroize;
 
 #[tauri::command]
@@ -31,10 +31,12 @@ pub async fn save_settings(
     settings: Settings,
     session: State<'_, Arc<SessionManager>>,
     autolock: State<'_, Arc<AutoLockTimer>>,
+    app: AppHandle,
 ) -> Result<(), CypheriaError> {
     safe_command!({
         autolock.bump_activity();
         let new_timeout = settings.auto_lock_secs;
+        let new_screenshot_protection = settings.screenshot_protection;
 
         session
             .with_session_mut(|key_store, vault_store| {
@@ -56,6 +58,13 @@ pub async fn save_settings(
             .await?;
 
         autolock.set_timeout(new_timeout);
+
+        // Apply content protection to the main window immediately when the setting changes.
+        // This avoids requiring a restart for the change to take effect.
+        if let Some(win) = app.get_webview_window("main") {
+            let _ = win.set_content_protected(new_screenshot_protection);
+        }
+
         Ok(())
     })
 }

@@ -10,6 +10,16 @@ pub struct Settings {
     pub clear_clipboard_secs: u64,
     pub lock_on_blur: bool,
     pub expiry_days: u64,
+    /// When true (default), the window uses OS-level content protection to block
+    /// screenshots and screen recording. When false, protection is disabled.
+    #[serde(default = "Settings::default_screenshot_protection")]
+    pub screenshot_protection: bool,
+}
+
+impl Settings {
+    fn default_screenshot_protection() -> bool {
+        true
+    }
 }
 
 impl Default for Settings {
@@ -23,6 +33,7 @@ impl Default for Settings {
             clear_clipboard_secs: 30,
             lock_on_blur: false,
             expiry_days: 90,
+            screenshot_protection: true,
         }
     }
 }

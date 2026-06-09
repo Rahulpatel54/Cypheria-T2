@@ -33,6 +33,15 @@ export async function loadSettings() {
       // Start or restart countdown with the actual persisted timeout
       import('./ui.js').then(m => m.startAutolockCountdown(s.auto_lock_secs)).catch(() => {});
     }
+    // Screenshot protection toggle — default to true (on) if not stored yet
+    const screenshotProtection = s.screenshot_protection !== undefined ? s.screenshot_protection : true;
+    if (el('set-screenshot-protection')) {
+      el('set-screenshot-protection').checked = screenshotProtection;
+    }
+    // Apply the persisted setting to the native window immediately
+    if (state._invoke) {
+      rawInvoke('apply_screenshot_protection', { enabled: screenshotProtection }).catch(() => {});
+    }
   } catch (_) { }
 }
 
@@ -41,6 +50,7 @@ export async function saveSettings() {
   if (state.settingsDebounce) clearTimeout(state.settingsDebounce);
   state.settingsDebounce = setTimeout(async () => {
     try {
+      const screenshotProtection = document.getElementById('set-screenshot-protection')?.checked ?? true;
       const settings = {
         theme: 'dark',
         launch_at_startup: document.getElementById('set-startup')?.checked ?? false,
@@ -50,6 +60,7 @@ export async function saveSettings() {
         clear_clipboard_secs: parseInt(document.getElementById('set-clipboard')?.value ?? '30'),
         expiry_days: parseInt(document.getElementById('set-expiry')?.value ?? '90'),
         lock_on_blur: document.getElementById('set-lock-on-blur')?.checked ?? false,
+        screenshot_protection: screenshotProtection,
       };
       state.lockOnBlur = settings.lock_on_blur;
       state.clipSecs = settings.clear_clipboard_secs;

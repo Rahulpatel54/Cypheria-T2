@@ -421,7 +421,7 @@ document.getElementById('btn-confirm-action')?.addEventListener('click', async (
   });
 
   // Settings changes
-  ['set-startup', 'set-tray', 'set-autolock', 'set-clipboard', 'set-showpwd', 'set-expiry', 'set-lock-on-blur'].forEach(id => {
+  ['set-startup', 'set-tray', 'set-autolock', 'set-clipboard', 'set-showpwd', 'set-expiry', 'set-lock-on-blur', 'set-screenshot-protection'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', saveSettings);
   });
 

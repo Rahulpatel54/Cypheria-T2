@@ -16,6 +16,20 @@ pub mod models;
 pub mod session;
 pub mod vault;
 
+/// Apply content protection to the main window based on the current persisted setting.
+/// Called from the frontend after settings are loaded on unlock.
+#[tauri::command]
+pub async fn apply_screenshot_protection(
+    enabled: bool,
+    app: tauri::AppHandle,
+) -> Result<(), crate::error::CypheriaError> {
+    if let Some(win) = app.get_webview_window("main") {
+        win.set_content_protected(enabled)
+            .map_err(|e| crate::error::CypheriaError::InternalError(e.to_string()))?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let session = Arc::new(session::manager::SessionManager::new());
@@ -74,6 +88,8 @@ pub fn run() {
             commands::clipboard::copy_text_to_clipboard,
             commands::entries::request_reveal_token,
             commands::entries::consume_reveal_token,
+            // Screenshot protection (user-configurable)
+            apply_screenshot_protection,
         ])
         .setup(move |app| {
             // Start auto-lock background task
