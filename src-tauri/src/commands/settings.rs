@@ -68,3 +68,15 @@ pub async fn save_settings(
         Ok(())
     })
 }
+
+#[tauri::command]
+pub async fn apply_screenshot_protection(
+    enabled: bool,
+    app: tauri::AppHandle,
+) -> Result<(), crate::error::CypheriaError> {
+    if let Some(win) = app.get_webview_window("main") {
+        win.set_content_protected(enabled)
+            .map_err(|e| crate::error::CypheriaError::InternalError(e.to_string()))?;
+    }
+    Ok(())
+}
